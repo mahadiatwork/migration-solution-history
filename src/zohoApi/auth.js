@@ -5,7 +5,7 @@ import {
   IS_SANDBOX,
   API_KEYS,
 } from "../config/serviceConstant";
-import { dataCenterMap } from "../config/zohoConstant";
+import { dataCenterMap } from "../config/config";
 
 const ZOHO = window.ZOHO;
 
