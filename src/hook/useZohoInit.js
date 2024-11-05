@@ -6,13 +6,15 @@ export const useZohoInit = ({ height, width } = {}) => {
   const [initZoho, setInitZoho] = useState(false);
   const [module, setModule] = useState(null);
   const [recordId, setRecordId] = useState(null);
+  const [initialData, setInitialData] = useState(null);
 
   useEffect(() => {
     zohoApi.auth.initZoho(
       (data, error) => {
-        const { module, recordId } = data;
-        setModule(module);
-        setRecordId(recordId);
+        const { Entity, EntityId } = data;
+        setModule(Entity);
+        setRecordId(EntityId);
+        setInitialData(data);
       },
       { height, width },
       (initZoho) => {
@@ -25,5 +27,6 @@ export const useZohoInit = ({ height, width } = {}) => {
     initZoho,
     module,
     recordId,
+    initialData,
   };
 };
