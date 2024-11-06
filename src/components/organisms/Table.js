@@ -9,24 +9,9 @@ import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
 import TableSortLabel from "@mui/material/TableSortLabel";
 import Paper from "@mui/material/Paper";
+import AttachmentIcon from "@mui/icons-material/Attachment";
 import { visuallyHidden } from "@mui/utils";
-
-const getDate = (dateStr) => {
-  const date = new Date(dateStr);
-  const formattedDate = date
-    .toLocaleString("en-GB", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    })
-    .replace(",", "");
-
-  const [datePart, timePart, ampm] = formattedDate.split(" ");
-  return [datePart, timePart + " " + ampm];
-};
+import { getDate } from "../../util/util";
 
 const keyValMap = {
   History_Date_Time: "Date",
@@ -61,7 +46,7 @@ function EnhancedTableHead({ order, orderBy, onRequestSort, headCells }) {
   };
 
   return (
-    <TableHead>
+    <TableHead sx={{ bgcolor: "rgba(236, 240, 241, 1)" }}>
       <TableRow>
         {headCells.map((headCell, index) => {
           if (headCell?.dontShowSort) {
@@ -70,7 +55,6 @@ function EnhancedTableHead({ order, orderBy, onRequestSort, headCells }) {
                 key={headCell.id}
                 align={headCell.numeric ? "right" : "left"}
                 sortDirection={orderBy === headCell.id ? order : false}
-                bgcolor={index % 2 === 0 ? "gray" : null}
                 size="small"
               >
                 {headCell.label}
@@ -82,7 +66,6 @@ function EnhancedTableHead({ order, orderBy, onRequestSort, headCells }) {
               key={headCell.id}
               align={headCell.numeric ? "right" : "left"}
               sortDirection={orderBy === headCell.id ? order : false}
-              bgcolor={index % 2 === 0 ? "gray" : null}
               size="small"
             >
               <TableSortLabel
@@ -107,13 +90,17 @@ function EnhancedTableHead({ order, orderBy, onRequestSort, headCells }) {
   );
 }
 
-export function Table({ rows, relatedListData }) {
+export function Table({
+  rows,
+  setSelectedRecordId,
+  handleClickOpenEditDialog,
+}) {
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("calories");
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(10);
 
-  const trows = relatedListData?.map((obj) => ({
+  const trows = rows?.map((obj) => ({
     id: obj?.id,
     date: getDate(obj?.History_Date_Time)?.[0],
     time: getDate(obj?.History_Date_Time)?.[1],
@@ -124,6 +111,7 @@ export function Table({ rows, relatedListData }) {
     regarding: obj?.Regarding,
     details: obj?.History_Details,
   }));
+  // console.log({ trows });
 
   const headCells = [
     {
@@ -166,7 +154,7 @@ export function Table({ rows, relatedListData }) {
       id: "icon",
       numeric: false,
       disablePadding: false,
-      label: "I",
+      label: <AttachmentIcon />,
       dontShowSort: true,
     },
     {
@@ -183,7 +171,9 @@ export function Table({ rows, relatedListData }) {
     setOrderBy(property);
   };
 
-  const handleClick = (event, id) => {};
+  const handleClick = (event, id) => {
+    setSelectedRecordId(id);
+  };
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -196,25 +186,25 @@ export function Table({ rows, relatedListData }) {
 
   // Avoid a layout jump when reaching the last page with empty rows.
   const emptyRows =
-    page > 0 ? Math.max(0, (1 + page) * rowsPerPage - trows.length) : 0;
+    page > 0 ? Math.max(0, (1 + page) * rowsPerPage - trows?.length) : 0;
 
   const visibleRows = React.useMemo(
     () =>
-      [...trows]
+      [...(trows || [])]
         .sort(getComparator(order, orderBy))
         .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
-    [order, rows, orderBy, page, rowsPerPage]
+    [order, trows, orderBy, page, rowsPerPage]
   );
 
   return (
-    <Paper sx={{ width: "100%" }}>
+    <Paper>
       <TableContainer>
         <MUITable aria-labelledby="tableTitle" size="small">
           <EnhancedTableHead
             order={order}
             orderBy={orderBy}
             onRequestSort={handleRequestSort}
-            rowCount={rows.length}
+            rowCount={trows?.length}
             headCells={headCells}
           />
           <TableBody>
@@ -225,6 +215,10 @@ export function Table({ rows, relatedListData }) {
                 <TableRow
                   hover
                   onClick={(event) => handleClick(event, row.id)}
+                  onDoubleClick={(event) => {
+                    handleClick(event, row.id);
+                    handleClickOpenEditDialog();
+                  }}
                   tabIndex={-1}
                   key={row.id}
                   sx={{ cursor: "pointer" }}
@@ -234,21 +228,21 @@ export function Table({ rows, relatedListData }) {
                     id={labelId}
                     scope="row"
                     size="small"
-                    sx={{ width: "8%" }}
+                    sx={{ width: "6%" }}
                   >
                     {row.date}
                   </TableCell>
 
-                  <TableCell size="small" sx={{ width: "8%" }}>
+                  <TableCell size="small" sx={{ width: "9%" }}>
                     {row.time}
                   </TableCell>
-                  <TableCell size="small" sx={{ width: "8%" }}>
+                  <TableCell size="small" sx={{ width: "9%" }}>
                     {row.type}
                   </TableCell>
-                  <TableCell size="small" sx={{ width: "8%" }}>
+                  <TableCell size="small" sx={{ width: "15%" }}>
                     {row.result}
                   </TableCell>
-                  <TableCell size="small" sx={{ width: "8%" }}>
+                  <TableCell size="small" sx={{ width: "5%" }}>
                     {row.duration}
                   </TableCell>
                   <TableCell size="small">
@@ -293,7 +287,7 @@ export function Table({ rows, relatedListData }) {
       <TablePagination
         rowsPerPageOptions={[5, 10, 25]}
         component="div"
-        count={rows.length}
+        count={trows?.length}
         rowsPerPage={rowsPerPage}
         page={page}
         onPageChange={handleChangePage}

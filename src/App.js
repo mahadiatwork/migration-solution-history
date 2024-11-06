@@ -1,44 +1,26 @@
 import * as React from "react";
 import Box from "@mui/material/Box";
+import Grid from "@mui/material/Grid2";
+import Paper from "@mui/material/Paper";
+import Button from "@mui/material/Button";
+import TextField from "@mui/material/TextField";
+import Autocomplete from "@mui/material/Autocomplete";
 import CircularProgress from "@mui/material/CircularProgress";
 
 import { useZohoInit } from "./hook/useZohoInit";
 import { zohoApi } from "./zohoApi";
 import { Table } from "./components/organisms/Table";
+import { Dialog } from "./components/organisms/Dialog";
 
 const parentContainerStyle = {
   borderTop: "1px solid #BABABA",
   minHeight: "calc(100vh - 1px)",
   p: "1em",
-  display: "grid",
-  placeItems: "center",
 };
 
-function createData(id, name, calories, fat, carbs, protein) {
-  return {
-    id,
-    name,
-    calories,
-    fat,
-    carbs,
-    protein,
-  };
-}
-
-const rows = [
-  createData(1, "Cupcake", 305, 3.7, 67, 4.3),
-  createData(2, "Donut", 452, 25.0, 51, 4.9),
-  createData(3, "Eclair", 262, 16.0, 24, 6.0),
-  createData(4, "Frozen yoghurt", 159, 6.0, 24, 4.0),
-  createData(5, "Gingerbread", 356, 16.0, 49, 3.9),
-  createData(6, "Honeycomb", 408, 3.2, 87, 6.5),
-  createData(7, "Ice cream sandwich", 237, 9.0, 37, 4.3),
-  createData(8, "Jelly Bean", 375, 0.0, 94, 0.0),
-  createData(9, "KitKat", 518, 26.0, 65, 7.0),
-  createData(10, "Lollipop", 392, 0.2, 98, 0.0),
-  createData(11, "Marshmallow", 318, 0, 81, 2.0),
-  createData(12, "Nougat", 360, 19.0, 9, 37.0),
-  createData(13, "Oreo", 437, 18.0, 63, 4.0),
+const op = [
+  { label: "The Shawshank Redemption", year: 1994 },
+  { label: "The Godfather", year: 1972 },
 ];
 
 function App() {
@@ -47,6 +29,25 @@ function App() {
     <CircularProgress />
   );
   const [relatedListData, setRelatedListData] = React.useState();
+  const [selectedRecordId, setSelectedRecordId] = React.useState();
+  const [openEditDialog, setOpenEditDialog] = React.useState(false);
+  const [openCreateDialog, setOpenCreateDialog] = React.useState(false);
+
+  const handleClickOpenCreateDialog = () => {
+    setOpenCreateDialog(true);
+  };
+
+  const handleCloseCreateDialog = () => {
+    setOpenCreateDialog(false);
+  };
+
+  const handleClickOpenEditDialog = () => {
+    setOpenEditDialog(true);
+  };
+
+  const handleCloseEditDialog = () => {
+    setOpenEditDialog(false);
+  };
 
   React.useEffect(() => {
     const fetchRLData = async () => {
@@ -68,13 +69,119 @@ function App() {
     }
   }, [module, recordId]);
 
+  let selectedObj = relatedListData?.filter(
+    (obj) => obj?.id === selectedRecordId
+  )?.[0];
+  const regarding = selectedObj?.Regarding;
+  const details = selectedObj?.History_Details;
+
   return (
-    <Box sx={parentContainerStyle}>
-      {initPageContent}
-      {relatedListData?.length > 0 ? (
-        <Table rows={rows} relatedListData={relatedListData} />
-      ) : null}
-    </Box>
+    <React.Fragment>
+      <Box sx={parentContainerStyle}>
+        <span
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          {initPageContent}
+        </span>
+        {relatedListData?.length > 0 ? (
+          <Grid container spacing={2}>
+            <Grid
+              size={8}
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: "1rem",
+              }}
+            >
+              <Autocomplete
+                sx={{ flexGrow: 1 }}
+                size="small"
+                options={op}
+                renderInput={(params) => (
+                  <TextField {...params} label="Dates" />
+                )}
+              />
+              <Autocomplete
+                sx={{ flexGrow: 1 }}
+                size="small"
+                options={op}
+                renderInput={(params) => (
+                  <TextField {...params} label="Types" />
+                )}
+              />
+              <Autocomplete
+                sx={{ flexGrow: 1 }}
+                size="small"
+                options={op}
+                renderInput={(params) => (
+                  <TextField {...params} label="Keyword" />
+                )}
+              />
+              <Autocomplete
+                sx={{ flexGrow: 1 }}
+                size="small"
+                options={op}
+                renderInput={(params) => (
+                  <TextField {...params} label="Users" />
+                )}
+              />
+            </Grid>
+            <Grid size={4} sx={{ display: "flex", justifyContent: "flex-end" }}>
+              <Button
+                variant="contained"
+                sx={{ minWidth: "14rem" }}
+                onClick={handleClickOpenCreateDialog}
+              >
+                Create
+              </Button>
+            </Grid>
+            <Grid size={8}>
+              <Table
+                rows={relatedListData}
+                setSelectedRecordId={setSelectedRecordId}
+                handleClickOpenEditDialog={handleClickOpenEditDialog}
+              />
+            </Grid>
+            <Grid size={4}>
+              <Paper
+                sx={{
+                  height: "100%",
+                  position: "relative",
+                }}
+              >
+                <Box
+                  sx={{
+                    position: "absolute",
+                    inset: "1rem",
+                    overflowY: "auto",
+                  }}
+                >
+                  {regarding}
+                  {details}
+                  {!regarding && !details ? "No data" : null}
+                </Box>
+              </Paper>
+            </Grid>
+          </Grid>
+        ) : null}
+      </Box>
+      <Dialog
+        openDialog={openEditDialog}
+        handleCloseDialog={handleCloseEditDialog}
+        obj={selectedObj}
+        title="Edit History"
+      />
+      <Dialog
+        openDialog={openCreateDialog}
+        handleCloseDialog={handleCloseCreateDialog}
+        title="Create"
+      />
+    </React.Fragment>
   );
 }
 
