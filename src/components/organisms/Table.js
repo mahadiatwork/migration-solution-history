@@ -63,28 +63,45 @@ function EnhancedTableHead({ order, orderBy, onRequestSort, headCells }) {
   return (
     <TableHead>
       <TableRow>
-        <TableCell padding="checkbox"></TableCell>
-        {headCells.map((headCell) => (
-          <TableCell
-            key={headCell.id}
-            align={headCell.numeric ? "right" : "left"}
-            padding={headCell.disablePadding ? "none" : "normal"}
-            sortDirection={orderBy === headCell.id ? order : false}
-          >
-            <TableSortLabel
-              active={orderBy === headCell.id}
-              direction={orderBy === headCell.id ? order : "asc"}
-              onClick={createSortHandler(headCell.id)}
+        {headCells.map((headCell, index) => {
+          if (headCell?.dontShowSort) {
+            return (
+              <TableCell
+                key={headCell.id}
+                align={headCell.numeric ? "right" : "left"}
+                sortDirection={orderBy === headCell.id ? order : false}
+                bgcolor={index % 2 === 0 ? "gray" : null}
+                size="small"
+              >
+                {headCell.label}
+              </TableCell>
+            );
+          }
+          return (
+            <TableCell
+              key={headCell.id}
+              align={headCell.numeric ? "right" : "left"}
+              sortDirection={orderBy === headCell.id ? order : false}
+              bgcolor={index % 2 === 0 ? "gray" : null}
+              size="small"
             >
-              {headCell.label}
-              {orderBy === headCell.id ? (
-                <Box component="span" sx={visuallyHidden}>
-                  {order === "desc" ? "sorted descending" : "sorted ascending"}
-                </Box>
-              ) : null}
-            </TableSortLabel>
-          </TableCell>
-        ))}
+              <TableSortLabel
+                active={orderBy === headCell.id}
+                direction={orderBy === headCell.id ? order : "asc"}
+                onClick={createSortHandler(headCell.id)}
+              >
+                {headCell.label}
+                {orderBy === headCell.id ? (
+                  <Box component="span" sx={visuallyHidden}>
+                    {order === "desc"
+                      ? "sorted descending"
+                      : "sorted ascending"}
+                  </Box>
+                ) : null}
+              </TableSortLabel>
+            </TableCell>
+          );
+        })}
       </TableRow>
     </TableHead>
   );
@@ -93,9 +110,9 @@ function EnhancedTableHead({ order, orderBy, onRequestSort, headCells }) {
 export function Table({ rows, relatedListData }) {
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("calories");
-  const [selected, setSelected] = React.useState([]);
   const [page, setPage] = React.useState(0);
   const [rowsPerPage, setRowsPerPage] = React.useState(10);
+
   const trows = relatedListData?.map((obj) => ({
     id: obj?.id,
     date: getDate(obj?.History_Date_Time)?.[0],
@@ -107,38 +124,56 @@ export function Table({ rows, relatedListData }) {
     regarding: obj?.Regarding,
     details: obj?.History_Details,
   }));
-  console.log(trows);
 
   const headCells = [
     {
-      id: "name",
+      id: "date",
       numeric: false,
       disablePadding: true,
-      label: "Dessert (100g serving)",
+      label: "Date",
     },
     {
-      id: "calories",
-      numeric: true,
+      id: "time",
+      numeric: false,
       disablePadding: false,
-      label: "Calories",
+      label: "Time",
     },
     {
-      id: "fat",
-      numeric: true,
+      id: "type",
+      numeric: false,
       disablePadding: false,
-      label: "Fat (g)",
+      label: "Type",
     },
     {
-      id: "carbs",
-      numeric: true,
+      id: "result",
+      numeric: false,
       disablePadding: false,
-      label: "Carbs (g)",
+      label: "Result",
     },
     {
-      id: "protein",
-      numeric: true,
+      id: "duration",
+      numeric: false,
       disablePadding: false,
-      label: "Protein (g)",
+      label: "Duration",
+    },
+    {
+      id: "regarding_details",
+      numeric: false,
+      disablePadding: false,
+      label: "Regarding & Details",
+    },
+    {
+      id: "icon",
+      numeric: false,
+      disablePadding: false,
+      label: "I",
+      dontShowSort: true,
+    },
+    {
+      id: "owner",
+      numeric: false,
+      disablePadding: false,
+      label: "Record Manager",
     },
   ];
 
@@ -148,33 +183,7 @@ export function Table({ rows, relatedListData }) {
     setOrderBy(property);
   };
 
-  const handleSelectAllClick = (event) => {
-    if (event.target.checked) {
-      const newSelected = rows.map((n) => n.id);
-      setSelected(newSelected);
-      return;
-    }
-    setSelected([]);
-  };
-
-  const handleClick = (event, id) => {
-    const selectedIndex = selected.indexOf(id);
-    let newSelected = [];
-
-    if (selectedIndex === -1) {
-      newSelected = newSelected.concat(selected, id);
-    } else if (selectedIndex === 0) {
-      newSelected = newSelected.concat(selected.slice(1));
-    } else if (selectedIndex === selected.length - 1) {
-      newSelected = newSelected.concat(selected.slice(0, -1));
-    } else if (selectedIndex > 0) {
-      newSelected = newSelected.concat(
-        selected.slice(0, selectedIndex),
-        selected.slice(selectedIndex + 1)
-      );
-    }
-    setSelected(newSelected);
-  };
+  const handleClick = (event, id) => {};
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -187,11 +196,11 @@ export function Table({ rows, relatedListData }) {
 
   // Avoid a layout jump when reaching the last page with empty rows.
   const emptyRows =
-    page > 0 ? Math.max(0, (1 + page) * rowsPerPage - rows.length) : 0;
+    page > 0 ? Math.max(0, (1 + page) * rowsPerPage - trows.length) : 0;
 
   const visibleRows = React.useMemo(
     () =>
-      [...rows]
+      [...trows]
         .sort(getComparator(order, orderBy))
         .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
     [order, rows, orderBy, page, rowsPerPage]
@@ -202,43 +211,69 @@ export function Table({ rows, relatedListData }) {
       <TableContainer>
         <MUITable aria-labelledby="tableTitle" size="small">
           <EnhancedTableHead
-            numSelected={selected.length}
             order={order}
             orderBy={orderBy}
-            onSelectAllClick={handleSelectAllClick}
             onRequestSort={handleRequestSort}
             rowCount={rows.length}
             headCells={headCells}
           />
           <TableBody>
             {visibleRows.map((row, index) => {
-              const isItemSelected = selected.includes(row.id);
               const labelId = `enhanced-table-checkbox-${index}`;
 
               return (
                 <TableRow
                   hover
                   onClick={(event) => handleClick(event, row.id)}
-                  role="checkbox"
-                  aria-checked={isItemSelected}
                   tabIndex={-1}
                   key={row.id}
-                  selected={isItemSelected}
                   sx={{ cursor: "pointer" }}
                 >
-                  <TableCell padding="checkbox"></TableCell>
                   <TableCell
                     component="th"
                     id={labelId}
                     scope="row"
-                    padding="none"
+                    size="small"
+                    sx={{ width: "8%" }}
                   >
-                    {row.name}
+                    {row.date}
                   </TableCell>
-                  <TableCell align="right">{row.calories}</TableCell>
-                  <TableCell align="right">{row.fat}</TableCell>
-                  <TableCell align="right">{row.carbs}</TableCell>
-                  <TableCell align="right">{row.protein}</TableCell>
+
+                  <TableCell size="small" sx={{ width: "8%" }}>
+                    {row.time}
+                  </TableCell>
+                  <TableCell size="small" sx={{ width: "8%" }}>
+                    {row.type}
+                  </TableCell>
+                  <TableCell size="small" sx={{ width: "8%" }}>
+                    {row.result}
+                  </TableCell>
+                  <TableCell size="small" sx={{ width: "8%" }}>
+                    {row.duration}
+                  </TableCell>
+                  <TableCell size="small">
+                    <span style={{ display: "block", marginBottom: "4px" }}>
+                      {row.regarding}
+                    </span>
+                    <span
+                      style={{
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2, // number of lines to show
+                        lineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                      }}
+                    >
+                      {row.details}
+                    </span>
+                  </TableCell>
+                  <TableCell size="small" sx={{ width: "3%" }}>
+                    {row.icon}
+                  </TableCell>
+                  <TableCell size="small" sx={{ width: "14%" }}>
+                    {row.record_Manager?.name}
+                  </TableCell>
                 </TableRow>
               );
             })}
