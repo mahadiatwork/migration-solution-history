@@ -265,7 +265,7 @@ export function Table({
                   <TableCell size="small" sx={{ width: "3%" }}>
                     {row.icon}
                   </TableCell>
-                  <TableCell size="small" sx={{ width: "14%" }}>
+                  <TableCell size="small" sx={{ width: "16%" }}>
                     {row.record_Manager?.name}
                   </TableCell>
                 </TableRow>
