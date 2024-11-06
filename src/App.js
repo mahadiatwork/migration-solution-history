@@ -91,7 +91,7 @@ function App() {
         {relatedListData?.length > 0 ? (
           <Grid container spacing={2}>
             <Grid
-              size={8}
+              size={9}
               sx={{
                 display: "flex",
                 justifyContent: "space-between",
@@ -131,7 +131,7 @@ function App() {
                 )}
               />
             </Grid>
-            <Grid size={4} sx={{ display: "flex", justifyContent: "flex-end" }}>
+            <Grid size={3} sx={{ display: "flex", justifyContent: "flex-end" }}>
               <Button
                 variant="contained"
                 sx={{ minWidth: "14rem" }}
@@ -140,14 +140,14 @@ function App() {
                 Create
               </Button>
             </Grid>
-            <Grid size={8}>
+            <Grid size={9}>
               <Table
                 rows={relatedListData}
                 setSelectedRecordId={setSelectedRecordId}
                 handleClickOpenEditDialog={handleClickOpenEditDialog}
               />
             </Grid>
-            <Grid size={4}>
+            <Grid size={3}>
               <Paper
                 sx={{
                   height: "100%",
@@ -161,7 +161,20 @@ function App() {
                     overflowY: "auto",
                   }}
                 >
-                  {regarding}
+                  {!!regarding ? (
+                    <span
+                      style={{
+                        display: "block",
+                        marginBottom: "4px",
+                        padding: "4px",
+                        backgroundColor: "rgba(236, 240, 241, 1)",
+                        borderRadius: "4px",
+                      }}
+                    >
+                      {regarding}
+                    </span>
+                  ) : null}
+
                   {details}
                   {!regarding && !details ? "No data" : null}
                 </Box>

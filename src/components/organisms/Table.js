@@ -9,7 +9,9 @@ import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
 import TableSortLabel from "@mui/material/TableSortLabel";
 import Paper from "@mui/material/Paper";
+import IconButton from "@mui/material/IconButton";
 import AttachmentIcon from "@mui/icons-material/Attachment";
+import DownloadIcon from "@mui/icons-material/Download";
 import { visuallyHidden } from "@mui/utils";
 import { getDate } from "../../util/util";
 
@@ -40,78 +42,10 @@ function getComparator(order, orderBy) {
     : (a, b) => -descendingComparator(a, b, orderBy);
 }
 
-function EnhancedTableHead({ order, orderBy, onRequestSort, headCells }) {
+function EnhancedTableHead({ order, orderBy, onRequestSort }) {
   const createSortHandler = (property) => (event) => {
     onRequestSort(event, property);
   };
-
-  return (
-    <TableHead sx={{ bgcolor: "rgba(236, 240, 241, 1)" }}>
-      <TableRow>
-        {headCells.map((headCell, index) => {
-          if (headCell?.dontShowSort) {
-            return (
-              <TableCell
-                key={headCell.id}
-                align={headCell.numeric ? "right" : "left"}
-                sortDirection={orderBy === headCell.id ? order : false}
-                size="small"
-              >
-                {headCell.label}
-              </TableCell>
-            );
-          }
-          return (
-            <TableCell
-              key={headCell.id}
-              align={headCell.numeric ? "right" : "left"}
-              sortDirection={orderBy === headCell.id ? order : false}
-              size="small"
-            >
-              <TableSortLabel
-                active={orderBy === headCell.id}
-                direction={orderBy === headCell.id ? order : "asc"}
-                onClick={createSortHandler(headCell.id)}
-              >
-                {headCell.label}
-                {orderBy === headCell.id ? (
-                  <Box component="span" sx={visuallyHidden}>
-                    {order === "desc"
-                      ? "sorted descending"
-                      : "sorted ascending"}
-                  </Box>
-                ) : null}
-              </TableSortLabel>
-            </TableCell>
-          );
-        })}
-      </TableRow>
-    </TableHead>
-  );
-}
-
-export function Table({
-  rows,
-  setSelectedRecordId,
-  handleClickOpenEditDialog,
-}) {
-  const [order, setOrder] = React.useState("asc");
-  const [orderBy, setOrderBy] = React.useState("calories");
-  const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(10);
-
-  const trows = rows?.map((obj) => ({
-    id: obj?.id,
-    date: getDate(obj?.History_Date_Time)?.[0],
-    time: getDate(obj?.History_Date_Time)?.[1],
-    type: obj?.History_Type,
-    result: obj?.History_Result,
-    duration: obj?.duration_min,
-    record_Manager: obj?.Owner,
-    regarding: obj?.Regarding,
-    details: obj?.History_Details,
-  }));
-  // console.log({ trows });
 
   const headCells = [
     {
@@ -165,6 +99,72 @@ export function Table({
     },
   ];
 
+  return (
+    <TableHead sx={{ bgcolor: "rgba(236, 240, 241, 1)" }}>
+      <TableRow>
+        {headCells.map((headCell, index) => {
+          if (headCell?.dontShowSort) {
+            return (
+              <TableCell
+                key={headCell.id}
+                align={headCell.numeric ? "right" : "left"}
+                sortDirection={orderBy === headCell.id ? order : false}
+                size="small"
+              >
+                {headCell.label}
+              </TableCell>
+            );
+          }
+          return (
+            <TableCell
+              key={headCell.id}
+              align={headCell.numeric ? "right" : "left"}
+              sortDirection={orderBy === headCell.id ? order : false}
+              size="small"
+            >
+              <TableSortLabel
+                active={orderBy === headCell.id}
+                direction={orderBy === headCell.id ? order : "asc"}
+                onClick={createSortHandler(headCell.id)}
+              >
+                {headCell.label}
+                {orderBy === headCell.id ? (
+                  <Box component="span" sx={visuallyHidden}>
+                    {order === "desc"
+                      ? "sorted descending"
+                      : "sorted ascending"}
+                  </Box>
+                ) : null}
+              </TableSortLabel>
+            </TableCell>
+          );
+        })}
+      </TableRow>
+    </TableHead>
+  );
+}
+
+export function Table({
+  rows,
+  setSelectedRecordId,
+  handleClickOpenEditDialog,
+}) {
+  const [order, setOrder] = React.useState("asc");
+  const [orderBy, setOrderBy] = React.useState("calories");
+
+  const tempRows = rows?.map((obj) => ({
+    id: obj?.id,
+    date: getDate(obj?.History_Date_Time)?.[0],
+    time: getDate(obj?.History_Date_Time)?.[1],
+    type: obj?.History_Type,
+    result: obj?.History_Result,
+    duration: obj?.duration_min,
+    record_Manager: obj?.Owner,
+    regarding: obj?.Regarding,
+    details: obj?.History_Details,
+    icon: <DownloadIcon />,
+  }));
+
   const handleRequestSort = (event, property) => {
     const isAsc = orderBy === property && order === "asc";
     setOrder(isAsc ? "desc" : "asc");
@@ -175,37 +175,21 @@ export function Table({
     setSelectedRecordId(id);
   };
 
-  const handleChangePage = (event, newPage) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  // Avoid a layout jump when reaching the last page with empty rows.
-  const emptyRows =
-    page > 0 ? Math.max(0, (1 + page) * rowsPerPage - trows?.length) : 0;
-
   const visibleRows = React.useMemo(
-    () =>
-      [...(trows || [])]
-        .sort(getComparator(order, orderBy))
-        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage),
-    [order, trows, orderBy, page, rowsPerPage]
+    () => [...(tempRows || [])].sort(getComparator(order, orderBy)),
+    [order, tempRows, orderBy]
   );
 
   return (
-    <Paper>
+    <Paper sx={{ height: "25.5rem", overflowY: "auto" }}>
       <TableContainer>
         <MUITable aria-labelledby="tableTitle" size="small">
           <EnhancedTableHead
             order={order}
             orderBy={orderBy}
             onRequestSort={handleRequestSort}
-            rowCount={trows?.length}
-            headCells={headCells}
+            rowCount={tempRows?.length}
+            // headCells={headCells}
           />
           <TableBody>
             {visibleRows.map((row, index) => {
@@ -246,9 +230,19 @@ export function Table({
                     {row.duration}
                   </TableCell>
                   <TableCell size="small">
-                    <span style={{ display: "block", marginBottom: "4px" }}>
-                      {row.regarding}
-                    </span>
+                    {!!row.regarding ? (
+                      <span
+                        style={{
+                          display: "block",
+                          marginBottom: "4px",
+                          padding: "4px",
+                          backgroundColor: "rgba(236, 240, 241, 1)",
+                          borderRadius: "4px",
+                        }}
+                      >
+                        {row.regarding}
+                      </span>
+                    ) : null}
                     <span
                       style={{
                         overflow: "hidden",
@@ -263,7 +257,14 @@ export function Table({
                     </span>
                   </TableCell>
                   <TableCell size="small" sx={{ width: "3%" }}>
-                    {row.icon}
+                    <IconButton
+                      disableRipple
+                      onClick={() => {
+                        console.log("icon clicked");
+                      }}
+                    >
+                      {row.icon}
+                    </IconButton>
                   </TableCell>
                   <TableCell size="small" sx={{ width: "16%" }}>
                     {row.record_Manager?.name}
@@ -271,28 +272,9 @@ export function Table({
                 </TableRow>
               );
             })}
-
-            {emptyRows > 0 && (
-              <TableRow
-                style={{
-                  height: 33 * emptyRows,
-                }}
-              >
-                <TableCell colSpan={6} />
-              </TableRow>
-            )}
           </TableBody>
         </MUITable>
       </TableContainer>
-      <TablePagination
-        rowsPerPageOptions={[5, 10, 25]}
-        component="div"
-        count={trows?.length}
-        rowsPerPage={rowsPerPage}
-        page={page}
-        onPageChange={handleChangePage}
-        onRowsPerPageChange={handleChangeRowsPerPage}
-      />
     </Paper>
   );
 }
