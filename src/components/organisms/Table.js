@@ -149,6 +149,7 @@ export function Table({
   setSelectedRecordId,
   handleClickOpenEditDialog,
 }) {
+  // console.log({ tempRows });
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("calories");
 

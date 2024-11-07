@@ -4,23 +4,9 @@ import TextField from "@mui/material/TextField";
 import { Dialog as MUIDialog } from "@mui/material";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
-import DialogContentText from "@mui/material/DialogContentText";
 import DialogTitle from "@mui/material/DialogTitle";
-import { getDate } from "../../util/util";
 
 export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
-  const tempObj = {
-    id: obj?.id,
-    date: getDate(obj?.History_Date_Time)?.[0],
-    time: getDate(obj?.History_Date_Time)?.[1],
-    type: obj?.History_Type,
-    result: obj?.History_Result,
-    duration: obj?.duration_min,
-    record_Manager: obj?.Owner,
-    regarding: obj?.Regarding,
-    details: obj?.History_Details,
-  };
-
   return (
     <MUIDialog
       open={openDialog}
@@ -64,7 +50,7 @@ export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
           label="Date"
           fullWidth
           variant="standard"
-          value={!!obj ? tempObj?.date : null}
+          value={obj?.date}
         />
         <TextField
           margin="dense"
@@ -73,7 +59,7 @@ export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
           label="time"
           fullWidth
           variant="standard"
-          value={!!obj ? tempObj?.time : null}
+          value={obj?.time}
         />
         <TextField
           margin="dense"
@@ -82,7 +68,7 @@ export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
           label="Type"
           fullWidth
           variant="standard"
-          value={!!obj ? tempObj?.type : null}
+          value={obj?.type}
         />
         <TextField
           margin="dense"
@@ -91,7 +77,7 @@ export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
           label="Result"
           fullWidth
           variant="standard"
-          value={!!obj ? tempObj?.result : null}
+          value={obj?.result}
         />
         <TextField
           margin="dense"
@@ -100,7 +86,7 @@ export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
           label="Duration"
           fullWidth
           variant="standard"
-          value={!!obj ? tempObj?.duration : null}
+          value={obj?.duration}
         />
         <TextField
           margin="dense"
@@ -109,7 +95,7 @@ export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
           label="Record Manager"
           fullWidth
           variant="standard"
-          value={!!obj ? tempObj?.record_Manager?.name : null}
+          value={obj?.record_Manager?.name}
         />
         <TextField
           margin="dense"
@@ -118,7 +104,7 @@ export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
           label="Regarding"
           fullWidth
           variant="standard"
-          value={!!obj ? tempObj?.regarding : null}
+          value={obj?.regarding}
         />
         <TextField
           margin="dense"
@@ -128,7 +114,7 @@ export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
           multiline
           fullWidth
           variant="standard"
-          value={!!obj ? tempObj?.details : null}
+          value={obj?.details}
         />
       </DialogContent>
       <DialogActions>
