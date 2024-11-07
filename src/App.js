@@ -104,8 +104,8 @@ function App() {
   let selectedObj = relatedListData?.filter(
     (obj) => obj?.id === selectedRecordId
   )?.[0];
-  const regarding = selectedObj?.Regarding;
-  const details = selectedObj?.History_Details;
+  const regarding = selectedObj?.regarding;
+  const details = selectedObj?.details;
 
   return (
     <React.Fragment>
@@ -128,10 +128,11 @@ function App() {
                 display: "flex",
                 justifyContent: "space-between",
                 gap: "1rem",
+                "& > *": { flexGrow: 1 },
               }}
             >
               <Autocomplete
-                sx={{ flexGrow: 1 }}
+                // sx={{ flexGrow: 1 }}
                 size="small"
                 options={op}
                 renderInput={(params) => (
@@ -139,7 +140,7 @@ function App() {
                 )}
               />
               <Autocomplete
-                sx={{ flexGrow: 1 }}
+                // sx={{ flexGrow: 1 }}
                 size="small"
                 options={typeList}
                 renderInput={(params) => (
@@ -150,7 +151,7 @@ function App() {
                 }}
               />
               <TextField
-                sx={{ flexGrow: 1 }}
+                // sx={{ flexGrow: 1 }}
                 size="small"
                 label="Keyword"
                 variant="outlined"
@@ -159,7 +160,7 @@ function App() {
                 }}
               />
               <Autocomplete
-                sx={{ flexGrow: 1 }}
+                // sx={{ flexGrow: 1 }}
                 size="small"
                 options={ownerList}
                 renderInput={(params) => (
