@@ -174,7 +174,7 @@ function App() {
             <Grid size={3} sx={{ display: "flex", justifyContent: "flex-end" }}>
               <Button
                 variant="contained"
-                sx={{ minWidth: "14rem" }}
+                sx={{ flexGrow: 1 }}
                 onClick={handleClickOpenCreateDialog}
               >
                 Create
