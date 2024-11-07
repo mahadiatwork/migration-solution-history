@@ -104,7 +104,7 @@ function App() {
   let selectedObj = relatedListData?.filter(
     (obj) => obj?.id === selectedRecordId
   )?.[0];
-  console.log({ selectedObj });
+  // console.log({ selectedObj });
   const regarding = selectedObj?.regarding;
   const details = selectedObj?.details;
 
