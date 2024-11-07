@@ -128,7 +128,7 @@ function App() {
                 display: "flex",
                 justifyContent: "space-between",
                 gap: "1rem",
-                "& > *": { flexGrow: 1 },
+                "& > *": { flexGrow: 1, flexBasis: "0px" },
               }}
             >
               <Autocomplete
