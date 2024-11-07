@@ -6,11 +6,13 @@ import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 import Autocomplete from "@mui/material/Autocomplete";
 import CircularProgress from "@mui/material/CircularProgress";
+import DownloadIcon from "@mui/icons-material/Download";
 
 import { useZohoInit } from "./hook/useZohoInit";
 import { zohoApi } from "./zohoApi";
 import { Table } from "./components/organisms/Table";
 import { Dialog } from "./components/organisms/Dialog";
+import { getDate } from "./util/util";
 
 const parentContainerStyle = {
   borderTop: "1px solid #BABABA",
@@ -32,6 +34,11 @@ function App() {
   const [selectedRecordId, setSelectedRecordId] = React.useState();
   const [openEditDialog, setOpenEditDialog] = React.useState(false);
   const [openCreateDialog, setOpenCreateDialog] = React.useState(false);
+  const [ownerList, setOwnerList] = React.useState();
+  const [selectedOwner, setSelectedOwner] = React.useState();
+  const [typeList, setTypeList] = React.useState();
+  const [selectedType, setSelectedType] = React.useState();
+  const [keyword, setKeyword] = React.useState("");
 
   const handleClickOpenCreateDialog = () => {
     setOpenCreateDialog(true);
@@ -61,7 +68,32 @@ function App() {
         ? setInitPageContent("No data")
         : setInitPageContent(undefined);
 
-      setRelatedListData(data);
+      const tempRows = data?.map((obj) => ({
+        id: obj?.id,
+        date: getDate(obj?.History_Date_Time)?.[0],
+        time: getDate(obj?.History_Date_Time)?.[1],
+        type: obj?.History_Type,
+        result: obj?.History_Result,
+        duration: obj?.duration_min,
+        record_Manager: obj?.Owner,
+        regarding: obj?.Regarding,
+        details: obj?.History_Details,
+        icon: <DownloadIcon />,
+      }));
+
+      setRelatedListData(tempRows);
+      const owners = data
+        ?.map((el) => el.Owner)
+        ?.map((owner) => owner?.name)
+        ?.filter((el) => el !== undefined)
+        ?.filter((el) => el !== null);
+      setOwnerList([...new Set(owners)]);
+
+      const types = data
+        ?.map((el) => el.History_Type)
+        ?.filter((el) => el !== undefined)
+        ?.filter((el) => el !== null);
+      setTypeList([...new Set(types)]);
     };
 
     if (module && recordId) {
@@ -109,26 +141,33 @@ function App() {
               <Autocomplete
                 sx={{ flexGrow: 1 }}
                 size="small"
-                options={op}
+                options={typeList}
                 renderInput={(params) => (
                   <TextField {...params} label="Types" />
                 )}
+                onChange={(e, value, reason) => {
+                  setSelectedType(value);
+                }}
+              />
+              <TextField
+                sx={{ flexGrow: 1 }}
+                size="small"
+                label="Keyword"
+                variant="outlined"
+                onChange={(e) => {
+                  setKeyword(e.target.value);
+                }}
               />
               <Autocomplete
                 sx={{ flexGrow: 1 }}
                 size="small"
-                options={op}
-                renderInput={(params) => (
-                  <TextField {...params} label="Keyword" />
-                )}
-              />
-              <Autocomplete
-                sx={{ flexGrow: 1 }}
-                size="small"
-                options={op}
+                options={ownerList}
                 renderInput={(params) => (
                   <TextField {...params} label="Users" />
                 )}
+                onChange={(e, value, reason) => {
+                  setSelectedOwner(value);
+                }}
               />
             </Grid>
             <Grid size={3} sx={{ display: "flex", justifyContent: "flex-end" }}>
@@ -142,7 +181,28 @@ function App() {
             </Grid>
             <Grid size={9}>
               <Table
-                rows={relatedListData}
+                rows={relatedListData
+                  ?.filter((el) => {
+                    if (selectedOwner) {
+                      return el.record_Manager.name === selectedOwner;
+                    }
+                    return true;
+                  })
+                  ?.filter((el) => {
+                    if (selectedType) {
+                      return el?.type === selectedType;
+                    }
+                    return true;
+                  })
+                  ?.filter(({ icon, record_Manager, ...el }) => {
+                    const vals = Object.values(el)
+                      ?.filter((el) => el !== undefined)
+                      ?.filter((el) => el !== null);
+
+                    const subArr = vals.filter((str) => str.includes(keyword));
+
+                    return !!subArr?.length;
+                  })}
                 setSelectedRecordId={setSelectedRecordId}
                 handleClickOpenEditDialog={handleClickOpenEditDialog}
               />

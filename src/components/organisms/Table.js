@@ -145,25 +145,12 @@ function EnhancedTableHead({ order, orderBy, onRequestSort }) {
 }
 
 export function Table({
-  rows,
+  rows: tempRows,
   setSelectedRecordId,
   handleClickOpenEditDialog,
 }) {
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("calories");
-
-  const tempRows = rows?.map((obj) => ({
-    id: obj?.id,
-    date: getDate(obj?.History_Date_Time)?.[0],
-    time: getDate(obj?.History_Date_Time)?.[1],
-    type: obj?.History_Type,
-    result: obj?.History_Result,
-    duration: obj?.duration_min,
-    record_Manager: obj?.Owner,
-    regarding: obj?.Regarding,
-    details: obj?.History_Details,
-    icon: <DownloadIcon />,
-  }));
 
   const handleRequestSort = (event, property) => {
     const isAsc = orderBy === property && order === "asc";
