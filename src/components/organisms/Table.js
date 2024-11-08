@@ -6,24 +6,12 @@ import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
 import TableContainer from "@mui/material/TableContainer";
 import TableHead from "@mui/material/TableHead";
-import TablePagination from "@mui/material/TablePagination";
 import TableRow from "@mui/material/TableRow";
 import TableSortLabel from "@mui/material/TableSortLabel";
 import Paper from "@mui/material/Paper";
 import IconButton from "@mui/material/IconButton";
 import AttachmentIcon from "@mui/icons-material/Attachment";
 import { visuallyHidden } from "@mui/utils";
-
-const keyValMap = {
-  History_Date_Time: "Date",
-  //   History_Date_Time: "Time",
-  History_Type: "Type",
-  History_Result: "Result",
-  duration_min: "Duration",
-  Owner: "Record Manager",
-  Regarding: "Regarding",
-  History_Details: "Details",
-};
 
 function descendingComparator(a, b, orderBy) {
   if (b[orderBy] < a[orderBy]) {
@@ -144,11 +132,10 @@ function EnhancedTableHead({ order, orderBy, onRequestSort }) {
 }
 
 export function Table({
-  rows: tempRows,
+  rows,
   setSelectedRecordId,
   handleClickOpenEditDialog,
 }) {
-  // console.log({ tempRows });
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("calories");
 
@@ -163,8 +150,8 @@ export function Table({
   };
 
   const visibleRows = React.useMemo(
-    () => [...(tempRows || [])].sort(getComparator(order, orderBy)),
-    [order, tempRows, orderBy]
+    () => [...(rows || [])].sort(getComparator(order, orderBy)),
+    [order, rows, orderBy]
   );
 
   return (
@@ -175,7 +162,7 @@ export function Table({
             order={order}
             orderBy={orderBy}
             onRequestSort={handleRequestSort}
-            rowCount={tempRows?.length}
+            rowCount={rows?.length}
             // headCells={headCells}
           />
           <TableBody>
@@ -185,7 +172,13 @@ export function Table({
               return (
                 <TableRow
                   hover
-                  onClick={(event) => handleClick(event, row.id)}
+                  onClick={(event) =>
+                    handleClick(
+                      event,
+                      row.id,
+                      dayjs(row?.date_time).format("Z")
+                    )
+                  }
                   onDoubleClick={(event) => {
                     handleClick(event, row.id);
                     handleClickOpenEditDialog();

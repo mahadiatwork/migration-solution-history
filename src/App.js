@@ -8,10 +8,17 @@ import Autocomplete from "@mui/material/Autocomplete";
 import CircularProgress from "@mui/material/CircularProgress";
 import DownloadIcon from "@mui/icons-material/Download";
 
+import dayjs from "dayjs";
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
 import { useZohoInit } from "./hook/useZohoInit";
 import { zohoApi } from "./zohoApi";
 import { Table } from "./components/organisms/Table";
 import { Dialog } from "./components/organisms/Dialog";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 
 const parentContainerStyle = {
   borderTop: "1px solid #BABABA",
@@ -19,9 +26,16 @@ const parentContainerStyle = {
   p: "1em",
 };
 
+function isInLastDays(date, pre) {
+  const now = dayjs();
+  const daysAgo = now.subtract(pre, "day");
+  return dayjs(date).isAfter(daysAgo);
+}
+
 const op = [
-  { label: "The Shawshank Redemption", year: 1994 },
-  { label: "The Godfather", year: 1972 },
+  { label: "All" },
+  { label: "Last 7 days", preDay: 7 },
+  { label: "Last 30 days", preDay: 30 },
 ];
 
 function App() {
@@ -37,6 +51,7 @@ function App() {
   const [selectedOwner, setSelectedOwner] = React.useState();
   const [typeList, setTypeList] = React.useState();
   const [selectedType, setSelectedType] = React.useState();
+  const [dateRange, setDateRange] = React.useState();
   const [keyword, setKeyword] = React.useState("");
 
   const handleClickOpenCreateDialog = () => {
@@ -63,13 +78,11 @@ function App() {
         RelatedListAPI: "History3",
       });
 
-      console.log({ data });
-
       data?.length < 1
         ? setInitPageContent("No data")
         : setInitPageContent(undefined);
 
-      const tempRows = data?.map((obj) => ({
+      const tempData = data?.map((obj) => ({
         id: obj?.id,
         date_time: obj?.History_Date_Time,
         type: obj?.History_Type,
@@ -81,7 +94,8 @@ function App() {
         icon: <DownloadIcon />,
       }));
 
-      setRelatedListData(tempRows);
+      console.log({ tempData });
+      setRelatedListData(tempData);
       const owners = data
         ?.map((el) => el.Owner)
         ?.map((owner) => owner?.name)
@@ -133,15 +147,16 @@ function App() {
               }}
             >
               <Autocomplete
-                // sx={{ flexGrow: 1 }}
                 size="small"
                 options={op}
                 renderInput={(params) => (
                   <TextField {...params} label="Dates" />
                 )}
+                onChange={(e, value, reason) => {
+                  setDateRange(value);
+                }}
               />
               <Autocomplete
-                // sx={{ flexGrow: 1 }}
                 size="small"
                 options={typeList}
                 renderInput={(params) => (
@@ -152,7 +167,6 @@ function App() {
                 }}
               />
               <TextField
-                // sx={{ flexGrow: 1 }}
                 size="small"
                 label="Keyword"
                 variant="outlined"
@@ -161,7 +175,6 @@ function App() {
                 }}
               />
               <Autocomplete
-                // sx={{ flexGrow: 1 }}
                 size="small"
                 options={ownerList}
                 renderInput={(params) => (
@@ -204,6 +217,19 @@ function App() {
                     const subArr = vals.filter((str) => str.includes(keyword));
 
                     return !!subArr?.length;
+                  })
+                  ?.filter((el) => {
+                    if (dateRange?.preDay) {
+                      const ff = isInLastDays(el?.date_time, dateRange?.preDay);
+                      // const ff = isInLastDays(el?.date_time, dateRange?.preDay);
+                      console.log({
+                        ed: el?.date_time,
+                        dp: dateRange?.preDay,
+                        ff,
+                      });
+                      return true;
+                    }
+                    return true;
                   })}
                 setSelectedRecordId={setSelectedRecordId}
                 handleClickOpenEditDialog={handleClickOpenEditDialog}
