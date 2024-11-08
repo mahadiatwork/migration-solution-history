@@ -12,7 +12,6 @@ import { useZohoInit } from "./hook/useZohoInit";
 import { zohoApi } from "./zohoApi";
 import { Table } from "./components/organisms/Table";
 import { Dialog } from "./components/organisms/Dialog";
-import { getDate } from "./util/util";
 
 const parentContainerStyle = {
   borderTop: "1px solid #BABABA",
@@ -64,14 +63,15 @@ function App() {
         RelatedListAPI: "History3",
       });
 
+      console.log({ data });
+
       data?.length < 1
         ? setInitPageContent("No data")
         : setInitPageContent(undefined);
 
       const tempRows = data?.map((obj) => ({
         id: obj?.id,
-        date: getDate(obj?.History_Date_Time)?.[0],
-        time: getDate(obj?.History_Date_Time)?.[1],
+        date_time: obj?.History_Date_Time,
         type: obj?.History_Type,
         result: obj?.History_Result,
         duration: obj?.duration_min,

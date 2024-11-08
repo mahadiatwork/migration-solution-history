@@ -1,4 +1,5 @@
 import * as React from "react";
+import dayjs from "dayjs";
 import Box from "@mui/material/Box";
 import { Table as MUITable } from "@mui/material";
 import TableBody from "@mui/material/TableBody";
@@ -11,9 +12,7 @@ import TableSortLabel from "@mui/material/TableSortLabel";
 import Paper from "@mui/material/Paper";
 import IconButton from "@mui/material/IconButton";
 import AttachmentIcon from "@mui/icons-material/Attachment";
-import DownloadIcon from "@mui/icons-material/Download";
 import { visuallyHidden } from "@mui/utils";
-import { getDate } from "../../util/util";
 
 const keyValMap = {
   History_Date_Time: "Date",
@@ -202,11 +201,15 @@ export function Table({
                     size="small"
                     sx={{ width: "6%" }}
                   >
-                    {row.date}
+                    {row?.date_time
+                      ? dayjs(row?.date_time).format("DD:MM:YYYY")
+                      : null}
                   </TableCell>
 
                   <TableCell size="small" sx={{ width: "9%" }}>
-                    {row.time}
+                    {row?.date_time
+                      ? dayjs(row?.date_time).format("h:mm A")
+                      : null}
                   </TableCell>
                   <TableCell size="small" sx={{ width: "9%" }}>
                     {row.type}

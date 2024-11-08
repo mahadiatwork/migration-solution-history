@@ -1,10 +1,19 @@
 import * as React from "react";
+import dayjs from "dayjs";
 import Button from "@mui/material/Button";
+import Box from "@mui/material/Box";
 import TextField from "@mui/material/TextField";
 import { Dialog as MUIDialog } from "@mui/material";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
 import DialogTitle from "@mui/material/DialogTitle";
+//---------------
+import { DemoContainer } from "@mui/x-date-pickers/internals/demo";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { TimePicker } from "@mui/x-date-pickers/TimePicker";
+//---------------
 
 export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
   return (
@@ -19,6 +28,11 @@ export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
           const formJson = Object.fromEntries(formData.entries());
           const date = formJson.date;
           const time = formJson.time;
+          const dateString = date + ":" + time;
+          const date_time = dayjs(
+            dateString,
+            "DD:MM:YYYY:hh:mm A"
+          ).toISOString();
           const type = formJson.type;
           const result = formJson.result;
           const duration = formJson.duration;
@@ -29,6 +43,7 @@ export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
           console.log({
             date,
             time,
+            date_time,
             type,
             result,
             duration,
@@ -43,24 +58,51 @@ export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
     >
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
-        <TextField
-          margin="dense"
-          id="date"
-          name="date"
-          label="Date"
-          fullWidth
-          variant="standard"
-          value={obj?.date}
-        />
-        <TextField
-          margin="dense"
-          id="time"
-          name="time"
-          label="time"
-          fullWidth
-          variant="standard"
-          value={obj?.time}
-        />
+        <Box sx={{ display: "flex" }}>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DemoContainer components={["DatePicker"]} sx={{ flexGrow: 1 }}>
+              <DatePicker
+                sx={{
+                  overflow: "hidden",
+                  flexGrow: 1,
+                  "& button": { mr: 0 },
+                }}
+                id="date"
+                label="Date"
+                name="date"
+                value={dayjs(obj?.date_time)}
+                format="DD:MM:YYYY"
+                fullWidth
+                slotProps={{
+                  textField: { variant: "standard", margin: "dense" },
+                }}
+              />
+            </DemoContainer>
+          </LocalizationProvider>
+        </Box>
+
+        <Box sx={{ display: "flex" }}>
+          <LocalizationProvider dateAdapter={AdapterDayjs}>
+            <DemoContainer components={["TimePicker"]} sx={{ flexGrow: 1 }}>
+              <TimePicker
+                sx={{
+                  overflow: "hidden",
+                  flexGrow: 1,
+                  "& button": { mr: 0 },
+                }}
+                id="time"
+                label="Time"
+                name="time"
+                value={dayjs(obj?.date_time)}
+                fullWidth
+                slotProps={{
+                  textField: { variant: "standard", margin: "dense" },
+                }}
+              />
+            </DemoContainer>
+          </LocalizationProvider>
+        </Box>
+
         <TextField
           margin="dense"
           id="type"
