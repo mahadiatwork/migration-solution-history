@@ -12,6 +12,7 @@ import Paper from "@mui/material/Paper";
 import IconButton from "@mui/material/IconButton";
 import AttachmentIcon from "@mui/icons-material/Attachment";
 import { visuallyHidden } from "@mui/utils";
+import { zohoApi } from "../../zohoApi";
 
 function descendingComparator(a, b, orderBy) {
   if (b[orderBy] < a[orderBy]) {
@@ -243,8 +244,21 @@ export function Table({
                   <TableCell size="small" sx={{ width: "3%" }}>
                     <IconButton
                       disableRipple
-                      onClick={() => {
-                        console.log("icon clicked");
+                      onClick={async () => {
+                        const { data } = await zohoApi.file.getAttachments({
+                          module: "History_X_Contacts",
+                          recordId: row.id,
+                        });
+                        console.log(data?.[0]);
+                        if (data?.length > 0) {
+                          zohoApi.file.downloadAttachmentById({
+                            module: "History_X_Contacts",
+                            recordId: row.id,
+                            attachmentId: data?.[0]?.id,
+                          });
+                        } else {
+                          console.log("No data");
+                        }
                       }}
                     >
                       {row.icon}
