@@ -249,12 +249,13 @@ export function Table({
                           module: "History_X_Contacts",
                           recordId: row.id,
                         });
-                        console.log(data?.[0]);
+                        // console.log(data);
                         if (data?.length > 0) {
                           zohoApi.file.downloadAttachmentById({
                             module: "History_X_Contacts",
                             recordId: row.id,
                             attachmentId: data?.[0]?.id,
+                            fileName: data?.[0]?.File_Name,
                           });
                         } else {
                           console.log("No data");
