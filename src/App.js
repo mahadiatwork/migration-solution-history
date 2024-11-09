@@ -26,7 +26,7 @@ const parentContainerStyle = {
   p: "1em",
 };
 
-function isInLastDays(date, pre) {
+function isInLastNDays(date, pre) {
   const now = dayjs();
   const daysAgo = now.subtract(pre, "day");
   return dayjs(date).isAfter(daysAgo);
@@ -94,7 +94,7 @@ function App() {
         icon: <DownloadIcon />,
       }));
 
-      console.log({ tempData });
+      // console.log({ tempData });
       setRelatedListData(tempData);
       const owners = data
         ?.map((el) => el.Owner)
@@ -220,14 +220,13 @@ function App() {
                   })
                   ?.filter((el) => {
                     if (dateRange?.preDay) {
-                      const ff = isInLastDays(el?.date_time, dateRange?.preDay);
                       // const ff = isInLastDays(el?.date_time, dateRange?.preDay);
-                      console.log({
-                        ed: el?.date_time,
-                        dp: dateRange?.preDay,
-                        ff,
-                      });
-                      return true;
+                      // console.log({
+                      //   ed: el?.date_time,
+                      //   dp: dateRange?.preDay,
+                      //   ff,
+                      // });
+                      return isInLastNDays(el?.date_time, dateRange?.preDay);
                     }
                     return true;
                   })}
