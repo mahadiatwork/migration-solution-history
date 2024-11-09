@@ -1,5 +1,13 @@
 const ZOHO = window.ZOHO;
 
+export async function resizeWindow({ height, width }) {
+  try {
+    const resizeResp = await ZOHO.CRM.UI.Resize({ height, width });
+  } catch (resizeWindowError) {
+    console.log({ resizeWindowError });
+  }
+}
+
 export async function initZoho(callback, { height, width }, initCallback) {
   ZOHO.embeddedApp.on("PageLoad", async function (initialData) {
     try {
@@ -25,4 +33,5 @@ export async function initZoho(callback, { height, width }, initCallback) {
 
 export const auth = {
   initZoho,
+  resizeWindow,
 };
