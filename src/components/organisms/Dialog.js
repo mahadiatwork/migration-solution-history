@@ -109,7 +109,7 @@ export function Dialog({ openDialog, handleCloseDialog, obj, title }) {
           label="Record Manager"
           fullWidth
           variant="standard"
-          value={obj?.record_Manager?.name}
+          value={obj?.ownerName}
         />
         <TextField
           margin="dense"
