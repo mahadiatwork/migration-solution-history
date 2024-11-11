@@ -13,9 +13,11 @@ import IconButton from "@mui/material/IconButton";
 import AttachmentIcon from "@mui/icons-material/Attachment";
 import CircularProgress from "@mui/material/CircularProgress";
 import { visuallyHidden } from "@mui/utils";
+import { useSnackbar } from "notistack";
 import { zohoApi } from "../../zohoApi";
 
 const DownloadButton = ({ rowId, rowIcon }) => {
+  const { enqueueSnackbar } = useSnackbar();
   const [waitingForDownload, setWaitingForDownload] = React.useState(false);
   return (
     <IconButton
@@ -36,6 +38,7 @@ const DownloadButton = ({ rowId, rowIcon }) => {
           });
           setWaitingForDownload(false);
         } else {
+          enqueueSnackbar("No file.", { variant: "error" });
           console.log("No data");
           setWaitingForDownload(false);
         }
