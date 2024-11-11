@@ -11,8 +11,40 @@ import TableSortLabel from "@mui/material/TableSortLabel";
 import Paper from "@mui/material/Paper";
 import IconButton from "@mui/material/IconButton";
 import AttachmentIcon from "@mui/icons-material/Attachment";
+import CircularProgress from "@mui/material/CircularProgress";
 import { visuallyHidden } from "@mui/utils";
 import { zohoApi } from "../../zohoApi";
+
+const DownloadButton = ({ rowId, rowIcon }) => {
+  const [waitingForDownload, setWaitingForDownload] = React.useState(false);
+  return (
+    <IconButton
+      disableRipple
+      onClick={async () => {
+        setWaitingForDownload(true);
+        const { data } = await zohoApi.file.getAttachments({
+          module: "History_X_Contacts",
+          recordId: rowId,
+        });
+        // console.log(data);
+        if (data?.length > 0) {
+          await zohoApi.file.downloadAttachmentById({
+            module: "History_X_Contacts",
+            recordId: rowId,
+            attachmentId: data?.[0]?.id,
+            fileName: data?.[0]?.File_Name,
+          });
+          setWaitingForDownload(false);
+        } else {
+          console.log("No data");
+          setWaitingForDownload(false);
+        }
+      }}
+    >
+      {waitingForDownload ? <CircularProgress size={16} /> : rowIcon}
+    </IconButton>
+  );
+};
 
 function descendingComparator(a, b, orderBy) {
   if (b[orderBy] < a[orderBy]) {
@@ -30,23 +62,17 @@ function getComparator(order, orderBy) {
     : (a, b) => -descendingComparator(a, b, orderBy);
 }
 
-function EnhancedTableHead({ order, orderBy, onRequestSort }) {
+function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
   const createSortHandler = (property) => (event) => {
-    onRequestSort(event, property);
+    handleRequestSort(event, property);
   };
 
   const headCells = [
     {
-      id: "date",
+      id: "date_time",
       numeric: false,
       disablePadding: true,
-      label: "Date",
-    },
-    {
-      id: "time",
-      numeric: false,
-      disablePadding: false,
-      label: "Time",
+      label: "Date & Time",
     },
     {
       id: "type",
@@ -67,7 +93,7 @@ function EnhancedTableHead({ order, orderBy, onRequestSort }) {
       label: "Duration",
     },
     {
-      id: "regarding_details",
+      id: "regarding",
       numeric: false,
       disablePadding: false,
       label: "Regarding & Details",
@@ -80,7 +106,7 @@ function EnhancedTableHead({ order, orderBy, onRequestSort }) {
       dontShowSort: true,
     },
     {
-      id: "owner",
+      id: "ownerName",
       numeric: false,
       disablePadding: false,
       label: "Record Manager",
@@ -95,8 +121,8 @@ function EnhancedTableHead({ order, orderBy, onRequestSort }) {
             return (
               <TableCell
                 key={headCell.id}
-                align={headCell.numeric ? "right" : "left"}
-                sortDirection={orderBy === headCell.id ? order : false}
+                // align={headCell.numeric ? "right" : "left"}
+                // sortDirection={orderBy === headCell.id ? order : false}
                 size="small"
               >
                 {headCell.label}
@@ -162,7 +188,7 @@ export function Table({
           <EnhancedTableHead
             order={order}
             orderBy={orderBy}
-            onRequestSort={handleRequestSort}
+            handleRequestSort={handleRequestSort}
             rowCount={rows?.length}
             // headCells={headCells}
           />
@@ -193,17 +219,16 @@ export function Table({
                     id={labelId}
                     scope="row"
                     size="small"
-                    sx={{ width: "6%" }}
+                    sx={{ width: "15%" }}
                   >
-                    {row?.date_time
-                      ? dayjs(row?.date_time).format("DD:MM:YYYY")
-                      : null}
-                  </TableCell>
-
-                  <TableCell size="small" sx={{ width: "9%" }}>
-                    {row?.date_time
-                      ? dayjs(row?.date_time).format("h:mm A")
-                      : null}
+                    {row?.date_time ? (
+                      <span>
+                        <span style={{ marginRight: ".5em" }}>
+                          {dayjs(row?.date_time).format("DD:MM:YYYY")}
+                        </span>
+                        <span>{dayjs(row?.date_time).format("h:mm A")}</span>
+                      </span>
+                    ) : null}
                   </TableCell>
                   <TableCell size="small" sx={{ width: "9%" }}>
                     {row.type}
@@ -242,31 +267,10 @@ export function Table({
                     </span>
                   </TableCell>
                   <TableCell size="small" sx={{ width: "3%" }}>
-                    <IconButton
-                      disableRipple
-                      onClick={async () => {
-                        const { data } = await zohoApi.file.getAttachments({
-                          module: "History_X_Contacts",
-                          recordId: row.id,
-                        });
-                        // console.log(data);
-                        if (data?.length > 0) {
-                          zohoApi.file.downloadAttachmentById({
-                            module: "History_X_Contacts",
-                            recordId: row.id,
-                            attachmentId: data?.[0]?.id,
-                            fileName: data?.[0]?.File_Name,
-                          });
-                        } else {
-                          console.log("No data");
-                        }
-                      }}
-                    >
-                      {row.icon}
-                    </IconButton>
+                    <DownloadButton rowId={row.id} rowIcon={row.icon} />
                   </TableCell>
                   <TableCell size="small" sx={{ width: "16%" }}>
-                    {row.record_Manager?.name}
+                    {row.ownerName}
                   </TableCell>
                 </TableRow>
               );

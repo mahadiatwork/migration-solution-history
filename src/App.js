@@ -88,10 +88,10 @@ function App() {
         type: obj?.History_Type,
         result: obj?.History_Result,
         duration: obj?.duration_min,
-        record_Manager: obj?.Owner,
         regarding: obj?.Regarding,
         details: obj?.History_Details,
         icon: <DownloadIcon />,
+        ownerName: obj?.Owner?.name,
       }));
 
       // console.log({ tempData });

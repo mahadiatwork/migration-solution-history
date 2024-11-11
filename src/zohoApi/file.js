@@ -169,6 +169,7 @@ async function downloadAttachmentById({
       responseType: "blob",
     };
     const resp = await axios.request(config);
+    console.log({ resp });
 
     downloadFile(resp?.data, fileName);
   } catch (downloadAttachmentByIdError) {
