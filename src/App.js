@@ -38,6 +38,9 @@ const op = [
   { label: "Last 30 days", preDay: 30 },
 ];
 
+
+const ZOHO = window.ZOHO;
+
 function App() {
   const { module, recordId } = useZohoInit();
   const [initPageContent, setInitPageContent] = React.useState(
@@ -53,6 +56,7 @@ function App() {
   const [selectedType, setSelectedType] = React.useState();
   const [dateRange, setDateRange] = React.useState();
   const [keyword, setKeyword] = React.useState("");
+  const [loggedInUser, setLoggedInUser] = React.useState(null);
 
   const handleClickOpenCreateDialog = () => {
     setOpenCreateDialog(true);
@@ -78,6 +82,18 @@ function App() {
         RelatedListAPI: "History3",
       });
 
+
+      await ZOHO.CRM.API.getAllUsers({ Type: "AllUsers" })
+        .then(function (data) {
+          console.log("all users", data?.users)
+          setOwnerList(data.users)
+        })
+
+      await ZOHO.CRM.CONFIG.getCurrentUser().then(function (data) {
+        console.log("logged in user", data.users[0]);
+        setLoggedInUser(data.users[0])
+      });
+
       data?.length < 1
         ? setInitPageContent("No data")
         : setInitPageContent(undefined);
@@ -101,7 +117,7 @@ function App() {
         ?.map((owner) => owner?.name)
         ?.filter((el) => el !== undefined)
         ?.filter((el) => el !== null);
-      setOwnerList([...new Set(owners)]);
+      // setOwnerList([...new Set(owners)]);
 
       const types = data
         ?.map((el) => el.History_Type)
@@ -177,6 +193,7 @@ function App() {
               <Autocomplete
                 size="small"
                 options={ownerList}
+                value={selectedOwner}
                 renderInput={(params) => (
                   <TextField {...params} label="Users" />
                 )}
@@ -275,11 +292,16 @@ function App() {
         handleCloseDialog={handleCloseEditDialog}
         obj={selectedObj}
         title="Edit History"
+        ownerList={ownerList}
+        loggedInUser={loggedInUser}
       />
       <Dialog
         openDialog={openCreateDialog}
         handleCloseDialog={handleCloseCreateDialog}
         title="Create"
+        ownerList={ownerList}
+        loggedInUser={loggedInUser}
+        ZOHO={ZOHO}
       />
     </React.Fragment>
   );
