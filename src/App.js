@@ -98,6 +98,9 @@ function App() {
         ? setInitPageContent("No data")
         : setInitPageContent(undefined);
 
+
+        console.log({data})
+
       const tempData = data?.map((obj) => ({
         id: obj?.id,
         date_time: obj?.History_Date_Time,
@@ -108,6 +111,7 @@ function App() {
         details: obj?.History_Details,
         icon: <DownloadIcon />,
         ownerName: obj?.Owner?.name,
+        historyId: obj?.Contact_History_Info?.id
       }));
 
       // console.log({ tempData });
@@ -117,7 +121,7 @@ function App() {
         ?.map((owner) => owner?.name)
         ?.filter((el) => el !== undefined)
         ?.filter((el) => el !== null);
-      // setOwnerList([...new Set(owners)]);
+      setOwnerList([...new Set(owners)]);
 
       const types = data
         ?.map((el) => el.History_Type)
@@ -137,6 +141,9 @@ function App() {
   // console.log({ selectedObj });
   const regarding = selectedObj?.regarding;
   const details = selectedObj?.details;
+
+
+  console.log("temp Data", relatedListData)
 
   return (
     <React.Fragment>
@@ -294,6 +301,7 @@ function App() {
         title="Edit History"
         ownerList={ownerList}
         loggedInUser={loggedInUser}
+        ZOHO={ZOHO}
       />
       <Dialog
         openDialog={openCreateDialog}
