@@ -1,6 +1,6 @@
 import * as React from "react";
 import Box from "@mui/material/Box";
-import Grid from "@mui/material/Grid2";
+import Grid from "@mui/material/Grid";
 import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
@@ -32,12 +32,11 @@ function isInLastNDays(date, pre) {
   return dayjs(date).isAfter(daysAgo);
 }
 
-const op = [
+const dateOptions = [
   { label: "All" },
   { label: "Last 7 days", preDay: 7 },
   { label: "Last 30 days", preDay: 30 },
 ];
-
 
 const ZOHO = window.ZOHO;
 
@@ -50,13 +49,14 @@ function App() {
   const [selectedRecordId, setSelectedRecordId] = React.useState();
   const [openEditDialog, setOpenEditDialog] = React.useState(false);
   const [openCreateDialog, setOpenCreateDialog] = React.useState(false);
-  const [ownerList, setOwnerList] = React.useState();
-  const [selectedOwner, setSelectedOwner] = React.useState();
-  const [typeList, setTypeList] = React.useState();
+  const [ownerList, setOwnerList] = React.useState([]);
+  const [selectedOwner, setSelectedOwner] = React.useState(null);
+  const [typeList, setTypeList] = React.useState([]);
   const [selectedType, setSelectedType] = React.useState();
   const [dateRange, setDateRange] = React.useState();
   const [keyword, setKeyword] = React.useState("");
   const [loggedInUser, setLoggedInUser] = React.useState(null);
+
 
   const handleClickOpenCreateDialog = () => {
     setOpenCreateDialog(true);
@@ -76,58 +76,56 @@ function App() {
 
   React.useEffect(() => {
     const fetchRLData = async () => {
-      const { data } = await zohoApi.record.getRecordsFromRelatedList({
-        module,
-        recordId,
-        RelatedListAPI: "History3",
-      });
+      try {
+        const { data } = await zohoApi.record.getRecordsFromRelatedList({
+          module,
+          recordId,
+          RelatedListAPI: "History3",
+        });
+
+        await ZOHO.CRM.API.getAllUsers({ Type: "AllUsers" }).then(function (data) {
+          const validUsers = data.users.filter(
+            (user) => user && user.full_name && user.id
+          );
+          setOwnerList(validUsers);
+        });
+
+        await ZOHO.CRM.CONFIG.getCurrentUser().then(function (data) {
+          setLoggedInUser(data.users[0]);
+        });
 
 
-      await ZOHO.CRM.API.getAllUsers({ Type: "AllUsers" })
-        .then(function (data) {
-          console.log("all users", data?.users)
-          setOwnerList(data.users)
-        })
+        console.log("data", data)
 
-      await ZOHO.CRM.CONFIG.getCurrentUser().then(function (data) {
-        console.log("logged in user", data.users[0]);
-        setLoggedInUser(data.users[0])
-      });
+        const tempData = data?.map((obj) => ({
+          name: obj.Name,
+          id: obj?.id,
+          date_time: obj?.History_Date_Time,
+          type: obj?.History_Type,
+          result: obj?.History_Result,
+          duration: obj?.duration_min,
+          regarding: obj?.Regarding,
+          details: obj?.History_Details,
+          icon: <DownloadIcon />,
+          ownerName: obj?.Owner?.name,
+          historyDetails: obj?.Contact_History_Info,
+          stakeHolder: obj?.Stakeholder
+        }));
 
-      data?.length < 1
-        ? setInitPageContent("No data")
-        : setInitPageContent(undefined);
+        setRelatedListData(tempData);
 
+        const types = data
+          ?.map((el) => el.History_Type)
+          ?.filter((el) => el !== undefined)
+          ?.filter((el) => el !== null);
+        setTypeList([...new Set(types)]);
 
-        console.log({data})
-
-      const tempData = data?.map((obj) => ({
-        id: obj?.id,
-        date_time: obj?.History_Date_Time,
-        type: obj?.History_Type,
-        result: obj?.History_Result,
-        duration: obj?.duration_min,
-        regarding: obj?.Regarding,
-        details: obj?.History_Details,
-        icon: <DownloadIcon />,
-        ownerName: obj?.Owner?.name,
-        historyId: obj?.Contact_History_Info?.id
-      }));
-
-      // console.log({ tempData });
-      setRelatedListData(tempData);
-      const owners = data
-        ?.map((el) => el.Owner)
-        ?.map((owner) => owner?.name)
-        ?.filter((el) => el !== undefined)
-        ?.filter((el) => el !== null);
-      setOwnerList([...new Set(owners)]);
-
-      const types = data
-        ?.map((el) => el.History_Type)
-        ?.filter((el) => el !== undefined)
-        ?.filter((el) => el !== null);
-      setTypeList([...new Set(types)]);
+        // Update initPageContent to null if data is loaded
+        setInitPageContent(null);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setInitPageContent("Error loading data.");
+      }
     };
 
     if (module && recordId) {
@@ -135,15 +133,10 @@ function App() {
     }
   }, [module, recordId]);
 
-  let selectedObj = relatedListData?.filter(
-    (obj) => obj?.id === selectedRecordId
-  )?.[0];
-  // console.log({ selectedObj });
+
+  let selectedObj = relatedListData?.find((obj) => obj?.id === selectedRecordId);
   const regarding = selectedObj?.regarding;
   const details = selectedObj?.details;
-
-
-  console.log("temp Data", relatedListData)
 
   return (
     <React.Fragment>
@@ -161,7 +154,8 @@ function App() {
         {relatedListData?.length > 0 ? (
           <Grid container spacing={2}>
             <Grid
-              size={9}
+              item
+              xs={9}
               sx={{
                 display: "flex",
                 justifyContent: "space-between",
@@ -171,59 +165,116 @@ function App() {
             >
               <Autocomplete
                 size="small"
-                options={op}
-                renderInput={(params) => (
-                  <TextField {...params} label="Dates" />
-                )}
-                onChange={(e, value, reason) => {
-                  setDateRange(value);
+                options={dateOptions}
+                sx={{
+                  width: "8rem",
+                  "& .MuiInputBase-root": {
+                    height: "30px", // Reduced height for input
+                  },
+                  "& .MuiInputLabel-root": {
+                    fontSize: "0.75rem", // Smaller label text
+                    top: "-2px", // Center the label vertically
+                  },
+                  "& .MuiInputLabel-shrink": {
+                    top: "0", // Adjust label position when shrunk
+                  },
                 }}
+                renderInput={(params) => (
+                  <TextField {...params} label="Dates" size="small" />
+                )}
+                onChange={(e, value) => setDateRange(value)}
               />
               <Autocomplete
                 size="small"
                 options={typeList}
-                renderInput={(params) => (
-                  <TextField {...params} label="Types" />
-                )}
-                onChange={(e, value, reason) => {
-                  setSelectedType(value);
+                sx={{
+                  width: "8rem",
+                  "& .MuiInputBase-root": {
+                    height: "30px", // Reduced height for input
+                  },
+                  "& .MuiInputLabel-root": {
+                    fontSize: "0.75rem", // Smaller label text
+                    top: "-2px", // Center the label vertically
+                  },
+                  "& .MuiInputLabel-shrink": {
+                    top: "0", // Adjust label position when shrunk
+                  },
                 }}
+                renderInput={(params) => (
+                  <TextField {...params} label="Types" size="small" />
+                )}
+                onChange={(e, value) => setSelectedType(value)}
               />
               <TextField
                 size="small"
                 label="Keyword"
                 variant="outlined"
-                onChange={(e) => {
-                  setKeyword(e.target.value);
+                sx={{
+                  width: "8rem",
+                  "& .MuiInputBase-root": {
+                    height: "30px", // Reduced height for input
+                  },
+                  "& .MuiInputLabel-root": {
+                    fontSize: "0.75rem", // Smaller label text
+                    top: "-2px", // Center the label vertically
+                  },
+                  "& .MuiInputLabel-shrink": {
+                    top: "0", // Adjust label position when shrunk
+                  },
                 }}
+                onChange={(e) => setKeyword(e.target.value)}
               />
               <Autocomplete
                 size="small"
-                options={ownerList}
-                value={selectedOwner}
-                renderInput={(params) => (
-                  <TextField {...params} label="Users" />
-                )}
-                onChange={(e, value, reason) => {
-                  setSelectedOwner(value);
+                options={ownerList || []}
+                getOptionLabel={(option) => option?.full_name || "Unknown User"}
+                value={selectedOwner || null}
+                isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                sx={{
+                  width: "8rem",
+                  "& .MuiInputBase-root": {
+                    height: "30px", // Reduced height for input
+                  },
+                  "& .MuiInputLabel-root": {
+                    fontSize: "0.75rem", // Smaller label text
+                    top: "-2px", // Center the label vertically
+                  },
+                  "& .MuiInputLabel-shrink": {
+                    top: "0", // Adjust label position when shrunk
+                  },
                 }}
+                renderInput={(params) => (
+                  <TextField {...params} label="Users" size="small" />
+                )}
+                onChange={(e, value) => setSelectedOwner(value)}
               />
             </Grid>
-            <Grid size={3} sx={{ display: "flex", justifyContent: "flex-end" }}>
+            <Grid
+              item
+              xs={3}
+              sx={{ display: "flex", justifyContent: "flex-end" }}
+            >
               <Button
                 variant="contained"
-                sx={{ flexGrow: 1 }}
+                sx={{
+                  flexGrow: 1,
+                  padding: "4px 8px", // Adjust padding for smaller height
+                  fontSize: "0.75rem", // Adjust font size if needed
+                  minHeight: "30px", // Minimum height for the button
+                  maxHeight: "30px", // Maximum height for consistency
+                  lineHeight: "1rem", // Adjust line height for text alignment
+                }}
                 onClick={handleClickOpenCreateDialog}
               >
                 Create
               </Button>
             </Grid>
-            <Grid size={9}>
+            <Grid item xs={9}>
               <Table
                 rows={relatedListData
                   ?.filter((el) => {
                     if (selectedOwner) {
-                      return el.record_Manager.name === selectedOwner;
+                      return el.ownerName === selectedOwner?.full_name;
                     }
                     return true;
                   })
@@ -233,23 +284,14 @@ function App() {
                     }
                     return true;
                   })
-                  ?.filter(({ icon, record_Manager, ...el }) => {
+                  ?.filter(({ icon, ownerName, ...el }) => {
                     const vals = Object.values(el)
                       ?.filter((el) => el !== undefined)
                       ?.filter((el) => el !== null);
-
-                    const subArr = vals.filter((str) => str.includes(keyword));
-
-                    return !!subArr?.length;
+                    return vals.some((str) => str.includes(keyword));
                   })
                   ?.filter((el) => {
                     if (dateRange?.preDay) {
-                      // const ff = isInLastDays(el?.date_time, dateRange?.preDay);
-                      // console.log({
-                      //   ed: el?.date_time,
-                      //   dp: dateRange?.preDay,
-                      //   ff,
-                      // });
                       return isInLastNDays(el?.date_time, dateRange?.preDay);
                     }
                     return true;
@@ -258,13 +300,8 @@ function App() {
                 handleClickOpenEditDialog={handleClickOpenEditDialog}
               />
             </Grid>
-            <Grid size={3}>
-              <Paper
-                sx={{
-                  height: "100%",
-                  position: "relative",
-                }}
-              >
+            <Grid item xs={3}>
+              <Paper sx={{ height: "100%", position: "relative" }}>
                 <Box
                   sx={{
                     position: "absolute",
@@ -285,9 +322,7 @@ function App() {
                       {regarding}
                     </span>
                   ) : null}
-
-                  {details}
-                  {!regarding && !details ? "No data" : null}
+                  {details || "No data"}
                 </Box>
               </Paper>
             </Grid>

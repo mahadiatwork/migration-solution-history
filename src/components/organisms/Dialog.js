@@ -53,54 +53,66 @@ export function Dialog({
   ZOHO, // Zoho instance for API calls
   selectedRowData,
 }) {
+
   const [contacts, setContacts] = React.useState([]);
-  const [selectedContacts, setSelectedContacts] = React.useState(
-    selectedRowData?.Participants || []
-  );
+  const [selectedContacts, setSelectedContacts] = React.useState([]);
   const [inputValue, setInputValue] = React.useState("");
   const [notFoundMessage, setNotFoundMessage] = React.useState("");
   const [loading, setLoading] = React.useState(false);
-  const [result, setResult] = React.useState(obj?.result || "");
-  const [type, setType] = React.useState(obj?.type || "");
+  const [result, setResult] = React.useState("");
+  const [type, setType] = React.useState("");
   const [historyName, setHistoryName] = React.useState("");
-
   const [mainHistoryData, setMainHistoryData] = React.useState(null);
   const [historyContacts, setHistoryContacts] = React.useState([]);
-  const [duration, setDuration] = React.useState(obj?.duration || ""); // Default
+  const [duration, setDuration] = React.useState("");
+  const [selectedOwner, setSelectedOwner] = React.useState(loggedInUser || null);
+  const [regarding, setRegarding] = React.useState(obj?.regarding || "");
+
+  // Reinitialize dialog state when `openDialog` or `obj` changes
+  React.useEffect(() => {
+    if (openDialog) {
+      setSelectedContacts(selectedRowData?.Participants || []);
+      setResult(obj?.result || "");
+      setType(obj?.type || "");
+      setDuration(obj?.duration || "");
+      setHistoryName(
+        selectedRowData?.Participants?.map((p) => p.Full_Name).join(", ") || ""
+      );
+      setSelectedOwner(loggedInUser || null);
+    }
+  }, [openDialog, obj, selectedRowData, loggedInUser]);
 
   React.useEffect(() => {
     const fetchHistoryData = async () => {
-      console.log("Fetching history data for ID:", obj?.historyId);
-      if (obj?.historyId) {
+      if (obj?.historyDetails) {
         try {
           const data = await ZOHO.CRM.API.getRelatedRecords({
             Entity: "History1",
-            RecordID: obj.historyId,
+            RecordID: obj?.historyDetails?.id,
             RelatedList: "Contacts3",
             page: 1,
             per_page: 200,
           });
 
-          // Map over the data array to extract only necessary contact details
-          const contactDetailsArray = data.data.map(record => ({
-            Full_Name: record.Contact_Details.name, // Use Full_Name key to match contacts structure
+          const contactDetailsArray = data.data.map((record) => ({
+            Full_Name: record.Contact_Details.name,
             id: record.Contact_Details.id,
           }));
 
-          console.log("related contacts", contactDetailsArray);
           setHistoryContacts(contactDetailsArray);
-          setSelectedContacts(contactDetailsArray); // Set initial selected contacts
+          setSelectedContacts(contactDetailsArray);
         } catch (error) {
           console.error("Error fetching related contacts:", error);
         }
       }
     };
 
-    fetchHistoryData();
-  }, [obj?.historyId]);
+    if (openDialog) {
+      fetchHistoryData();
+    }
+  }, [obj?.historyDetails, openDialog]);
 
-
-  const handleSearch = async (query) => {
+  const handleContactSearch = async (query) => {
     setNotFoundMessage("");
     setLoading(true);
 
@@ -138,7 +150,7 @@ export function Dialog({
     setInputValue(newInputValue);
     setNotFoundMessage("");
     if (newInputValue.endsWith(" ")) {
-      handleSearch(newInputValue);
+      handleContactSearch(newInputValue);
     }
   };
 
@@ -146,19 +158,15 @@ export function Dialog({
     setSelectedContacts(newValue);
   };
 
-  console.log("Main history data", mainHistoryData);
+  const handleRegardingChange = (event) => {
+    setRegarding(event.target.value); // Update the state with user input
+  };
+  
 
-  // Update historyName whenever selectedContacts changes
   React.useEffect(() => {
-    const names = selectedContacts.map(contact => contact.Full_Name).join(", ");
+    const names = selectedContacts.map((contact) => contact.Full_Name).join(", ");
     setHistoryName(names);
   }, [selectedContacts]);
-
-  React.useEffect(() => {
-    if (type in resultMapping) {
-      setResult(resultMapping[type]);
-    }
-  }, [type]);
 
   return (
     <MUIDialog
@@ -172,7 +180,20 @@ export function Dialog({
           const formJson = Object.fromEntries(formData.entries());
           const date_time = dayjs(formJson.date_time).format("YYYY-MM-DDTHH:mm:ssZ");
 
-          console.log(formJson);
+          const contactsData = selectedContacts.map((contact) => ({
+            id: contact.id,
+            name: contact.Full_Name,
+          }));
+    
+          // Include contacts data in the final form data
+          const finalData = {
+            ...formJson,
+            regarding,
+            contacts: contactsData, // Attach contacts array
+            date_time: dayjs(formJson.date_time).format("YYYY-MM-DDTHH:mm:ssZ"),
+          };
+
+          console.log(finalData); // Log the final submission data
 
           handleCloseDialog();
         },
@@ -242,7 +263,8 @@ export function Dialog({
               label="Regarding"
               fullWidth
               variant="standard"
-              value={obj?.regarding || ""}
+              value={regarding} // Controlled value from state
+              onChange={handleRegardingChange} // Update state on user input
             />
             <TextField
               margin="dense"
@@ -275,92 +297,89 @@ export function Dialog({
             <Autocomplete
               options={ownerList}
               getOptionLabel={(option) => option.full_name || ""}
-              id="history_owner"
+              value={selectedOwner} // Default to loggedInUser if available
+              onChange={(event, newValue) => setSelectedOwner(newValue)}
               renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="History Owner"
-                  name="history_owner"
-                  variant="standard"
-                />
+                <TextField {...params} label="History Owner" name="history_owner" variant="standard" />
               )}
             />
-              <FormControl fullWidth variant="standard" sx={{ marginTop: 1 }}>
-            <InputLabel>Type</InputLabel>
-            <Select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              label="Type"
-            >
-              <MenuItem value="Meeting">Meeting</MenuItem>
-              <MenuItem value="To-Do">To-Do</MenuItem>
-              <MenuItem value="Appointment">Appointment</MenuItem>
-              <MenuItem value="Boardroom">Boardroom</MenuItem>
-              <MenuItem value="Call Billing">Call Billing</MenuItem>
-              <MenuItem value="Email Billing">Email Billing</MenuItem>
-              <MenuItem value="Initial Consultation">Initial Consultation</MenuItem>
-              <MenuItem value="Call">Call</MenuItem>
-              <MenuItem value="Mail">Mail</MenuItem>
-              <MenuItem value="Meeting Billing">Meeting Billing</MenuItem>
-              <MenuItem value="Personal Activity">Personal Activity</MenuItem>
-              <MenuItem value="Room 1">Room 1</MenuItem>
-              <MenuItem value="Room 2">Room 2</MenuItem>
-              <MenuItem value="Room 3">Room 3</MenuItem>
-              <MenuItem value="To Do Billing">To Do Billing</MenuItem>
-              <MenuItem value="Vacation">Vacation</MenuItem>
-            </Select>
-          </FormControl>
 
-          <FormControl fullWidth variant="standard" sx={{ marginTop: 1 }}>
-            <InputLabel>Result</InputLabel>
-            <Select
-              value={result}
-              onChange={(e) => setResult(e.target.value)}
-              label="Result"
-            >
-              <MenuItem value="Call Attempted">Call Attempted</MenuItem>
-              <MenuItem value="Call Completed">Call Completed</MenuItem>
-              <MenuItem value="Call Left Message">Call Left Message</MenuItem>
-              <MenuItem value="Call Received">Call Received</MenuItem>
-              <MenuItem value="Meeting Held">Meeting Held</MenuItem>
-              <MenuItem value="Meeting Not Held">Meeting Not Held</MenuItem>
-              <MenuItem value="To-do Done">To-do Done</MenuItem>
-              <MenuItem value="To-do Not Done">To-do Not Done</MenuItem>
-              <MenuItem value="Appointment Completed">Appointment Completed</MenuItem>
-              <MenuItem value="Appointment Not Completed">Appointment Not Completed</MenuItem>
-              <MenuItem value="Boardroom - Completed">Boardroom - Completed</MenuItem>
-              <MenuItem value="Boardroom - Not Completed">Boardroom - Not Completed</MenuItem>
-              <MenuItem value="Call Billing - Completed">Call Billing - Completed</MenuItem>
-              <MenuItem value="Initial Consultation - Completed">Initial Consultation - Completed</MenuItem>
-              <MenuItem value="Initial Consultation - Not Completed">Initial Consultation - Not Completed</MenuItem>
-              <MenuItem value="Mail - Completed">Mail - Completed</MenuItem>
-              <MenuItem value="Mail - Not Completed">Mail - Not Completed</MenuItem>
-              <MenuItem value="Meeting Billing - Completed">Meeting Billing - Completed</MenuItem>
-              <MenuItem value="Meeting Billing - Not Completed">Meeting Billing - Not Completed</MenuItem>
-              <MenuItem value="Personal Activity - Completed">Personal Activity - Completed</MenuItem>
-              <MenuItem value="Personal Activity - Not Completed">Personal Activity - Not Completed</MenuItem>
-              <MenuItem value="Note">Note</MenuItem>
-              <MenuItem value="Mail Received">Mail Received</MenuItem>
-              <MenuItem value="Mail Sent">Mail Sent</MenuItem>
-              <MenuItem value="Email Received">Email Received</MenuItem>
-              <MenuItem value="Courier Sent">Courier Sent</MenuItem>
-              <MenuItem value="Email Sent">Email Sent</MenuItem>
-              <MenuItem value="Payment Received">Payment Received</MenuItem>
-              <MenuItem value="Room 1 - Completed">Room 1 - Completed</MenuItem>
-              <MenuItem value="Room 1 - Not Completed">Room 1 - Not Completed</MenuItem>
-              <MenuItem value="Room 2 - Completed">Room 2 - Completed</MenuItem>
-              <MenuItem value="Room 2 - Not Completed">Room 2 - Not Completed</MenuItem>
-              <MenuItem value="Room 3 - Completed">Room 3 - Completed</MenuItem>
-              <MenuItem value="Room 3 - Not Completed">Room 3 - Not Completed</MenuItem>
-              <MenuItem value="To Do Billing - Completed">To Do Billing - Completed</MenuItem>
-              <MenuItem value="To Do Billing - Not Completed">To Do Billing - Not Completed</MenuItem>
-              <MenuItem value="Vacation - Completed">Vacation - Completed</MenuItem>
-              <MenuItem value="Vacation - Not Completed">Vacation - Not Completed</MenuItem>
-              <MenuItem value="Vacation Cancelled">Vacation Cancelled</MenuItem>
-              <MenuItem value="Attachment">Attachment</MenuItem>
-              <MenuItem value="E-mail Attachment">E-mail Attachment</MenuItem>
-            </Select>
-          </FormControl>
+            <FormControl fullWidth variant="standard" sx={{ marginTop: 1 }}>
+              <InputLabel>Type</InputLabel>
+              <Select
+                value={type}
+                onChange={(e) => setType(e.target.value)}
+                label="Type"
+              >
+                <MenuItem value="Meeting">Meeting</MenuItem>
+                <MenuItem value="To-Do">To-Do</MenuItem>
+                <MenuItem value="Appointment">Appointment</MenuItem>
+                <MenuItem value="Boardroom">Boardroom</MenuItem>
+                <MenuItem value="Call Billing">Call Billing</MenuItem>
+                <MenuItem value="Email Billing">Email Billing</MenuItem>
+                <MenuItem value="Initial Consultation">Initial Consultation</MenuItem>
+                <MenuItem value="Call">Call</MenuItem>
+                <MenuItem value="Mail">Mail</MenuItem>
+                <MenuItem value="Meeting Billing">Meeting Billing</MenuItem>
+                <MenuItem value="Personal Activity">Personal Activity</MenuItem>
+                <MenuItem value="Room 1">Room 1</MenuItem>
+                <MenuItem value="Room 2">Room 2</MenuItem>
+                <MenuItem value="Room 3">Room 3</MenuItem>
+                <MenuItem value="To Do Billing">To Do Billing</MenuItem>
+                <MenuItem value="Vacation">Vacation</MenuItem>
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth variant="standard" sx={{ marginTop: 1 }}>
+              <InputLabel>Result</InputLabel>
+              <Select
+                value={result}
+                onChange={(e) => setResult(e.target.value)}
+                label="Result"
+              >
+                <MenuItem value="Call Attempted">Call Attempted</MenuItem>
+                <MenuItem value="Call Completed">Call Completed</MenuItem>
+                <MenuItem value="Call Left Message">Call Left Message</MenuItem>
+                <MenuItem value="Call Received">Call Received</MenuItem>
+                <MenuItem value="Meeting Held">Meeting Held</MenuItem>
+                <MenuItem value="Meeting Not Held">Meeting Not Held</MenuItem>
+                <MenuItem value="To-do Done">To-do Done</MenuItem>
+                <MenuItem value="To-do Not Done">To-do Not Done</MenuItem>
+                <MenuItem value="Appointment Completed">Appointment Completed</MenuItem>
+                <MenuItem value="Appointment Not Completed">Appointment Not Completed</MenuItem>
+                <MenuItem value="Boardroom - Completed">Boardroom - Completed</MenuItem>
+                <MenuItem value="Boardroom - Not Completed">Boardroom - Not Completed</MenuItem>
+                <MenuItem value="Call Billing - Completed">Call Billing - Completed</MenuItem>
+                <MenuItem value="Initial Consultation - Completed">Initial Consultation - Completed</MenuItem>
+                <MenuItem value="Initial Consultation - Not Completed">Initial Consultation - Not Completed</MenuItem>
+                <MenuItem value="Mail - Completed">Mail - Completed</MenuItem>
+                <MenuItem value="Mail - Not Completed">Mail - Not Completed</MenuItem>
+                <MenuItem value="Meeting Billing - Completed">Meeting Billing - Completed</MenuItem>
+                <MenuItem value="Meeting Billing - Not Completed">Meeting Billing - Not Completed</MenuItem>
+                <MenuItem value="Personal Activity - Completed">Personal Activity - Completed</MenuItem>
+                <MenuItem value="Personal Activity - Not Completed">Personal Activity - Not Completed</MenuItem>
+                <MenuItem value="Note">Note</MenuItem>
+                <MenuItem value="Mail Received">Mail Received</MenuItem>
+                <MenuItem value="Mail Sent">Mail Sent</MenuItem>
+                <MenuItem value="Email Received">Email Received</MenuItem>
+                <MenuItem value="Courier Sent">Courier Sent</MenuItem>
+                <MenuItem value="Email Sent">Email Sent</MenuItem>
+                <MenuItem value="Payment Received">Payment Received</MenuItem>
+                <MenuItem value="Room 1 - Completed">Room 1 - Completed</MenuItem>
+                <MenuItem value="Room 1 - Not Completed">Room 1 - Not Completed</MenuItem>
+                <MenuItem value="Room 2 - Completed">Room 2 - Completed</MenuItem>
+                <MenuItem value="Room 2 - Not Completed">Room 2 - Not Completed</MenuItem>
+                <MenuItem value="Room 3 - Completed">Room 3 - Completed</MenuItem>
+                <MenuItem value="Room 3 - Not Completed">Room 3 - Not Completed</MenuItem>
+                <MenuItem value="To Do Billing - Completed">To Do Billing - Completed</MenuItem>
+                <MenuItem value="To Do Billing - Not Completed">To Do Billing - Not Completed</MenuItem>
+                <MenuItem value="Vacation - Completed">Vacation - Completed</MenuItem>
+                <MenuItem value="Vacation - Not Completed">Vacation - Not Completed</MenuItem>
+                <MenuItem value="Vacation Cancelled">Vacation Cancelled</MenuItem>
+                <MenuItem value="Attachment">Attachment</MenuItem>
+                <MenuItem value="E-mail Attachment">E-mail Attachment</MenuItem>
+              </Select>
+            </FormControl>
 
 
             <TextField

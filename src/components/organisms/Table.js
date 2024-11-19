@@ -21,6 +21,7 @@ const DownloadButton = ({ rowId, rowIcon }) => {
   const [waitingForDownload, setWaitingForDownload] = React.useState(false);
   return (
     <IconButton
+      sx={{ fontSize: "12pt" }}
       disableRipple
       onClick={async () => {
         setWaitingForDownload(true);
@@ -28,7 +29,6 @@ const DownloadButton = ({ rowId, rowIcon }) => {
           module: "History_X_Contacts",
           recordId: rowId,
         });
-        // console.log(data);
         if (data?.length > 0) {
           await zohoApi.file.downloadAttachmentById({
             module: "History_X_Contacts",
@@ -39,7 +39,6 @@ const DownloadButton = ({ rowId, rowIcon }) => {
           setWaitingForDownload(false);
         } else {
           enqueueSnackbar("No file.", { variant: "error" });
-          console.log("No data");
           setWaitingForDownload(false);
         }
       }}
@@ -71,74 +70,30 @@ function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
   };
 
   const headCells = [
-    {
-      id: "date_time",
-      numeric: false,
-      disablePadding: true,
-      label: "Date & Time",
-    },
-    {
-      id: "type",
-      numeric: false,
-      disablePadding: false,
-      label: "Type",
-    },
-    {
-      id: "result",
-      numeric: false,
-      disablePadding: false,
-      label: "Result",
-    },
-    {
-      id: "duration",
-      numeric: false,
-      disablePadding: false,
-      label: "Duration",
-    },
-    {
-      id: "regarding",
-      numeric: false,
-      disablePadding: false,
-      label: "Regarding & Details",
-    },
-    {
-      id: "icon",
-      numeric: false,
-      disablePadding: false,
-      label: <AttachmentIcon />,
-      dontShowSort: true,
-    },
-    {
-      id: "ownerName",
-      numeric: false,
-      disablePadding: false,
-      label: "Record Manager",
-    },
+    { id: "name", numeric: false, label: "Name" },
+    { id: "date_time", numeric: false, label: "Date & Time" },
+    { id: "type", numeric: false, label: "Type" },
+    { id: "result", numeric: false, label: "Result" },
+    { id: "duration", numeric: false, label: "Duration" },
+    { id: "regarding", numeric: false, label: "Regarding & Details" },
+    { id: "icon", numeric: false, label: <AttachmentIcon />, dontShowSort: true },
+    { id: "ownerName", numeric: false, label: "Record Manager" },
   ];
 
   return (
     <TableHead sx={{ bgcolor: "rgba(236, 240, 241, 1)" }}>
       <TableRow>
-        {headCells.map((headCell, index) => {
-          if (headCell?.dontShowSort) {
-            return (
-              <TableCell
-                key={headCell.id}
-                // align={headCell.numeric ? "right" : "left"}
-                // sortDirection={orderBy === headCell.id ? order : false}
-                size="small"
-              >
-                {headCell.label}
-              </TableCell>
-            );
-          }
-          return (
-            <TableCell
-              key={headCell.id}
-              align={headCell.numeric ? "right" : "left"}
-              sortDirection={orderBy === headCell.id ? order : false}
-              size="small"
-            >
+        {headCells.map((headCell) => (
+          <TableCell
+            key={headCell.id}
+            align={headCell.numeric ? "right" : "left"}
+            size="small"
+            sx={{
+              padding: "4px 8px",
+              fontSize: "9pt",
+            }}
+          >
+            {!headCell.dontShowSort ? (
               <TableSortLabel
                 active={orderBy === headCell.id}
                 direction={orderBy === headCell.id ? order : "asc"}
@@ -147,27 +102,23 @@ function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
                 {headCell.label}
                 {orderBy === headCell.id ? (
                   <Box component="span" sx={visuallyHidden}>
-                    {order === "desc"
-                      ? "sorted descending"
-                      : "sorted ascending"}
+                    {order === "desc" ? "sorted descending" : "sorted ascending"}
                   </Box>
                 ) : null}
               </TableSortLabel>
-            </TableCell>
-          );
-        })}
+            ) : (
+              headCell.label
+            )}
+          </TableCell>
+        ))}
       </TableRow>
     </TableHead>
   );
 }
 
-export function Table({
-  rows,
-  setSelectedRecordId,
-  handleClickOpenEditDialog,
-}) {
+export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog }) {
   const [order, setOrder] = React.useState("asc");
-  const [orderBy, setOrderBy] = React.useState("calories");
+  const [orderBy, setOrderBy] = React.useState("name");
 
   const handleRequestSort = (event, property) => {
     const isAsc = orderBy === property && order === "asc";
@@ -193,91 +144,84 @@ export function Table({
             orderBy={orderBy}
             handleRequestSort={handleRequestSort}
             rowCount={rows?.length}
-            // headCells={headCells}
           />
           <TableBody>
-            {visibleRows.map((row, index) => {
-              const labelId = `enhanced-table-checkbox-${index}`;
-
-              return (
-                <TableRow
-                  hover
-                  onClick={(event) =>
-                    handleClick(
-                      event,
-                      row.id,
-                      dayjs(row?.date_time).format("Z")
+            {visibleRows.map((row, index) => (
+              <TableRow
+                hover
+                onClick={(event) => handleClick(event, row.id)}
+                onDoubleClick={(event) => {
+                  handleClick(event, row.id);
+                  handleClickOpenEditDialog();
+                }}
+                tabIndex={-1}
+                key={row.id}
+                sx={{
+                  cursor: "pointer",
+                  "& .MuiTableCell-root": {
+                    padding: "4px 8px",
+                    fontSize: "9pt",
+                  },
+                }}
+              >
+                <TableCell
+                  size="small"
+                  sx={{
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                    color: "primary.main",
+                  }}
+                  onClick={() =>
+                    window.open(
+                      `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${row.historyDetails?.id}`,
+                      "_blank"
                     )
                   }
-                  onDoubleClick={(event) => {
-                    handleClick(event, row.id);
-                    handleClickOpenEditDialog();
-                  }}
-                  tabIndex={-1}
-                  key={row.id}
-                  sx={{ cursor: "pointer" }}
                 >
-                  <TableCell
-                    component="th"
-                    id={labelId}
-                    scope="row"
-                    size="small"
-                    sx={{ width: "15%" }}
-                  >
-                    {row?.date_time ? (
-                      <span>
-                        <span style={{ marginRight: ".5em" }}>
-                          {dayjs(row?.date_time).format("DD:MM:YYYY")}
-                        </span>
-                        <span>{dayjs(row?.date_time).format("h:mm A")}</span>
-                      </span>
-                    ) : null}
-                  </TableCell>
-                  <TableCell size="small" sx={{ width: "9%" }}>
-                    {row.type}
-                  </TableCell>
-                  <TableCell size="small" sx={{ width: "15%" }}>
-                    {row.result}
-                  </TableCell>
-                  <TableCell size="small" sx={{ width: "5%" }}>
-                    {row.duration}
-                  </TableCell>
-                  <TableCell size="small">
-                    {!!row.regarding ? (
-                      <span
-                        style={{
-                          display: "block",
-                          marginBottom: "4px",
-                          padding: "4px",
-                          backgroundColor: "rgba(236, 240, 241, 1)",
-                          borderRadius: "4px",
-                        }}
-                      >
-                        {row.regarding}
-                      </span>
-                    ) : null}
-                    <span
-                      style={{
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        display: "-webkit-box",
-                        WebkitLineClamp: 2, // number of lines to show
-                        lineClamp: 2,
-                        WebkitBoxOrient: "vertical",
+                  {
+                    JSON.stringify(row)
+                  }
+                </TableCell>
+                <TableCell size="small">
+                  {row?.date_time
+                    ? `${dayjs(row.date_time).format("DD/MM/YYYY h:mm A")}`
+                    : null}
+                </TableCell>
+                <TableCell size="small">{row.type}</TableCell>
+                <TableCell size="small">{row.result}</TableCell>
+                <TableCell size="small">{row.duration}</TableCell>
+                <TableCell size="small">
+                  {!!row.regarding && (
+                    <Box
+                      sx={{
+                        display: "block",
+                        marginBottom: "4px",
+                        padding: "4px",
+                        backgroundColor: "rgba(236, 240, 241, 1)",
+                        borderRadius: "4px",
                       }}
                     >
-                      {row.details}
-                    </span>
-                  </TableCell>
-                  <TableCell size="small" sx={{ width: "3%" }}>
-                    <DownloadButton rowId={row.id} rowIcon={row.icon} />
-                  </TableCell>
-                  <TableCell size="small" sx={{ width: "16%" }}>
-                    {row.ownerName}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                      {row.regarding}
+                    </Box>
+                  )}
+                  <Box
+                    sx={{
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                    }}
+                  >
+                    {row.details}
+                  </Box>
+                </TableCell>
+                <TableCell size="small">
+                  <DownloadButton rowId={row.id} rowIcon={row.icon} />
+                </TableCell>
+                <TableCell size="small">{row.ownerName}</TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </MUITable>
       </TableContainer>
