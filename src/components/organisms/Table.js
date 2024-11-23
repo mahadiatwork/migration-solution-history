@@ -15,6 +15,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { visuallyHidden } from "@mui/utils";
 import { useSnackbar } from "notistack";
 import { zohoApi } from "../../zohoApi";
+import DownloadIcon from '@mui/icons-material/Download';
 
 const DownloadButton = ({ rowId, rowIcon }) => {
   const { enqueueSnackbar } = useSnackbar();
@@ -134,95 +135,105 @@ export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog }) 
     () => [...(rows || [])].sort(getComparator(order, orderBy)),
     [order, rows, orderBy]
   );
+  
 
   return (
     <Paper sx={{ height: "25.5rem", overflowY: "auto" }}>
       <TableContainer>
-        <MUITable aria-labelledby="tableTitle" size="small">
+        <MUITable
+          aria-labelledby="tableTitle"
+          size="small"
+          sx={{ tableLayout: "fixed" }} // Ensures consistent column widths
+        >
           <EnhancedTableHead
             order={order}
             orderBy={orderBy}
             handleRequestSort={handleRequestSort}
             rowCount={rows?.length}
           />
-          <TableBody>
-            {visibleRows.map((row, index) => (
-              <TableRow
-                hover
-                onClick={(event) => handleClick(event, row.id)}
-                onDoubleClick={(event) => {
-                  handleClick(event, row.id);
-                  handleClickOpenEditDialog();
-                }}
-                tabIndex={-1}
-                key={row.id}
-                sx={{
-                  cursor: "pointer",
-                  "& .MuiTableCell-root": {
-                    padding: "4px 8px",
-                    fontSize: "9pt",
-                  },
-                }}
-              >
-                <TableCell
-                  size="small"
-                  sx={{
-                    cursor: "pointer",
-                    textDecoration: "underline",
-                    color: "primary.main",
-                  }}
-                  onClick={() =>
-                    window.open(
-                      `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${row.historyDetails?.id}`,
-                      "_blank"
-                    )
-                  }
-                >
-                  {
-                    JSON.stringify(row)
-                  }
-                </TableCell>
-                <TableCell size="small">
-                  {row?.date_time
-                    ? `${dayjs(row.date_time).format("DD/MM/YYYY h:mm A")}`
-                    : null}
-                </TableCell>
-                <TableCell size="small">{row.type}</TableCell>
-                <TableCell size="small">{row.result}</TableCell>
-                <TableCell size="small">{row.duration}</TableCell>
-                <TableCell size="small">
-                  {!!row.regarding && (
-                    <Box
-                      sx={{
-                        display: "block",
-                        marginBottom: "4px",
-                        padding: "4px",
-                        backgroundColor: "rgba(236, 240, 241, 1)",
-                        borderRadius: "4px",
-                      }}
-                    >
-                      {row.regarding}
-                    </Box>
-                  )}
-                  <Box
-                    sx={{
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      display: "-webkit-box",
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: "vertical",
-                    }}
-                  >
-                    {row.details}
-                  </Box>
-                </TableCell>
-                <TableCell size="small">
-                  <DownloadButton rowId={row.id} rowIcon={row.icon} />
-                </TableCell>
-                <TableCell size="small">{row.ownerName}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
+        <TableBody>
+  {visibleRows.map((row, index) => {
+    // Add a fallback to skip undefined rows
+    if (!row || typeof row.name === "undefined") {
+      console.warn("Skipping malformed row:", row);
+      return null; // Skip this iteration
+    }
+
+    return (
+      <TableRow
+        hover
+        key={row.id || index}
+        sx={{
+          cursor: "pointer",
+          "& .MuiTableCell-root": {
+            padding: "4px 8px",
+            fontSize: "9pt",
+          },
+        }}
+      >
+        <TableCell
+          size="small"
+          sx={{
+            cursor: "pointer",
+            textDecoration: "underline",
+            color: "primary.main",
+          }}
+          onClick={() =>
+            row.historyDetails?.id &&
+            window.open(
+              `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${row.historyDetails.id}`,
+              "_blank"
+            )
+          }
+        >
+          { row.historyDetails?.name || row.name || "Unknown Name"}
+        </TableCell>
+        <TableCell size="small">
+          {row?.date_time
+            ? `${dayjs(row.date_time).format("DD/MM/YYYY h:mm A")}`
+            : "No Date"}
+        </TableCell>
+        <TableCell size="small">{row.type || "Unknown Type"}</TableCell>
+        <TableCell size="small">{row.result || "No Result"}</TableCell>
+        <TableCell size="small">{row.duration || "N/A"}</TableCell>
+        <TableCell size="small" sx={{ width: "400px" }}>
+          <Box
+            sx={{
+              display: "-webkit-box",
+              WebkitLineClamp: 8,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "normal",
+              padding: "4px",
+            }}
+          >
+            {row.regarding || "No Regarding"}
+          </Box>
+          <Box
+            sx={{
+              display: "-webkit-box",
+              WebkitLineClamp: 8,
+              WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "normal",
+              padding: "4px",
+            }}
+          >
+            {row.details || "No Details"}
+          </Box>
+        </TableCell>
+        <DownloadButton
+            rowId={row.id} // Pass row id
+            rowIcon={row.icon || <DownloadIcon />} // Default to AttachmentIcon if icon is missing
+          />
+        <TableCell size="small">{row.ownerName || "Unknown Owner"}</TableCell>
+      </TableRow>
+    );
+  })}
+</TableBody>
+
         </MUITable>
       </TableContainer>
     </Paper>

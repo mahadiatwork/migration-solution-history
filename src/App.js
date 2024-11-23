@@ -138,6 +138,12 @@ function App() {
   const regarding = selectedObj?.regarding;
   const details = selectedObj?.details;
 
+
+  const handleRecordAdded = (newRecord) => {
+    setRelatedListData((prevData) => [newRecord, ...prevData]); // Add the new record to the top of the table
+  };
+  
+
   return (
     <React.Fragment>
       <Box sx={parentContainerStyle}>
@@ -345,6 +351,7 @@ function App() {
         ownerList={ownerList}
         loggedInUser={loggedInUser}
         ZOHO={ZOHO}
+        onRecordAdded={handleRecordAdded} // Pass the callback
       />
     </React.Fragment>
   );
