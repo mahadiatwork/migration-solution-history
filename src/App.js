@@ -56,6 +56,7 @@ function App() {
   const [dateRange, setDateRange] = React.useState();
   const [keyword, setKeyword] = React.useState("");
   const [loggedInUser, setLoggedInUser] = React.useState(null);
+  const [selectedRowData, setSelectedRowData] = React.useState(null);
 
 
   const handleClickOpenCreateDialog = () => {
@@ -66,11 +67,21 @@ function App() {
     setOpenCreateDialog(false);
   };
 
-  const handleClickOpenEditDialog = () => {
+  const handleClickOpenEditDialog = (rowData) => {
     setOpenEditDialog(true);
+    setSelectedRowData(rowData)
   };
 
-  const handleCloseEditDialog = () => {
+  const handleCloseEditDialog = (updatedRowData) => {
+    console.log({isRowChaning: updatedRowData})
+    if (updatedRowData) {
+      // Update the selected row in the relatedListData state
+      setRelatedListData(prevData => 
+        prevData.map((item) =>
+          item.id === updatedRowData.id ? { ...item, ...updatedRowData } : item
+        )
+      );
+    }
     setOpenEditDialog(false);
   };
 
@@ -135,14 +146,23 @@ function App() {
 
 
   let selectedObj = relatedListData?.find((obj) => obj?.id === selectedRecordId);
-  const regarding = selectedObj?.regarding;
-  const details = selectedObj?.details;
+
+  const [regarding, setRegarding] = React.useState(selectedRowData?.regarding || "")
+
+  const [details, setDetails] = React.useState(selectedRowData?.details || "")
 
 
   const handleRecordAdded = (newRecord) => {
     setRelatedListData((prevData) => [newRecord, ...prevData]); // Add the new record to the top of the table
   };
-  
+
+  const handleRightSideDataShow = (currentRegarding, currentDetails) => {
+    setRegarding(currentRegarding);
+    setDetails(currentDetails)
+  }
+
+
+  console.log({relatedListData})
 
   return (
     <React.Fragment>
@@ -290,12 +310,12 @@ function App() {
                     }
                     return true;
                   })
-                  ?.filter(({ icon, ownerName, ...el }) => {
-                    const vals = Object.values(el)
-                      ?.filter((el) => el !== undefined)
-                      ?.filter((el) => el !== null);
-                    return vals.some((str) => str.includes(keyword));
-                  })
+                  // ?.filter(({ icon, ownerName, ...el }) => {
+                  //   const vals = Object.values(el)
+                  //     ?.filter((el) => el !== undefined)
+                  //     ?.filter((el) => el !== null);
+                  //   return vals.some((str) => str.includes(keyword));
+                  // })
                   ?.filter((el) => {
                     if (dateRange?.preDay) {
                       return isInLastNDays(el?.date_time, dateRange?.preDay);
@@ -304,6 +324,7 @@ function App() {
                   })}
                 setSelectedRecordId={setSelectedRecordId}
                 handleClickOpenEditDialog={handleClickOpenEditDialog}
+                handleRightSideDataShow={handleRightSideDataShow}
               />
             </Grid>
             <Grid item xs={3}>
@@ -312,7 +333,9 @@ function App() {
                   sx={{
                     position: "absolute",
                     inset: "1rem",
-                    overflowY: "auto",
+                    overflow: "auto", // Allows overflow in both axes if needed
+                    wordWrap: "break-word", // Ensures long words break to next line
+                    whiteSpace: "normal", // Allows text to wrap normally
                   }}
                 >
                   {!!regarding ? (
@@ -323,13 +346,18 @@ function App() {
                         padding: "4px",
                         backgroundColor: "rgba(236, 240, 241, 1)",
                         borderRadius: "4px",
+                        wordWrap: "break-word", // Ensures text wraps correctly inside the span
+                        whiteSpace: "normal", // Ensures line breaks
                       }}
                     >
                       {regarding}
                     </span>
                   ) : null}
-                  {details || "No data"}
+                  <span style={{ wordWrap: "break-word", whiteSpace: "normal" }}>
+                    {details || "No data"}
+                  </span>
                 </Box>
+
               </Paper>
             </Grid>
           </Grid>
@@ -338,11 +366,11 @@ function App() {
       <Dialog
         openDialog={openEditDialog}
         handleCloseDialog={handleCloseEditDialog}
-        obj={selectedObj}
         title="Edit History"
         ownerList={ownerList}
         loggedInUser={loggedInUser}
         ZOHO={ZOHO}
+        selectedRowData={selectedRowData}
       />
       <Dialog
         openDialog={openCreateDialog}

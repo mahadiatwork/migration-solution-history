@@ -24,6 +24,7 @@ import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import Typography from "@mui/material/Typography";
 import Stakeholder from "../atoms/Stakeholder";
+import { getResultOptions } from "./helperFunc";
 
 
 const durationOptions = Array.from({ length: 24 }, (_, i) => (i + 1) * 10);
@@ -50,7 +51,6 @@ const resultMapping = {
 export function Dialog({
   openDialog,
   handleCloseDialog,
-  obj,
   title,
   ownerList,
   loggedInUser,
@@ -70,23 +70,24 @@ export function Dialog({
   const [historyContacts, setHistoryContacts] = React.useState([]);
   const [duration, setDuration] = React.useState("");
   const [selectedOwner, setSelectedOwner] = React.useState(loggedInUser || null);
-  const [regarding, setRegarding] = React.useState(obj?.regarding || "");
-  const [formData, setFormData] = React.useState(obj || {}); // Form data state
+  const [regarding, setRegarding] = React.useState(selectedRowData?.regarding || "");
+  const [formData, setFormData] = React.useState(selectedRowData || {}); // Form data state
   const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "success" });
+
 
   // Reinitialize dialog state when `openDialog` or `obj` changes
   React.useEffect(() => {
     if (openDialog) {
       setFormData({
-        ...obj,
+        ...selectedRowData,
         Participants: selectedRowData?.Participants || [],
-        result: obj?.result || "",
-        type: obj?.type || "",
-        duration: obj?.duration || "",
-        regarding: obj?.regarding || "",
-        details: obj?.details || "",
-        stakeHolder: obj?.stakeHolder || null,
-        date_time: obj?.date_time ? dayjs(obj.date_time) : dayjs(), // Initialize with the current date
+        result: selectedRowData?.result || "",
+        type: selectedRowData?.type || "",
+        duration: selectedRowData?.duration || "",
+        regarding: selectedRowData?.regarding || "",
+        details: selectedRowData?.details || "",
+        stakeHolder: selectedRowData?.stakeHolder || null,
+        date_time: selectedRowData?.date_time ? dayjs(selectedRowData.date_time) : dayjs(), // Initialize with the current date
       });
 
       setSelectedContacts(selectedRowData?.Participants || []);
@@ -95,16 +96,16 @@ export function Dialog({
       );
       setSelectedOwner(loggedInUser || null);
     }
-  }, [openDialog, obj, selectedRowData, loggedInUser]);
+  }, [openDialog, selectedRowData, loggedInUser]);
 
 
   React.useEffect(() => {
     const fetchHistoryData = async () => {
-      if (obj?.historyDetails) {
+      if (selectedRowData?.historyDetails) {
         try {
           const data = await ZOHO.CRM.API.getRelatedRecords({
             Entity: "History1",
-            RecordID: obj?.historyDetails?.id,
+            RecordID: selectedRowData?.historyDetails?.id,
             RelatedList: "Contacts3",
             page: 1,
             per_page: 200,
@@ -126,7 +127,7 @@ export function Dialog({
     if (openDialog) {
       fetchHistoryData();
     }
-  }, [obj?.historyDetails, openDialog]);
+  }, [selectedRowData?.historyDetails, openDialog]);
 
   const handleContactSearch = async (query) => {
     setNotFoundMessage("");
@@ -192,7 +193,7 @@ export function Dialog({
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-  
+
     // Map form data to API field names for History1
     const finalData = {
       Name: historyName,
@@ -200,10 +201,10 @@ export function Dialog({
       Regarding: formData.regarding,
       Owner: selectedOwner
         ? {
-            id: selectedOwner.id,
-            full_name: selectedOwner.full_name,
-            email: selectedOwner.email,
-          }
+          id: selectedOwner.id,
+          full_name: selectedOwner.full_name,
+          email: selectedOwner.email,
+        }
         : null,
       History_Result: formData.result || "",
       Stakeholder: formData.stakeHolder ? { id: formData.stakeHolder.id } : null,
@@ -213,24 +214,49 @@ export function Dialog({
         ? dayjs(formData.date_time).format("YYYY-MM-DDTHH:mm:ssZ")
         : null,
     };
-    
-  
+
     try {
       let historyId;
-  
+
       if (selectedRowData) {
+
         // Update the History1 record
         const updateConfig = {
           Entity: "History1",
           APIData: {
-            id: selectedRowData.id,
+            id: selectedRowData.historyDetails.id,
             ...finalData,
           },
           Trigger: ["workflow"],
         };
+
+
+        handleCloseDialog({
+          id: selectedRowData.id,
+          ...formData
+        });
         const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
         if (updateResponse?.data[0]?.code === "SUCCESS") {
-          historyId = selectedRowData.id; // Use the existing ID for the child record
+          historyId = selectedRowData.historyDetails.id; // Use the existing ID for the child record
+          const updateConfig = {
+            Entity: "History_X_Contacts",
+            APIData: {
+              id: selectedRowData?.id,
+              History_Details: formData.details || "",
+              History_Result: formData.result || "",
+              History_Type: formData.type || "",
+              Stakeholder: formData.stakeHolder ? { id: formData.stakeHolder.id } : null,
+              Regarding: formData.regarding || "",
+              History_Date_Time: formData.date_time
+                ? dayjs(formData.date_time).format("YYYY-MM-DDTHH:mm:ssZ")
+                : null,
+              Contact_History_Info: { id: historyId }, // Reference the History1 record
+            },
+            Trigger: ["workflow"],
+          };
+
+          const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
+          console.log({ updateResponse })
         } else {
           throw new Error("Failed to update History1 record.");
         }
@@ -243,52 +269,50 @@ export function Dialog({
           },
           Trigger: ["workflow"],
         };
-  
-        const createResponse = await ZOHO.CRM.API.insertRecord(createConfig);
 
-        console.log(createResponse)
+        const createResponse = await ZOHO.CRM.API.insertRecord(createConfig);
         if (createResponse?.data[0]?.code === "SUCCESS") {
           historyId = createResponse.data[0].details.id; // Get the new ID
+          if (historyId) {
+            const historyXContactsPromises = selectedContacts.map((contact) => {
+              const historyXContactsData = {
+                History_Details: formData.details || "",
+                History_Result: formData.result || "",
+                History_Type: formData.type || "",
+                Stakeholder: formData.stakeHolder ? { id: formData.stakeHolder.id } : null,
+                Regarding: formData.regarding || "",
+                History_Date_Time: formData.date_time
+                  ? dayjs(formData.date_time).format("YYYY-MM-DDTHH:mm:ssZ")
+                  : null,
+                Contact_Details: { id: contact.id }, // Reference the participant
+                Contact_History_Info: { id: historyId }, // Reference the History1 record
+              };
+
+              const historyXContactsConfig = {
+                Entity: "History_X_Contacts",
+                APIData: historyXContactsData,
+              };
+
+              return ZOHO.CRM.API.insertRecord(historyXContactsConfig);
+            });
+
+            const historyXContactsResponses = await Promise.all(historyXContactsPromises);
+
+            // Check for any errors in creating History_X_Contacts
+            const failedContacts = historyXContactsResponses.filter(
+              (response) => response?.data[0]?.code !== "SUCCESS"
+            );
+            if (failedContacts.length > 0) {
+              throw new Error("Failed to create one or more History_X_Contacts records.");
+            }
+          }
         } else {
           throw new Error("Failed to create History1 record.");
         }
       }
 
       // Map form data to API field names for History_X_Contacts
-      if (historyId) {
-        const historyXContactsPromises = selectedContacts.map((contact) => {
-          const historyXContactsData = {
-            History_Details: formData.details || "",
-            History_Result: formData.result || "",
-            History_Type: formData.type || "",
-            Stakeholder: formData.stakeHolder ? { id: formData.stakeHolder.id } : null,
-            Regarding: formData.regarding || "",
-            History_Date_Time: formData.date_time
-              ? dayjs(formData.date_time).format("YYYY-MM-DDTHH:mm:ssZ")
-              : null,
-              Contact_Details	: { id: contact.id }, // Reference the participant
-            Contact_History_Info: { id: historyId }, // Reference the History1 record
-          };
-  
-          const historyXContactsConfig = {
-            Entity: "History_X_Contacts",
-            APIData: historyXContactsData,
-          };
-  
-          return ZOHO.CRM.API.insertRecord(historyXContactsConfig);
-        });
-  
-        const historyXContactsResponses = await Promise.all(historyXContactsPromises);
-  
-        // Check for any errors in creating History_X_Contacts
-        const failedContacts = historyXContactsResponses.filter(
-          (response) => response?.data[0]?.code !== "SUCCESS"
-        );
-        if (failedContacts.length > 0) {
-          throw new Error("Failed to create one or more History_X_Contacts records.");
-        }
-      }
-  
+
       // Show success message
       setSnackbar({ open: true, message: "Record saved successfully!", severity: "success" });
     } catch (error) {
@@ -298,13 +322,12 @@ export function Dialog({
       handleCloseDialog();
     }
   };
-  
-  
+
+
 
   const handleCloseSnackbar = () => {
     setSnackbar({ open: false, message: "", severity: "success" });
   };
-
 
 
 
@@ -359,7 +382,7 @@ export function Dialog({
               <Autocomplete
                 options={durationOptions}
                 getOptionLabel={(option) => option.toString()}
-                value={formData.duration}
+                value={formData?.duration}
                 onChange={(event, newValue) =>
                   handleInputChange("duration", newValue)
                 }
@@ -375,7 +398,7 @@ export function Dialog({
                 fullWidth
                 multiline
                 variant="standard"
-                defaultValue={obj?.details || ""}
+                defaultValue={formData?.details || ""}
                 onChange={(e) => handleInputChange("details", e.target.value)}
               />
               <TextField
@@ -385,7 +408,7 @@ export function Dialog({
                 label="Regarding"
                 fullWidth
                 variant="standard"
-                value={formData.regarding}
+                value={formData?.regarding}
                 onChange={(e) => handleInputChange("regarding", e.target.value)}
               />
 
@@ -432,7 +455,10 @@ export function Dialog({
                 <InputLabel>Type</InputLabel>
                 <Select
                   value={formData.type}
-                  onChange={(e) => handleInputChange("type", e.target.value)}
+                  onChange={(e) => {
+                    handleInputChange("type", e.target.value)
+                    handleInputChange("result", getResultOptions(e.target.value))
+                  }}
                   label="Type"
                 >
                   <MenuItem value="Meeting">Meeting</MenuItem>

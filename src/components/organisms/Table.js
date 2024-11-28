@@ -27,12 +27,12 @@ const DownloadButton = ({ rowId, rowIcon }) => {
       onClick={async () => {
         setWaitingForDownload(true);
         const { data } = await zohoApi.file.getAttachments({
-          module: "History_X_Contacts",
+          module: "History1",
           recordId: rowId,
         });
         if (data?.length > 0) {
           await zohoApi.file.downloadAttachmentById({
-            module: "History_X_Contacts",
+            module: "History1",
             recordId: rowId,
             attachmentId: data?.[0]?.id,
             fileName: data?.[0]?.File_Name,
@@ -76,7 +76,7 @@ function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
     { id: "type", numeric: false, label: "Type" },
     { id: "result", numeric: false, label: "Result" },
     { id: "duration", numeric: false, label: "Duration" },
-    { id: "regarding", numeric: false, label: "Regarding & Details" },
+    { id: "regarding", numeric: false, label: "Regarding & Details", width: "400px" }, // Set width here
     { id: "icon", numeric: false, label: <AttachmentIcon />, dontShowSort: true },
     { id: "ownerName", numeric: false, label: "Record Manager" },
   ];
@@ -92,6 +92,7 @@ function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
             sx={{
               padding: "4px 8px",
               fontSize: "9pt",
+              width: headCell.width || "auto", // Apply width here
             }}
           >
             {!headCell.dontShowSort ? (
@@ -117,7 +118,7 @@ function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
   );
 }
 
-export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog }) {
+export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog,handleRightSideDataShow,searchKeyword }) {
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("name");
 
@@ -135,7 +136,6 @@ export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog }) 
     () => [...(rows || [])].sort(getComparator(order, orderBy)),
     [order, rows, orderBy]
   );
-  
 
   return (
     <Paper sx={{ height: "25.5rem", overflowY: "auto" }}>
@@ -143,7 +143,10 @@ export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog }) 
         <MUITable
           aria-labelledby="tableTitle"
           size="small"
-          sx={{ tableLayout: "fixed" }} // Ensures consistent column widths
+          sx={{
+            tableLayout: "fixed",
+            borderCollapse: "collapse",  // Add this line
+          }}
         >
           <EnhancedTableHead
             order={order}
@@ -151,89 +154,102 @@ export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog }) 
             handleRequestSort={handleRequestSort}
             rowCount={rows?.length}
           />
-        <TableBody>
-  {visibleRows.map((row, index) => {
-    // Add a fallback to skip undefined rows
-    if (!row || typeof row.name === "undefined") {
-      console.warn("Skipping malformed row:", row);
-      return null; // Skip this iteration
-    }
+          <TableBody>
+            {visibleRows.map((row, index) => {
+              // Add a fallback to skip undefined rows
+              if (!row || typeof row.name === "undefined") {
+                console.warn("Skipping malformed row:", row);
+                return null; // Skip this iteration
+              }
 
-    return (
-      <TableRow
-        hover
-        key={row.id || index}
-        sx={{
-          cursor: "pointer",
-          "& .MuiTableCell-root": {
-            padding: "4px 8px",
-            fontSize: "9pt",
-          },
-        }}
-      >
-        <TableCell
-          size="small"
-          sx={{
-            cursor: "pointer",
-            textDecoration: "underline",
-            color: "primary.main",
-          }}
-          onClick={() =>
-            row.historyDetails?.id &&
-            window.open(
-              `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${row.historyDetails.id}`,
-              "_blank"
-            )
-          }
-        >
-          { row.historyDetails?.name || row.name || "Unknown Name"}
-        </TableCell>
-        <TableCell size="small">
-          {row?.date_time
-            ? `${dayjs(row.date_time).format("DD/MM/YYYY h:mm A")}`
-            : "No Date"}
-        </TableCell>
-        <TableCell size="small">{row.type || "Unknown Type"}</TableCell>
-        <TableCell size="small">{row.result || "No Result"}</TableCell>
-        <TableCell size="small">{row.duration || "N/A"}</TableCell>
-        <TableCell size="small" sx={{ width: "400px" }}>
-          <Box
-            sx={{
-              display: "-webkit-box",
-              WebkitLineClamp: 8,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "normal",
-              padding: "4px",
-            }}
-          >
-            {row.regarding || "No Regarding"}
-          </Box>
-          <Box
-            sx={{
-              display: "-webkit-box",
-              WebkitLineClamp: 8,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "normal",
-              padding: "4px",
-            }}
-          >
-            {row.details || "No Details"}
-          </Box>
-        </TableCell>
-        <DownloadButton
-            rowId={row.id} // Pass row id
-            rowIcon={row.icon || <DownloadIcon />} // Default to AttachmentIcon if icon is missing
-          />
-        <TableCell size="small">{row.ownerName || "Unknown Owner"}</TableCell>
-      </TableRow>
-    );
-  })}
-</TableBody>
-
+              return (
+                <TableRow
+                  hover
+                  key={row.id || index}
+                  sx={{
+                    cursor: "pointer",
+                    borderBottom: "1px solid #ddd", // Add bottom border to TableRow
+                    "& .MuiTableCell-root": {
+                      padding: "4px 8px",
+                      fontSize: "9pt",
+                      borderBottom: "1px solid #ddd", // Ensure border for each TableCell
+                    },
+                  }}
+                  onDoubleClick={() => handleClickOpenEditDialog(row)}
+                  onClick={() => handleRightSideDataShow(row.regarding, row.details)}
+                >
+                  <TableCell
+                    size="small"
+                    sx={{
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      color: "primary.main",
+                    }}
+                    onClick={() =>
+                      row.historyDetails?.id &&
+                      window.open(
+                        `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${row.historyDetails.id}`,
+                        "_blank"
+                      )
+                    }
+                  >
+                    {row.historyDetails?.name || row.name || "Unknown Name"}
+                  </TableCell>
+                  <TableCell size="small">
+                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                      <span>{dayjs(row.date_time).format("DD/MM/YYYY")}</span>
+                      <span>{dayjs(row.date_time).format("h:mm A")}</span>
+                    </Box>
+                  </TableCell>
+                  <TableCell size="small">{row.type || "Unknown Type"}</TableCell>
+                  <TableCell size="small">{row.result || "No Result"}</TableCell>
+                  <TableCell size="small">{row.duration || "N/A"}</TableCell>
+                  <TableCell
+                    size="small"
+                    sx={{
+                      width: "400px", // Ensure this is applied correctly
+                      whiteSpace: "normal", // Allow wrapping of text
+                      wordWrap: "break-word", // Allow breaking long words
+                      overflow: "hidden", // Hide overflow content
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 8,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "normal",
+                        padding: "4px",
+                      }}
+                    >
+                      {row.regarding || "No Regarding"}
+                    </Box>
+                    <Box
+                      sx={{
+                        display: "-webkit-box",
+                        WebkitLineClamp: 8,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "normal",
+                        padding: "4px",
+                      }}
+                    >
+                      {row.details || "No Details"}
+                    </Box>
+                  </TableCell>
+                  <TableCell
+                    size="small"
+                  >
+                    <DownloadButton rowId={row.id} rowIcon={<DownloadIcon />} />
+                  </TableCell>
+                  <TableCell size="small">{row.ownerName || "Unknown Owner"}</TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
         </MUITable>
       </TableContainer>
     </Paper>
