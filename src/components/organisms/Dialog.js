@@ -27,6 +27,15 @@ import Stakeholder from "../atoms/Stakeholder";
 import { getResultOptions } from "./helperFunc";
 
 
+const debounce = (func, delay) => {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => func(...args), delay);
+  };
+};
+
+
 const durationOptions = Array.from({ length: 24 }, (_, i) => (i + 1) * 10);
 
 const resultMapping = {
@@ -56,6 +65,7 @@ export function Dialog({
   loggedInUser,
   ZOHO, // Zoho instance for API calls
   selectedRowData,
+  currentContact
 }) {
 
   const [contacts, setContacts] = React.useState([]);
@@ -90,7 +100,7 @@ export function Dialog({
         date_time: selectedRowData?.date_time ? dayjs(selectedRowData.date_time) : dayjs(), // Initialize with the current date
       });
 
-      setSelectedContacts(selectedRowData?.Participants || []);
+      setSelectedContacts(selectedRowData?.Participants || [currentContact] || []);
       setHistoryName(
         selectedRowData?.Participants?.map((p) => p.Full_Name).join(", ") || ""
       );
@@ -129,51 +139,52 @@ export function Dialog({
     }
   }, [selectedRowData?.historyDetails, openDialog]);
 
-  const handleContactSearch = async (query) => {
-    setNotFoundMessage("");
-    setLoading(true);
+  const debouncedHandleContactSearch = React.useRef(
+    debounce(async (query) => {
+      setNotFoundMessage("");
+      setLoading(true);
 
-    if (ZOHO && query.trim()) {
-      try {
-        const searchResults = await ZOHO.CRM.API.searchRecord({
-          Entity: "Contacts",
-          Type: "word",
-          Query: query.trim(),
-        });
+      if (ZOHO && query.trim()) {
+        try {
+          const searchResults = await ZOHO.CRM.API.searchRecord({
+            Entity: "Contacts",
+            Type: "word",
+            Query: query.trim(),
+          });
 
-        if (searchResults.data && searchResults.data.length > 0) {
-          const formattedContacts = searchResults.data.map((contact) => ({
-            Full_Name: contact.Full_Name,
-            id: contact.id,
-          }));
+          if (searchResults.data && searchResults.data.length > 0) {
+            const formattedContacts = searchResults.data.map((contact) => ({
+              Full_Name: contact.Full_Name,
+              id: contact.id,
+            }));
 
-          setContacts([...formattedContacts, ...selectedContacts]);
-          setNotFoundMessage("");
-        } else {
-          setNotFoundMessage(`"${query}" not found in the database`);
+            setContacts([...formattedContacts, ...selectedContacts]);
+            setNotFoundMessage("");
+          } else {
+            setNotFoundMessage(`"${query}" not found in the database`);
+          }
+        } catch (error) {
+          console.error("Error during search:", error);
+          setNotFoundMessage("An error occurred while searching. Please try again.");
+        } finally {
+          setLoading(false);
         }
-      } catch (error) {
-        console.error("Error during search:", error);
-        setNotFoundMessage("An error occurred while searching. Please try again.");
-      } finally {
+      } else {
         setLoading(false);
       }
-    } else {
-      setLoading(false);
-    }
-  };
+    }, 500) // Adjust debounce delay as needed
+  ).current;
 
   const handleInputChangeWithDelay = (event, newInputValue) => {
-    setInputValue(newInputValue);
+    setInputValue(newInputValue); // Update inputValue
     setNotFoundMessage("");
-    if (newInputValue.endsWith(" ")) {
-      handleContactSearch(newInputValue);
-    }
+    debouncedHandleContactSearch(newInputValue); // Call debounced function
   };
 
   const handleSelectionChange = (event, newValue) => {
     setSelectedContacts(newValue);
   };
+
 
   const handleRegardingChange = (event) => {
     setRegarding(event.target.value); // Update the state with user input
@@ -181,7 +192,7 @@ export function Dialog({
 
 
   React.useEffect(() => {
-    const names = selectedContacts.map((contact) => contact.Full_Name).join(", ");
+    const names = selectedContacts.map((contact) => contact?.Full_Name).join(", ");
     setHistoryName(names);
   }, [selectedContacts]);
 
@@ -349,7 +360,7 @@ export function Dialog({
               <Autocomplete
                 multiple
                 options={contacts}
-                getOptionLabel={(option) => option.Full_Name || ""}
+                getOptionLabel={(option) => option?.Full_Name || ""}
                 value={selectedContacts}
                 onChange={handleSelectionChange}
                 inputValue={inputValue}
@@ -367,7 +378,7 @@ export function Dialog({
                 }
                 renderTags={(value, getTagProps) =>
                   value.map((option, index) => (
-                    <Chip label={option.Full_Name} {...getTagProps({ index })} />
+                    <Chip label={option?.Full_Name} {...getTagProps({ index })} />
                   ))
                 }
                 renderInput={(params) => (

@@ -57,6 +57,9 @@ function App() {
   const [keyword, setKeyword] = React.useState("");
   const [loggedInUser, setLoggedInUser] = React.useState(null);
   const [selectedRowData, setSelectedRowData] = React.useState(null);
+  const [entityId, setEntityId] = React.useState(null);
+  const [currentContact, setCurrentContact] = React.useState(null)
+  const [zohoLoaded, setZohoLoaded] = React.useState(false);
 
 
   const handleClickOpenCreateDialog = () => {
@@ -104,6 +107,14 @@ function App() {
         await ZOHO.CRM.CONFIG.getCurrentUser().then(function (data) {
           setLoggedInUser(data.users[0]);
         });
+
+        await ZOHO.CRM.API.getRecord({
+          Entity: module, approved: "both", RecordID: recordId
+         })
+         .then(function(data){
+          setCurrentContact(data.data[0])
+         })
+         
 
 
         console.log("data", data)
@@ -380,6 +391,7 @@ function App() {
         loggedInUser={loggedInUser}
         ZOHO={ZOHO}
         onRecordAdded={handleRecordAdded} // Pass the callback
+        currentContact={currentContact}
       />
     </React.Fragment>
   );
