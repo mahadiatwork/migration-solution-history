@@ -78,7 +78,7 @@ function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
     { id: "duration", numeric: false, label: "Duration" },
     { id: "regarding", numeric: false, label: "Regarding & Details", width: "400px" }, // Set width here
     { id: "icon", numeric: false, label: <AttachmentIcon />, dontShowSort: true },
-    { id: "ownerName", numeric: false, label: "Record Manager" },
+    { id: "ownerName", numeric: false, label: "Record Owner" },
   ];
 
   return (
@@ -118,9 +118,10 @@ function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
   );
 }
 
-export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog,handleRightSideDataShow,searchKeyword }) {
+export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog, handleRightSideDataShow }) {
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("name");
+  const [selectedRowId, setSelectedRowId] = React.useState(null);
 
   const handleRequestSort = (event, property) => {
     const isAsc = orderBy === property && order === "asc";
@@ -128,8 +129,15 @@ export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog,han
     setOrderBy(property);
   };
 
-  const handleClick = (event, id) => {
-    setSelectedRecordId(id);
+  const handleRowClick = (row) => {
+    if (row.id === selectedRowId) {
+      // Deselect row if already selected
+      setSelectedRowId(null);
+    } else {
+      // Select the clicked row
+      setSelectedRowId(row.id);
+      handleRightSideDataShow(row.regarding, row.details);
+    }
   };
 
   const visibleRows = React.useMemo(
@@ -145,7 +153,7 @@ export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog,han
           size="small"
           sx={{
             tableLayout: "fixed",
-            borderCollapse: "collapse",  // Add this line
+            borderCollapse: "collapse",
           }}
         >
           <EnhancedTableHead
@@ -156,42 +164,49 @@ export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog,han
           />
           <TableBody>
             {visibleRows.map((row, index) => {
-              // Add a fallback to skip undefined rows
               if (!row || typeof row.name === "undefined") {
                 console.warn("Skipping malformed row:", row);
-                return null; // Skip this iteration
+                return null;
               }
+
+              const isSelected = row.id === selectedRowId;
 
               return (
                 <TableRow
-                  hover
                   key={row.id || index}
                   sx={{
                     cursor: "pointer",
-                    borderBottom: "1px solid #ddd", // Add bottom border to TableRow
+                    borderBottom: "1px solid #ddd",
+                    backgroundColor: isSelected ? "primary.main" : "inherit", // Highlight selected row
+                    color: isSelected ? "white" : "inherit", // Change text color for selected row
+                    "&:hover": {
+                      backgroundColor: isSelected ? "primary.main" : "rgba(0, 0, 0, 0.04)", // Apply hover only if not selected
+                    },
                     "& .MuiTableCell-root": {
+                      color: isSelected ? "white" : "inherit", // Ensure text color for cells
                       padding: "4px 8px",
                       fontSize: "9pt",
-                      borderBottom: "1px solid #ddd", // Ensure border for each TableCell
+                      borderBottom: "1px solid #ddd",
                     },
                   }}
                   onDoubleClick={() => handleClickOpenEditDialog(row)}
-                  onClick={() => handleRightSideDataShow(row.regarding, row.details)}
+                  onClick={() => handleRowClick(row)}
                 >
                   <TableCell
                     size="small"
                     sx={{
                       cursor: "pointer",
                       textDecoration: "underline",
-                      color: "primary.main",
+                      color: isSelected ? "white" : "primary.main",
                     }}
-                    onClick={() =>
+                    onClick={(e) => {
+                      e.stopPropagation();
                       row.historyDetails?.id &&
-                      window.open(
-                        `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${row.historyDetails.id}`,
-                        "_blank"
-                      )
-                    }
+                        window.open(
+                          `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${row.historyDetails.id}`,
+                          "_blank"
+                        );
+                    }}
                   >
                     {row.historyDetails?.name || row.name || "Unknown Name"}
                   </TableCell>
@@ -207,10 +222,10 @@ export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog,han
                   <TableCell
                     size="small"
                     sx={{
-                      width: "400px", // Ensure this is applied correctly
-                      whiteSpace: "normal", // Allow wrapping of text
-                      wordWrap: "break-word", // Allow breaking long words
-                      overflow: "hidden", // Hide overflow content
+                      width: "400px",
+                      whiteSpace: "normal",
+                      wordWrap: "break-word",
+                      overflow: "hidden",
                     }}
                   >
                     <Box
@@ -240,9 +255,7 @@ export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog,han
                       {row.details || "No Details"}
                     </Box>
                   </TableCell>
-                  <TableCell
-                    size="small"
-                  >
+                  <TableCell size="small">
                     <DownloadButton rowId={row.id} rowIcon={<DownloadIcon />} />
                   </TableCell>
                   <TableCell size="small">{row.ownerName || "Unknown Owner"}</TableCell>
@@ -255,3 +268,5 @@ export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog,han
     </Paper>
   );
 }
+
+

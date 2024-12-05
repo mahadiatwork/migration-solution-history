@@ -76,10 +76,10 @@ function App() {
   };
 
   const handleCloseEditDialog = (updatedRowData) => {
-    console.log({isRowChaning: updatedRowData})
+    console.log({ isRowChaning: updatedRowData })
     if (updatedRowData) {
       // Update the selected row in the relatedListData state
-      setRelatedListData(prevData => 
+      setRelatedListData(prevData =>
         prevData.map((item) =>
           item.id === updatedRowData.id ? { ...item, ...updatedRowData } : item
         )
@@ -89,6 +89,7 @@ function App() {
   };
 
   React.useEffect(() => {
+
     const fetchRLData = async () => {
       try {
         const { data } = await zohoApi.record.getRecordsFromRelatedList({
@@ -110,14 +111,11 @@ function App() {
 
         await ZOHO.CRM.API.getRecord({
           Entity: module, approved: "both", RecordID: recordId
-         })
-         .then(function(data){
-          setCurrentContact(data.data[0])
-         })
-         
+        })
+          .then(function (data) {
+            setCurrentContact(data.data[0])
+          })
 
-
-        console.log("data", data)
 
         const tempData = data?.map((obj) => ({
           name: obj.Name,
@@ -173,7 +171,7 @@ function App() {
   }
 
 
-  console.log({relatedListData})
+  console.log({ relatedListData })
 
   return (
     <React.Fragment>
@@ -359,12 +357,13 @@ function App() {
                         borderRadius: "4px",
                         wordWrap: "break-word", // Ensures text wraps correctly inside the span
                         whiteSpace: "normal", // Ensures line breaks
+                        fontSize: "9pt"
                       }}
                     >
                       {regarding}
                     </span>
                   ) : null}
-                  <span style={{ wordWrap: "break-word", whiteSpace: "normal" }}>
+                  <span style={{ wordWrap: "break-word", whiteSpace: "normal",fontSize: "9pt" }}>
                     {details || "No data"}
                   </span>
                 </Box>

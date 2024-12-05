@@ -12,6 +12,8 @@ export const useZohoInit = ({ height, width } = {}) => {
     zohoApi.auth.initZoho(
       (data, error) => {
         const { Entity, EntityId } = data;
+        console.log("entity", Entity);
+        console.log("EntityId", EntityId)
         setModule(Entity);
         setRecordId(EntityId);
         setInitialData(data);
