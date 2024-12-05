@@ -17,17 +17,14 @@ import {
 } from "@mui/material";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
-import DialogTitle from "@mui/material/DialogTitle";
 import { DemoContainer } from "@mui/x-date-pickers/internals/demo";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
-import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
-import Typography from "@mui/material/Typography";
-import Stakeholder from "../atoms/Stakeholder";
 import { getResultOptions } from "./helperFunc";
 import ContactField from "./ContactFields";
 import RegardingField from "./RegardingField";
+import DownloadIcon from '@mui/icons-material/Download';
 
 
 const debounce = (func, delay) => {
@@ -68,20 +65,13 @@ export function Dialog({
   loggedInUser,
   ZOHO, // Zoho instance for API calls
   selectedRowData,
-  currentContact
+  currentContact,
+  onRecordAdded
 }) {
 
-  const [contacts, setContacts] = React.useState([]);
   const [selectedContacts, setSelectedContacts] = React.useState([]);
-  const [inputValue, setInputValue] = React.useState("");
-  const [notFoundMessage, setNotFoundMessage] = React.useState("");
-  const [loading, setLoading] = React.useState(false);
-  const [result, setResult] = React.useState("");
-  const [type, setType] = React.useState("");
   const [historyName, setHistoryName] = React.useState("");
-  const [mainHistoryData, setMainHistoryData] = React.useState(null);
   const [historyContacts, setHistoryContacts] = React.useState([]);
-  const [duration, setDuration] = React.useState("");
   const [selectedOwner, setSelectedOwner] = React.useState(loggedInUser || null);
   const [regarding, setRegarding] = React.useState(selectedRowData?.regarding || "");
   const [formData, setFormData] = React.useState(selectedRowData || {}); // Form data state
@@ -177,7 +167,7 @@ export function Dialog({
       History_Result: formData.result || "",
       Stakeholder: formData.stakeHolder ? { id: formData.stakeHolder.id } : null,
       History_Type: formData.type || "",
-      Duration: formData.duration ? String(formData.duration) : null, // Convert duration to string
+      Duration: formData.duration ? String(formData.duration) : null,
       Date: formData.date_time
         ? dayjs(formData.date_time).format("YYYY-MM-DDTHH:mm:ssZ")
         : null,
@@ -186,49 +176,7 @@ export function Dialog({
     try {
       let historyId;
 
-      if (selectedRowData) {
-
-        // Update the History1 record
-        const updateConfig = {
-          Entity: "History1",
-          APIData: {
-            id: selectedRowData.historyDetails.id,
-            ...finalData,
-          },
-          Trigger: ["workflow"],
-        };
-
-
-        handleCloseDialog({
-          id: selectedRowData.id,
-          ...formData
-        });
-        const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
-        if (updateResponse?.data[0]?.code === "SUCCESS") {
-          historyId = selectedRowData.historyDetails.id; // Use the existing ID for the child record
-          const updateConfig = {
-            Entity: "History_X_Contacts",
-            APIData: {
-              id: selectedRowData?.id,
-              History_Details: formData.details || "",
-              History_Result: formData.result || "",
-              History_Type: formData.type || "",
-              Stakeholder: formData.stakeHolder ? { id: formData.stakeHolder.id } : null,
-              Regarding: formData.regarding || "",
-              History_Date_Time: formData.date_time
-                ? dayjs(formData.date_time).format("YYYY-MM-DDTHH:mm:ssZ")
-                : null,
-              Contact_History_Info: { id: historyId }, // Reference the History1 record
-            },
-            Trigger: ["workflow"],
-          };
-
-          const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
-          console.log({ updateResponse })
-        } else {
-          throw new Error("Failed to update History1 record.");
-        }
-      } else {
+      if (!selectedRowData) {
         // Create a new History1 record
         const createConfig = {
           Entity: "History1",
@@ -240,7 +188,25 @@ export function Dialog({
 
         const createResponse = await ZOHO.CRM.API.insertRecord(createConfig);
         if (createResponse?.data[0]?.code === "SUCCESS") {
-          historyId = createResponse.data[0].details.id; // Get the new ID
+          historyId = createResponse.data[0].details.id;
+
+          // Prepare the new record for the table
+          const newRecord = {
+            name: finalData.Name,
+            id: historyId,
+            date_time: finalData.Date,
+            type: finalData.History_Type,
+            result: finalData.History_Result,
+            duration: finalData.Duration,
+            regarding: finalData.Regarding,
+            details: finalData.History_Details_Plain,
+            icon: <DownloadIcon />, // Use the same icon setup
+            ownerName: finalData.Owner?.full_name || "",
+          };
+
+          // Pass the new record to the parent using the callback
+          onRecordAdded(newRecord);
+
           if (historyId) {
             const historyXContactsPromises = selectedContacts.map((contact) => {
               const historyXContactsData = {
@@ -252,8 +218,8 @@ export function Dialog({
                 History_Date_Time: formData.date_time
                   ? dayjs(formData.date_time).format("YYYY-MM-DDTHH:mm:ssZ")
                   : null,
-                Contact_Details: { id: contact.id }, // Reference the participant
-                Contact_History_Info: { id: historyId }, // Reference the History1 record
+                Contact_Details: { id: contact.id },
+                Contact_History_Info: { id: historyId },
               };
 
               const historyXContactsConfig = {
@@ -264,22 +230,12 @@ export function Dialog({
               return ZOHO.CRM.API.insertRecord(historyXContactsConfig);
             });
 
-            const historyXContactsResponses = await Promise.all(historyXContactsPromises);
-
-            // Check for any errors in creating History_X_Contacts
-            const failedContacts = historyXContactsResponses.filter(
-              (response) => response?.data[0]?.code !== "SUCCESS"
-            );
-            if (failedContacts.length > 0) {
-              throw new Error("Failed to create one or more History_X_Contacts records.");
-            }
+            await Promise.all(historyXContactsPromises);
           }
         } else {
           throw new Error("Failed to create History1 record.");
         }
       }
-
-      // Map form data to API field names for History_X_Contacts
 
       // Show success message
       setSnackbar({ open: true, message: "Record saved successfully!", severity: "success" });
@@ -288,6 +244,55 @@ export function Dialog({
       setSnackbar({ open: true, message: error.message || "An error occurred.", severity: "error" });
     } finally {
       handleCloseDialog();
+    }
+  };
+
+
+  const handleDelete = async () => {
+    if (!selectedRowData) return; // No record selected
+
+    try {
+      // Delete related records first
+      if (selectedRowData?.historyDetails) {
+        const relatedRecordsResponse = await ZOHO.CRM.API.getRelatedRecords({
+          Entity: "History1",
+          RecordID: selectedRowData?.historyDetails?.id,
+          RelatedList: "Contacts3",
+        });
+        const relatedRecords = relatedRecordsResponse?.data || [];
+        const deletePromises = relatedRecords.map((record) =>
+          ZOHO.CRM.API.deleteRecord({
+            Entity: "History_X_Contacts",
+            RecordID: record.id,
+          })
+        );
+
+
+        await Promise.all(deletePromises);
+      }
+
+      // Delete the main record
+      const response = await ZOHO.CRM.API.deleteRecord({
+        Entity: "History1",
+        RecordID: selectedRowData?.historyDetails?.id,
+      });
+
+      if (response?.data[0]?.code === "SUCCESS") {
+        setSnackbar({
+          open: true,
+          message: "Record and related records deleted successfully!",
+          severity: "success",
+        });
+
+        // Notify parent to remove the record from the table
+        handleCloseDialog({ deleted: true, id: selectedRowData.id });
+        window.location.reload();
+      } else {
+        throw new Error("Failed to delete record.");
+      }
+    } catch (error) {
+      console.error("Error deleting record or related records:", error);
+      setSnackbar({ open: true, message: "Error deleting records.", severity: "error" });
     }
   };
 
@@ -371,19 +376,25 @@ export function Dialog({
           onSubmit: handleSubmit,
           sx: {
             minWidth: "60%",
+            maxHeight: "90vh", // Prevent scrolling
+            overflow: "hidden", // Hide overflow if content exceeds
             "& *": {
               fontSize: "9pt", // Apply 9pt globally
             },
           },
         }}
       >
-        {/* <DialogTitle sx={{ fontSize: "16px" }}>{title}</DialogTitle> */}
-        <DialogContent>
-          {/* <Box></Box> */}
-           <Grid container spacing={2}>
+        <DialogContent
+          sx={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "8px", // Reduce spacing between fields
+          }}
+        >
+          <Grid container spacing={1}>
             <Grid item xs={12} sm={6}>
-            <FormControl fullWidth variant="standard">
-                <InputLabel>Type</InputLabel>
+              <FormControl fullWidth variant="standard" sx={{ fontSize: "9pt" }}>
+                <InputLabel sx={{ fontSize: "9pt" }}>Type</InputLabel>
                 <Select
                   value={formData.type}
                   onChange={(e) => {
@@ -391,9 +402,14 @@ export function Dialog({
                     handleInputChange("result", getResultOptions(e.target.value));
                   }}
                   label="Type"
+                  sx={{
+                    "& .MuiSelect-select": {
+                      fontSize: "9pt",
+                    },
+                  }}
                 >
                   {typeOptions.map((type) => (
-                    <MenuItem key={type} value={type}>
+                    <MenuItem key={type} value={type} sx={{ fontSize: "9pt" }}>
                       {type}
                     </MenuItem>
                   ))}
@@ -402,15 +418,20 @@ export function Dialog({
             </Grid>
 
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth variant="standard">
-                <InputLabel>Result</InputLabel>
+              <FormControl fullWidth variant="standard" sx={{ fontSize: "9pt" }}>
+                <InputLabel sx={{ fontSize: "9pt" }}>Result</InputLabel>
                 <Select
                   value={formData.result}
                   onChange={(e) => handleInputChange("result", e.target.value)}
                   label="Result"
+                  sx={{
+                    "& .MuiSelect-select": {
+                      fontSize: "9pt",
+                    },
+                  }}
                 >
-                  {typeOptions.map((result) => (
-                    <MenuItem key={result} value={result}>
+                  {resultOptions.map((result) => (
+                    <MenuItem key={result} value={result} sx={{ fontSize: "9pt" }}>
                       {result}
                     </MenuItem>
                   ))}
@@ -426,20 +447,39 @@ export function Dialog({
             currentContact={currentContact}
             selectedContacts={historyContacts}
           />
-          <Grid container>
-            <Grid item xs={6}>
-              <Box sx={{ width: "95%" }}>
+
+          <Grid container spacing={1}>
+            <Grid
+              item
+              xs={6}
+              sx={{
+                overflow: "hidden", // Ensure the grid container doesn't allow overflow
+                width: "98%"
+              }}
+            >
+              <Box sx={{ width: "99%", mt: -1 }}>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
-                  <DemoContainer components={["DateTimePicker"]}>
+                  <DemoContainer
+                    components={["DateTimePicker"]}
+                    sx={{
+                      overflow: "hidden", // Prevent overflow in the DemoContainer
+                    }}
+                  >
                     <DateTimePicker
                       id="date_time"
                       label="Date & Time"
                       name="date_time"
-                      value={formData.date_time || dayjs()} // Initialize with current date if null
-                      onChange={(newValue) => handleInputChange("date_time", newValue || dayjs())} // Update formData when date changes
+                      value={formData.date_time || dayjs()}
+                      onChange={(newValue) =>
+                        handleInputChange("date_time", newValue || dayjs())
+                      }
                       format="DD/MM/YYYY hh:mm A"
-                      sx={{ overflow: "hidden" }}
-                      fullWidth
+                      sx={{
+                        "& .MuiInputBase-input": {
+                          fontSize: "9pt",
+                        },
+                        overflow: "hidden", // Prevent overflow in the DateTimePicker
+                      }}
                       slotProps={{
                         textField: { variant: "standard", margin: "dense" },
                       }}
@@ -449,33 +489,65 @@ export function Dialog({
               </Box>
             </Grid>
 
+
             <Grid item xs={6}>
               <Autocomplete
                 options={durationOptions}
                 getOptionLabel={(option) => option.toString()}
                 value={formData?.duration}
-                onChange={(event, newValue) =>
-                  handleInputChange("duration", newValue)
-                }
+                onChange={(event, newValue) => handleInputChange("duration", newValue)}
                 renderInput={(params) => (
-                  <TextField {...params} label="Duration (Min)" variant="standard" sx={{ mt: 1 }} />
+                  <TextField
+                    {...params}
+                    label="Duration (Min)"
+                    variant="standard"
+                    sx={{
+                      "& .MuiInputBase-input": {
+                        fontSize: "9pt", // Font size for the input
+                      },
+                      "& .MuiInputLabel-root": {
+                        fontSize: "9pt", // Font size for the label
+                      },
+                      "& .MuiFormHelperText-root": {
+                        fontSize: "9pt", // Font size for helper text (if any)
+                      },
+                    }}
+                  />
                 )}
+                sx={{
+                  "& .MuiAutocomplete-option": {
+                    fontSize: "9pt", // Font size for dropdown options
+                  },
+                  "& .MuiAutocomplete-input": {
+                    fontSize: "9pt", // Font size for the input field inside the Autocomplete
+                  },
+                }}
               />
+
             </Grid>
           </Grid>
-          <Grid container>
+
+          <Grid container spacing={1}>
             <Grid item xs={6}>
-              <Box sx={{ width: "95%" }}>
-                <Autocomplete
-                  options={ownerList}
-                  getOptionLabel={(option) => option.full_name || ""}
-                  value={selectedOwner} // Default to loggedInUser if available
-                  onChange={(event, newValue) => setSelectedOwner(newValue)}
-                  renderInput={(params) => (
-                    <TextField {...params} label="Record Owner" name="history_owner" variant="standard" />
-                  )}
-                />
-              </Box>
+              <Autocomplete
+                options={ownerList}
+                getOptionLabel={(option) => option.full_name || ""}
+                value={selectedOwner}
+                onChange={(event, newValue) => setSelectedOwner(newValue)}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Record Owner"
+                    name="history_owner"
+                    variant="standard"
+                    sx={{
+                      "& .MuiInputBase-input": {
+                        fontSize: "9pt",
+                      },
+                    }}
+                  />
+                )}
+              />
             </Grid>
             <Grid item xs={6}>
               <RegardingField
@@ -484,13 +556,32 @@ export function Dialog({
               />
             </Grid>
           </Grid>
-          <Box sx={{ display: "flex", flexDirection: "column", width: "100%", mt: 2 }}>
-            <Box sx={{ display: "flex", alignItems: "center", gap: 1, width: "100%" }}>
 
-              {/* TextField for File Name */}
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 1,
+              mt: 2,
+              fontSize: "9pt",
+            }}
+          >
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1,
+                width: "100%",
+              }}
+            >
               <TextField
                 variant="standard"
-                sx={{ flexGrow: 1 }}
+                sx={{
+                  flexGrow: 1,
+                  "& .MuiInputBase-input": {
+                    fontSize: "9pt",
+                  },
+                }}
                 value={formData?.attachment?.name || ""}
                 placeholder="No file selected"
                 InputProps={{
@@ -498,7 +589,6 @@ export function Dialog({
                 }}
               />
 
-              {/* Attach Button */}
               <Button
                 variant="outlined"
                 size="small"
@@ -507,6 +597,7 @@ export function Dialog({
                   flexShrink: 0,
                   minWidth: "80px",
                   textTransform: "none",
+                  fontSize: "9pt",
                 }}
               >
                 Attachment
@@ -516,37 +607,61 @@ export function Dialog({
                   onChange={(e) => {
                     const file = e.target.files[0];
                     if (file) {
-                      handleInputChange("attachment", file); // Update formData with selected file
+                      handleInputChange("attachment", file);
                     }
                   }}
                 />
               </Button>
             </Box>
           </Box>
+
           <Box>
-              <TextField
-                margin="dense"
-                id="history_details"
-                name="history_details"
-                label="History Details"
-                fullWidth
-                multiline
-                variant="standard"
-                minRows={3}
-                defaultValue={formData?.details || ""}
-                onChange={(e) => handleInputChange("details", e.target.value)}
-              />
-            </Box>
+            <TextField
+              margin="dense"
+              id="history_details"
+              name="history_details"
+              label="History Details"
+              fullWidth
+              multiline
+              variant="standard"
+              minRows={3}
+              defaultValue={formData?.details || ""}
+              onChange={(e) => handleInputChange("details", e.target.value)}
+              sx={{
+                "& .MuiInputBase-input": {
+                  fontSize: "9pt",
+                },
+              }}
+            />
+          </Box>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog} variant="outlined">
+        <DialogActions sx={{ display: "flex", justifyContent: "space-between" }}>
+          <Button
+            onClick={handleDelete}
+            variant="outlined"
+            color="error"
+            sx={{
+              fontSize: "9pt",
+              marginLeft: "8px",
+              textTransform: "none",
+              padding: "4px 8px",
+            }}
+          >
+            Delete
+          </Button>
+          <Box sx={{display: "flex", gap: 1}}>          <Button
+            onClick={handleCloseDialog}
+            variant="outlined"
+            sx={{ fontSize: "9pt" }}
+          >
             Cancel
           </Button>
-          <Button type="submit" variant="contained">
-            Save
-          </Button>
+            <Button type="submit" variant="contained" sx={{ fontSize: "9pt" }}>
+              Save
+            </Button></Box>
         </DialogActions>
       </MUIDialog>
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}

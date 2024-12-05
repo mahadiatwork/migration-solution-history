@@ -111,12 +111,32 @@ export default function ContactField({
       return updatedParticipants;
     });
   };
-  
 
   // Save selected participants to parent state
   const handleOk = () => {
     handleInputChange("scheduledWith", selectedParticipants); // Sync with parent
     setIsModalOpen(false);
+  };
+
+  const commonStyles = {
+    "& .MuiInputBase-root": {
+      fontSize: "9pt",
+    },
+    "& .MuiInputLabel-root": {
+      fontSize: "9pt",
+    },
+    "& .MuiButton-root": {
+      fontSize: "9pt",
+    },
+    "& .MuiTypography-root": {
+      fontSize: "9pt",
+    },
+    "& .MuiTableCell-root": {
+      fontSize: "9pt",
+    },
+    "& .MuiMenuItem-root": {
+      fontSize: "9pt",
+    },
   };
 
   return (
@@ -133,15 +153,16 @@ export default function ContactField({
             readOnly: true,
           }}
           size="small"
+          sx={commonStyles}
         />
-        <Button variant="contained" onClick={handleOpen} size="small" sx={{ width: "100px" }}>
+        <Button variant="contained" onClick={handleOpen} size="small" sx={{ width: "100px", ...commonStyles }}>
           Contacts
         </Button>
       </Box>
 
       {/* Modal */}
       <Dialog open={isModalOpen} onClose={handleCancel} fullWidth maxWidth="md">
-        <DialogContent>
+        <DialogContent sx={commonStyles}>
           <Box display="flex" gap={2} mb={2}>
             <TextField
               select
@@ -150,6 +171,7 @@ export default function ContactField({
               onChange={(e) => setSearchType(e.target.value)}
               fullWidth
               size="small"
+              sx={commonStyles}
             >
               <MenuItem value="First_Name">First Name</MenuItem>
               <MenuItem value="Last_Name">Last Name</MenuItem>
@@ -163,11 +185,12 @@ export default function ContactField({
               onChange={(e) => setSearchText(e.target.value)}
               fullWidth
               size="small"
+              sx={commonStyles}
             />
             <Button
               variant="contained"
               onClick={handleSearch}
-              sx={{ width: "150px" }}
+              sx={{ width: "150px", ...commonStyles }}
             >
               Search
             </Button>
@@ -196,6 +219,7 @@ export default function ContactField({
                             (c) => c.id === contact.id
                           )}
                           onChange={() => toggleContactSelection(contact)}
+                          sx={commonStyles}
                         />
                       </TableCell>
                       <TableCell>{contact.First_Name}</TableCell>
@@ -220,7 +244,7 @@ export default function ContactField({
           <Box mt={3}>
             <Typography variant="h6">Selected Contacts:</Typography>
             <TableContainer>
-              <Table size="small" sx={{ tableLayout: "fixed", fontSize: "9pt" }}>
+              <Table size="small" sx={commonStyles}>
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ width: "50px", fontWeight: "bold" }}></TableCell>
@@ -238,6 +262,7 @@ export default function ContactField({
                         <Checkbox
                           checked
                           onChange={() => toggleContactSelection(contact)}
+                          sx={commonStyles}
                         />
                       </TableCell>
                       <TableCell>{contact.First_Name}</TableCell>
@@ -253,7 +278,7 @@ export default function ContactField({
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCancel} variant="outlined">
+          <Button onClick={handleCancel} variant="outlined" sx={commonStyles}>
             Cancel
           </Button>
           <Button
@@ -261,6 +286,7 @@ export default function ContactField({
             variant="contained"
             color="primary"
             disabled={selectedParticipants.length === 0}
+            sx={commonStyles}
           >
             OK
           </Button>

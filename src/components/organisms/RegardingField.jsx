@@ -43,9 +43,16 @@ const RegardingField = ({ formData, handleInputChange }) => {
   };
 
   return (
-    <Box sx={{ width: "100%",mt: "3px" }}>
+    <Box sx={{ width: "100%", mt: "3px" }}>
       <FormControl fullWidth size="small" variant="standard">
-        <InputLabel id="regarding-label">Regarding</InputLabel>
+        <InputLabel
+          id="regarding-label"
+          sx={{
+            fontSize: "9pt", // Adjust label font size
+          }}
+        >
+          Regarding
+        </InputLabel>
         <Select
           labelId="regarding-label"
           id="regarding-select"
@@ -55,14 +62,17 @@ const RegardingField = ({ formData, handleInputChange }) => {
             "& .MuiInputBase-root": {
               padding: "0 !important",
             },
+            fontSize: "9pt", // Ensure the dropdown options also have a 9pt font size
           }}
         >
           {predefinedOptions.map((option) => (
-            <MenuItem key={option} value={option}>
+            <MenuItem key={option} value={option} sx={{ fontSize: "9pt" }}>
               {option}
             </MenuItem>
           ))}
-          <MenuItem value="Other">Other (Manually enter)</MenuItem>
+          <MenuItem value="Other" sx={{ fontSize: "9pt" }}>
+            Other (Manually enter)
+          </MenuItem>
         </Select>
       </FormControl>
 
@@ -78,6 +88,9 @@ const RegardingField = ({ formData, handleInputChange }) => {
             mt: 2,
             "& .MuiInputBase-root": {
               padding: "0 !important",
+            },
+            "& .MuiInputLabel-root": {
+              fontSize: "9pt", // Ensure the custom input's label is also 9pt
             },
           }}
         />

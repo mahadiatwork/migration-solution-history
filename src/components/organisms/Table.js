@@ -118,7 +118,7 @@ function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
   );
 }
 
-export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog, handleRightSideDataShow }) {
+export function Table({ rows, highlightedRecordId, handleClickOpenEditDialog, handleRightSideDataShow }) {
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("name");
   const [selectedRowId, setSelectedRowId] = React.useState(null);
@@ -177,10 +177,20 @@ export function Table({ rows, setSelectedRecordId, handleClickOpenEditDialog, ha
                   sx={{
                     cursor: "pointer",
                     borderBottom: "1px solid #ddd",
-                    backgroundColor: isSelected ? "primary.main" : "inherit", // Highlight selected row
+                    backgroundColor:
+                      row.id === highlightedRecordId
+                        ? "rgba(255, 230, 130, 0.8)" // Highlight the newly created row
+                        : isSelected
+                          ? "primary.main" // Highlight selected row
+                          : "inherit", // Default background
                     color: isSelected ? "white" : "inherit", // Change text color for selected row
                     "&:hover": {
-                      backgroundColor: isSelected ? "primary.main" : "rgba(0, 0, 0, 0.04)", // Apply hover only if not selected
+                      backgroundColor:
+                        row.id === highlightedRecordId
+                          ? "rgba(255, 230, 130, 0.8)" // Keep highlight on hover for new row
+                          : isSelected
+                            ? "primary.main"
+                            : "rgba(0, 0, 0, 0.04)", // Apply hover only if not selected
                     },
                     "& .MuiTableCell-root": {
                       color: isSelected ? "white" : "inherit", // Ensure text color for cells
