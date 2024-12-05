@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
   Button,
@@ -30,17 +30,21 @@ export default function ContactField({
   const [searchText, setSearchText] = useState(""); // Search input
   const [filteredContacts, setFilteredContacts] = useState([]); // Filtered contacts for display
   const [isModalOpen, setIsModalOpen] = useState(false); // Modal state
+  const didMount = useRef(false); // Track initial render
 
   // Initialize `selectedParticipants` from `selectedContacts`
   useEffect(() => {
-    if (selectedContacts.length > 0) {
+    if (selectedContacts.length > 0 && !didMount.current) {
+      didMount.current = true; // Set flag after first render
       const formattedContacts = selectedContacts.map((contact) => ({
         id: contact.id,
         Full_Name: contact.Full_Name,
         Email: contact.Email || "No Email",
         Mobile: contact.Mobile || "N/A",
-        First_Name: contact.First_Name || contact.Full_Name?.split(" ")[0] || "N/A",
-        Last_Name: contact.Last_Name || contact.Full_Name?.split(" ")[1] || "N/A",
+        First_Name:
+          contact.First_Name || contact.Full_Name?.split(" ")[0] || "N/A",
+        Last_Name:
+          contact.Last_Name || contact.Full_Name?.split(" ")[1] || "N/A",
         ID_Number: contact.ID_Number || "N/A",
       }));
       setSelectedParticipants(formattedContacts);
@@ -83,7 +87,9 @@ export default function ContactField({
       if (searchResults.data && searchResults.data.length > 0) {
         const formattedContacts = searchResults.data.map((contact) => ({
           id: contact.id,
-          Full_Name: `${contact.First_Name || "N/A"} ${contact.Last_Name || "N/A"}`,
+          Full_Name: `${contact.First_Name || "N/A"} ${
+            contact.Last_Name || "N/A"
+          }`,
           Email: contact.Email || "No Email",
           Mobile: contact.Mobile || "N/A",
           First_Name: contact.First_Name || "N/A",
@@ -107,7 +113,15 @@ export default function ContactField({
       const updatedParticipants = alreadySelected
         ? prev.filter((c) => c.id !== contact.id) // Remove if already selected
         : [...prev, contact]; // Add if not selected
-      handleInputChange("scheduledWith", updatedParticipants); // Sync with parent
+
+      // Prevent redundant updates
+      if (
+        JSON.stringify(updatedParticipants) !==
+        JSON.stringify(selectedParticipants)
+      ) {
+        handleInputChange("scheduledWith", updatedParticipants); // Sync with parent
+      }
+
       return updatedParticipants;
     });
   };
@@ -155,7 +169,12 @@ export default function ContactField({
           size="small"
           sx={commonStyles}
         />
-        <Button variant="contained" onClick={handleOpen} size="small" sx={{ width: "100px", ...commonStyles }}>
+        <Button
+          variant="contained"
+          onClick={handleOpen}
+          size="small"
+          sx={{ width: "100px", ...commonStyles }}
+        >
           Contacts
         </Button>
       </Box>
@@ -173,12 +192,23 @@ export default function ContactField({
               size="small"
               sx={commonStyles}
             >
-              <MenuItem value="First_Name">First Name</MenuItem>
-              <MenuItem value="Last_Name">Last Name</MenuItem>
-              <MenuItem value="Email">Email</MenuItem>
-              <MenuItem value="Mobile">Mobile</MenuItem>
-              <MenuItem value="ID_Number">MS File Number</MenuItem>
+              <MenuItem value="First_Name" sx={{ fontSize: "9pt" }}>
+                First Name
+              </MenuItem>
+              <MenuItem value="Last_Name" sx={{ fontSize: "9pt" }}>
+                Last Name
+              </MenuItem>
+              <MenuItem value="Email" sx={{ fontSize: "9pt" }}>
+                Email
+              </MenuItem>
+              <MenuItem value="Mobile" sx={{ fontSize: "9pt" }}>
+                Mobile
+              </MenuItem>
+              <MenuItem value="ID_Number" sx={{ fontSize: "9pt" }}>
+                MS File Number
+              </MenuItem>
             </TextField>
+
             <TextField
               label="Search Text"
               value={searchText}
@@ -239,20 +269,26 @@ export default function ContactField({
               </TableBody>
             </Table>
           </TableContainer>
-
-          {/* Selected Contacts Table */}
           <Box mt={3}>
             <Typography variant="h6">Selected Contacts:</Typography>
             <TableContainer>
               <Table size="small" sx={commonStyles}>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ width: "50px", fontWeight: "bold" }}></TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>First Name</TableCell>
+                    <TableCell
+                      sx={{ width: "50px", fontWeight: "bold" }}
+                    ></TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>
+                      First Name
+                    </TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Last Name</TableCell>
-                    <TableCell sx={{ width: "30%", fontWeight: "bold" }}>Email</TableCell>
+                    <TableCell sx={{ width: "30%", fontWeight: "bold" }}>
+                      Email
+                    </TableCell>
                     <TableCell sx={{ fontWeight: "bold" }}>Mobile</TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>MS File Number</TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>
+                      MS File Number
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>

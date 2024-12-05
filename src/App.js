@@ -16,6 +16,7 @@ import { useZohoInit } from "./hook/useZohoInit";
 import { zohoApi } from "./zohoApi";
 import { Table } from "./components/organisms/Table";
 import { Dialog } from "./components/organisms/Dialog";
+import { TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -92,35 +93,35 @@ const App = () => {
                 });
 
                 const usersResponse = await ZOHO.CRM.API.getAllUsers({ Type: "AllUsers" });
-                const validUsers = usersResponse.users.filter((user) => user && user.full_name && user.id);
-                setOwnerList(validUsers);
+                const validUsers = usersResponse?.users?.filter((user) => user?.full_name && user?.id);
+                setOwnerList(validUsers || []);
 
                 const currentUserResponse = await ZOHO.CRM.CONFIG.getCurrentUser();
-                setLoggedInUser(currentUserResponse.users[0]);
+                setLoggedInUser(currentUserResponse?.users?.[0] || null);
 
                 const currentContactResponse = await ZOHO.CRM.API.getRecord({
                     Entity: module,
                     approved: "both",
                     RecordID: recordId,
                 });
-                setCurrentContact(currentContactResponse.data[0]);
+                setCurrentContact(currentContactResponse?.data?.[0] || null);
 
                 const tempData = data?.map((obj) => ({
-                    name: obj?.Name,
+                    name: obj?.Name || "No Name",
                     id: obj?.id,
                     date_time: obj?.History_Date_Time,
-                    type: obj?.History_Type,
-                    result: obj?.History_Result,
-                    duration: obj?.duration_min,
-                    regarding: obj?.Regarding,
-                    details: obj?.History_Details,
+                    type: obj?.History_Type || "Unknown Type",
+                    result: obj?.History_Result || "No Result",
+                    duration: obj?.duration_min || "N/A",
+                    regarding: obj?.Regarding || "No Regarding",
+                    details: obj?.History_Details || "No Details",
                     icon: <DownloadIcon />,
-                    ownerName: obj?.Owner?.name,
+                    ownerName: obj?.Owner?.name || "Unknown Owner",
                     historyDetails: obj?.Contact_History_Info,
                     stakeHolder: obj?.Stakeholder,
                 }));
 
-                setRelatedListData(tempData);
+                setRelatedListData(tempData || []);
 
                 const types = data
                     ?.map((el) => el.History_Type)
@@ -139,14 +140,19 @@ const App = () => {
         }
     }, [module, recordId]);
 
+    const [highlightedRecordId, setHighlightedRecordId] = React.useState(null);
+
     const handleRecordAdded = (newRecord) => {
-        setRelatedListData((prevData) => [newRecord, ...prevData]); // Add the new record to the top of the table
-      };      
+        setRelatedListData((prevData) => [newRecord, ...prevData]); // Add the new record to the top
+        setHighlightedRecordId(newRecord.id); // Set the highlighted record ID
+    };
 
     const handleRightSideDataShow = (currentRegarding, currentDetails) => {
-        setRegarding(currentRegarding);
-        setDetails(currentDetails);
+        setRegarding(currentRegarding || "No Regarding");
+        setDetails(currentDetails || "No Details");
     };
+
+
 
     return (
         <React.Fragment>
@@ -243,6 +249,7 @@ const App = () => {
                             </Button>
                         </Grid>
                         <Grid item xs={9}>
+
                             <Table
                                 rows={relatedListData
                                     ?.filter((el) => (selectedOwner ? el.ownerName === selectedOwner?.full_name : true))
@@ -251,6 +258,7 @@ const App = () => {
                                 setSelectedRecordId={setSelectedRecordId}
                                 handleClickOpenEditDialog={handleClickOpenEditDialog}
                                 handleRightSideDataShow={handleRightSideDataShow}
+                                highlightedRecordId={highlightedRecordId} // Pass the highlighted ID
                             />
                         </Grid>
                         <Grid item xs={3}>
@@ -287,7 +295,128 @@ const App = () => {
                             </Paper>
                         </Grid>
                     </Grid>
-                ) : null}
+                ) :
+                    <Box>
+                        <Grid container spacing={2}>
+                            <Grid
+                                item
+                                xs={9}
+                                sx={{
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    gap: "1rem",
+                                    "& > *": { flexGrow: 1, flexBasis: "0px" },
+                                }}
+                            >
+                                <Autocomplete
+                                    size="small"
+                                    options={dateOptions}
+                                    sx={{
+                                        width: "8rem",
+                                        "& .MuiInputBase-root": {
+                                            height: "30px",
+                                        },
+                                    }}
+                                    renderInput={(params) => <TextField {...params} label="Dates" size="small" />}
+                                    onChange={(e, value) => setDateRange(value)}
+                                />
+                                <Autocomplete
+                                    size="small"
+                                    options={typeList}
+                                    sx={{
+                                        width: "8rem",
+                                        "& .MuiInputBase-root": {
+                                            height: "30px",
+                                        },
+                                    }}
+                                    renderInput={(params) => <TextField {...params} label="Types" size="small" />}
+                                    onChange={(e, value) => setSelectedType(value)}
+                                />
+                                <TextField
+                                    size="small"
+                                    label="Keyword"
+                                    variant="outlined"
+                                    sx={{
+                                        width: "8rem",
+                                        "& .MuiInputBase-root": {
+                                            height: "30px",
+                                        },
+                                    }}
+                                    onChange={(e) => setKeyword(e.target.value)}
+                                />
+                                <Autocomplete
+                                    size="small"
+                                    options={ownerList || []}
+                                    getOptionLabel={(option) => option?.full_name || "Unknown User"}
+                                    value={selectedOwner || null}
+                                    isOptionEqualToValue={(option, value) => option?.id === value?.id}
+                                    sx={{
+                                        width: "8rem",
+                                        "& .MuiInputBase-root": {
+                                            height: "30px",
+                                        },
+                                    }}
+                                    renderInput={(params) => <TextField {...params} label="Users" size="small" />}
+                                    onChange={(e, value) => setSelectedOwner(value)}
+                                />
+                            </Grid>
+                            <Grid item xs={3} sx={{ display: "flex", justifyContent: "flex-end" }}>
+                                <Button
+                                    variant="contained"
+                                    sx={{
+                                        flexGrow: 1,
+                                        padding: "4px 8px",
+                                        fontSize: "0.75rem",
+                                        minHeight: "30px",
+                                        maxHeight: "30px",
+                                        lineHeight: "1rem",
+                                    }}
+                                    onClick={handleClickOpenCreateDialog}
+                                >
+                                    Create
+                                </Button>
+                            </Grid>
+                        </Grid>
+                        <Box mt={2}>
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell>Name</TableCell>
+                                            <TableCell>Type</TableCell>
+                                            <TableCell>Result</TableCell>
+                                            <TableCell>Date & Time</TableCell>
+                                            <TableCell>Owner</TableCell>
+                                        </TableRow>
+                                    </TableHead>
+                                    <TableBody>
+                                        {relatedListData.length > 0 ? (
+                                            relatedListData.map((row) => (
+                                                <TableRow key={row.id}>
+                                                    <TableCell>{row.name || "Unknown Name"}</TableCell>
+                                                    <TableCell>{row.type || "Unknown Type"}</TableCell>
+                                                    <TableCell>{row.result || "No Result"}</TableCell>
+                                                    <TableCell>
+                                                        {row.date_time
+                                                            ? dayjs(row.date_time).format("DD/MM/YYYY HH:mm A")
+                                                            : "No Date"}
+                                                    </TableCell>
+                                                    <TableCell>{row.ownerName || "Unknown Owner"}</TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={5} align="center">
+                                                    No data available
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Box>
+                    </Box>
+                }
             </Box>
             <Dialog
                 openDialog={openEditDialog}
