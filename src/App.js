@@ -77,11 +77,16 @@ const App = () => {
     const handleCloseEditDialog = (updatedRowData) => {
         if (updatedRowData) {
             setRelatedListData((prevData) =>
-                prevData.map((item) => (item.id === updatedRowData.id ? { ...item, ...updatedRowData } : item))
+                prevData.map((item) =>
+                    item.id === updatedRowData.id ? { ...item, ...updatedRowData } : item
+                )
             );
+            setHighlightedRecordId(updatedRowData.id); // Set the highlighted record ID
         }
         setOpenEditDialog(false);
     };
+
+
 
     React.useEffect(() => {
         const fetchRLData = async () => {
@@ -152,6 +157,16 @@ const App = () => {
         setDetails(currentDetails || "No Details");
     };
 
+    const handleRecordUpdate = (updatedRecord) => {
+        setRelatedListData((prevData) =>
+            prevData.map((row) =>
+                row.id === updatedRecord.id ? { ...row, ...updatedRecord } : row
+            )
+        );
+        setHighlightedRecordId(updatedRecord.id); // Set the highlighted record ID
+    };
+
+
 
 
     return (
@@ -184,22 +199,35 @@ const App = () => {
                                 size="small"
                                 options={dateOptions}
                                 sx={{
-                                    width: "8rem",
                                     "& .MuiInputBase-root": {
-                                        height: "30px",
+                                        height: "33px",
                                     },
+                                    "& .MuiInputLabel-root": {
+                                        fontSize: "9pt", // Adjust label font size
+                                    }
                                 }}
-                                renderInput={(params) => <TextField {...params} label="Dates" size="small" />}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Dates"
+                                        size="small"
+                                        InputLabelProps={{ style: { fontSize: "9pt" } }} // Additional inline styling for the label
+                                    />
+                                )}
                                 onChange={(e, value) => setDateRange(value)}
                             />
+
                             <Autocomplete
                                 size="small"
                                 options={typeList}
                                 sx={{
                                     width: "8rem",
                                     "& .MuiInputBase-root": {
-                                        height: "30px",
+                                        height: "33px",
                                     },
+                                    "& .MuiInputLabel-root": {
+                                        fontSize: "9pt", // Adjust label font size
+                                    }
                                 }}
                                 renderInput={(params) => <TextField {...params} label="Types" size="small" />}
                                 onChange={(e, value) => setSelectedType(value)}
@@ -211,8 +239,12 @@ const App = () => {
                                 sx={{
                                     width: "8rem",
                                     "& .MuiInputBase-root": {
-                                        height: "30px",
+                                        height: "33px",
                                     },
+                                    "& .MuiInputLabel-root": {
+                                        fontSize: "9pt", // Adjust label font size
+                                    }
+
                                 }}
                                 onChange={(e) => setKeyword(e.target.value)}
                             />
@@ -225,8 +257,12 @@ const App = () => {
                                 sx={{
                                     width: "8rem",
                                     "& .MuiInputBase-root": {
-                                        height: "30px",
+                                        height: "33px",
                                     },
+                                    "& .MuiInputLabel-root": {
+                                        fontSize: "9pt", // Adjust label font size
+                                    }
+
                                 }}
                                 renderInput={(params) => <TextField {...params} label="Users" size="small" />}
                                 onChange={(e, value) => setSelectedOwner(value)}
@@ -239,8 +275,8 @@ const App = () => {
                                     flexGrow: 1,
                                     padding: "4px 8px",
                                     fontSize: "0.75rem",
-                                    minHeight: "30px",
-                                    maxHeight: "30px",
+                                    minHeight: "33px",
+                                    maxHeight: "33px",
                                     lineHeight: "1rem",
                                 }}
                                 onClick={handleClickOpenCreateDialog}
@@ -258,8 +294,9 @@ const App = () => {
                                 setSelectedRecordId={setSelectedRecordId}
                                 handleClickOpenEditDialog={handleClickOpenEditDialog}
                                 handleRightSideDataShow={handleRightSideDataShow}
-                                highlightedRecordId={highlightedRecordId} // Pass the highlighted ID
+                                highlightedRecordId={highlightedRecordId} // Pass highlighted ID to the table
                             />
+
                         </Grid>
                         <Grid item xs={3}>
                             <Paper sx={{ height: "100%", position: "relative" }}>
@@ -392,17 +429,21 @@ const App = () => {
                                     <TableBody>
                                         {relatedListData.length > 0 ? (
                                             relatedListData.map((row) => (
-                                                <TableRow key={row.id}>
+                                                <TableRow
+                                                    key={row.id}
+                                                    sx={{
+                                                        backgroundColor: row.id === highlightedRecordId ? "rgba(0, 123, 255, 0.1)" : "inherit", // Highlight if ID matches
+                                                    }}
+                                                >
                                                     <TableCell>{row.name || "Unknown Name"}</TableCell>
                                                     <TableCell>{row.type || "Unknown Type"}</TableCell>
                                                     <TableCell>{row.result || "No Result"}</TableCell>
                                                     <TableCell>
-                                                        {row.date_time
-                                                            ? dayjs(row.date_time).format("DD/MM/YYYY HH:mm A")
-                                                            : "No Date"}
+                                                        {row.date_time ? dayjs(row.date_time).format("DD/MM/YYYY HH:mm A") : "No Date"}
                                                     </TableCell>
                                                     <TableCell>{row.ownerName || "Unknown Owner"}</TableCell>
                                                 </TableRow>
+
                                             ))
                                         ) : (
                                             <TableRow>
@@ -426,6 +467,7 @@ const App = () => {
                 loggedInUser={loggedInUser}
                 ZOHO={ZOHO}
                 selectedRowData={selectedRowData}
+                onRecordAdded={handleRecordUpdate} // Update the existing record
             />
             <Dialog
                 openDialog={openCreateDialog}

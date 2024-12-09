@@ -16,30 +16,40 @@ const RegardingField = ({ formData, handleInputChange }) => {
     "No appointments tonight",
   ]; // The predefined options
 
-  const [selectedValue, setSelectedValue] = useState(formData.regarding || "");
+  const [selectedValue, setSelectedValue] = useState("");
   const [manualInput, setManualInput] = useState("");
 
   useEffect(() => {
-    // Check if the selected value is part of the predefined options
-    if (selectedValue && !predefinedOptions.includes(selectedValue)) {
-      setSelectedValue("Other"); // Set to "Other" if it doesn't match any predefined option
-      setManualInput(formData.regarding); // Populate manual input with the custom value
+    if (formData.regarding) {
+      if (predefinedOptions.includes(formData.regarding)) {
+        setSelectedValue(formData.regarding);
+        setManualInput("");
+      } else {
+        setSelectedValue("Other");
+        setManualInput(formData.regarding);
+      }
+    } else {
+      setSelectedValue("");
+      setManualInput("");
     }
-  }, [selectedValue, formData.regarding]);
+  }, [formData.regarding]);
 
   const handleSelectChange = (event) => {
     const value = event.target.value;
     setSelectedValue(value);
+
     if (value !== "Other") {
       setManualInput(""); // Clear manual input if predefined option is selected
-      handleInputChange("regarding", value); // Pass the selected value to handleInputChange
+      handleInputChange("regarding", value); // Pass the selected value to parent
+    } else {
+      handleInputChange("regarding", ""); // Clear regarding in parent
     }
   };
 
   const handleManualInputChange = (event) => {
     const value = event.target.value;
     setManualInput(value);
-    handleInputChange("regarding", value); // Pass the manual input value to handleInputChange
+    handleInputChange("regarding", value); // Pass the manual input to parent
   };
 
   return (
@@ -48,7 +58,7 @@ const RegardingField = ({ formData, handleInputChange }) => {
         <InputLabel
           id="regarding-label"
           sx={{
-            fontSize: "9pt", // Adjust label font size
+            fontSize: "9pt",
           }}
         >
           Regarding
@@ -62,7 +72,7 @@ const RegardingField = ({ formData, handleInputChange }) => {
             "& .MuiInputBase-root": {
               padding: "0 !important",
             },
-            fontSize: "9pt", // Ensure the dropdown options also have a 9pt font size
+            fontSize: "9pt",
           }}
         >
           {predefinedOptions.map((option) => (
@@ -75,7 +85,6 @@ const RegardingField = ({ formData, handleInputChange }) => {
           </MenuItem>
         </Select>
       </FormControl>
-
       {selectedValue === "Other" && (
         <TextField
           label="Enter your custom regarding"
@@ -86,11 +95,14 @@ const RegardingField = ({ formData, handleInputChange }) => {
           onChange={handleManualInputChange}
           sx={{
             mt: 2,
-            "& .MuiInputBase-root": {
-              padding: "0 !important",
+            "& .MuiInputBase-input": {
+              fontSize: "9pt", // Set input text size
             },
             "& .MuiInputLabel-root": {
-              fontSize: "9pt", // Ensure the custom input's label is also 9pt
+              fontSize: "9pt", // Set label text size
+            },
+            "& .MuiFormHelperText-root": {
+              fontSize: "9pt", // Set helper text size if needed
             },
           }}
         />

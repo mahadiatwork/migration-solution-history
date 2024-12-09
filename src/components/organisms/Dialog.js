@@ -57,6 +57,10 @@ const resultMapping = {
   "Vacation": "Vacation - Completed",
 };
 
+const typeMapping = Object.fromEntries(
+  Object.entries(resultMapping).map(([type, result]) => [result, type])
+);
+
 export function Dialog({
   openDialog,
   handleCloseDialog,
@@ -81,8 +85,7 @@ export function Dialog({
   // Reinitialize dialog state when `openDialog` or `obj` changes
   React.useEffect(() => {
     if (openDialog) {
-      setFormData({
-        ...selectedRowData,
+      setFormData((prev) => ({
         Participants: selectedRowData?.Participants || [],
         result: selectedRowData?.result || "",
         type: selectedRowData?.type || "",
@@ -90,16 +93,19 @@ export function Dialog({
         regarding: selectedRowData?.regarding || "",
         details: selectedRowData?.details || "",
         stakeHolder: selectedRowData?.stakeHolder || null,
-        date_time: selectedRowData?.date_time ? dayjs(selectedRowData.date_time) : dayjs(), // Initialize with the current date
-      });
+        date_time: selectedRowData?.date_time ? dayjs(selectedRowData.date_time) : dayjs(), // Default to current date
+      }));
 
+      // Set default values for related fields
       setSelectedContacts(selectedRowData?.Participants || [currentContact] || []);
       setHistoryName(
-        selectedRowData?.Participants?.map((p) => p.Full_Name).join(", ") || ""
+        (selectedRowData?.Participants?.map((p) => p.Full_Name).join(", ")) || ""
       );
       setSelectedOwner(loggedInUser || null);
     }
-  }, [openDialog, selectedRowData, loggedInUser]);
+  }, [openDialog, selectedRowData, loggedInUser, currentContact]);
+
+
 
 
   React.useEffect(() => {
@@ -152,7 +158,6 @@ export function Dialog({
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    // Map form data to API field names for History1
     const finalData = {
       Name: historyName,
       History_Details_Plain: formData.details,
@@ -174,10 +179,41 @@ export function Dialog({
     };
 
     try {
-      let historyId;
+      if (selectedRowData) {
+        // Update an existing record
+        const updateConfig = {
+          Entity: "History1",
+          RecordID: selectedRowData?.historyDetails?.id,
+          APIData: {
+            id: selectedRowData?.historyDetails?.id,
+            ...finalData,
+          },
+          Trigger: ["workflow"],
+        };
 
-      if (!selectedRowData) {
-        // Create a new History1 record
+        const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
+        if (updateResponse?.data[0]?.code === "SUCCESS") {
+          const updatedRecord = {
+            ...selectedRowData, // Preserve existing fields
+            name: finalData.Name,
+            date_time: finalData.Date,
+            type: finalData.History_Type,
+            result: finalData.History_Result,
+            duration: finalData.Duration,
+            regarding: finalData.Regarding,
+            details: finalData.History_Details_Plain,
+            ownerName: finalData.Owner?.full_name || "",
+          };
+
+          // Pass the updated record to the parent
+          if (onRecordAdded) onRecordAdded(updatedRecord);
+
+          setSnackbar({ open: true, message: "Record updated successfully!", severity: "success" });
+        } else {
+          throw new Error("Failed to update record.");
+        }
+      } else {
+        // Create a new record
         const createConfig = {
           Entity: "History1",
           APIData: {
@@ -188,57 +224,25 @@ export function Dialog({
 
         const createResponse = await ZOHO.CRM.API.insertRecord(createConfig);
         if (createResponse?.data[0]?.code === "SUCCESS") {
-          historyId = createResponse.data[0].details.id;
-
-          // Prepare the new record for the table
           const newRecord = {
             name: finalData.Name,
-            id: historyId,
+            id: createResponse.data[0].details.id,
             date_time: finalData.Date,
             type: finalData.History_Type,
             result: finalData.History_Result,
             duration: finalData.Duration,
             regarding: finalData.Regarding,
             details: finalData.History_Details_Plain,
-            icon: <DownloadIcon />, // Use the same icon setup
             ownerName: finalData.Owner?.full_name || "",
           };
 
-          // Pass the new record to the parent using the callback
-          onRecordAdded(newRecord);
+          if (onRecordAdded) onRecordAdded(newRecord);
 
-          if (historyId) {
-            const historyXContactsPromises = selectedContacts.map((contact) => {
-              const historyXContactsData = {
-                History_Details: formData.details || "",
-                History_Result: formData.result || "",
-                History_Type: formData.type || "",
-                Stakeholder: formData.stakeHolder ? { id: formData.stakeHolder.id } : null,
-                Regarding: formData.regarding || "",
-                History_Date_Time: formData.date_time
-                  ? dayjs(formData.date_time).format("YYYY-MM-DDTHH:mm:ssZ")
-                  : null,
-                Contact_Details: { id: contact.id },
-                Contact_History_Info: { id: historyId },
-              };
-
-              const historyXContactsConfig = {
-                Entity: "History_X_Contacts",
-                APIData: historyXContactsData,
-              };
-
-              return ZOHO.CRM.API.insertRecord(historyXContactsConfig);
-            });
-
-            await Promise.all(historyXContactsPromises);
-          }
+          setSnackbar({ open: true, message: "Record created successfully!", severity: "success" });
         } else {
-          throw new Error("Failed to create History1 record.");
+          throw new Error("Failed to create record.");
         }
       }
-
-      // Show success message
-      setSnackbar({ open: true, message: "Record saved successfully!", severity: "success" });
     } catch (error) {
       console.error("Error saving records:", error);
       setSnackbar({ open: true, message: error.message || "An error occurred.", severity: "error" });
@@ -322,6 +326,8 @@ export function Dialog({
     "Other"
   ];
 
+
+
   const resultOptions = [
     "Call Attempted",
     "Call Completed",
@@ -396,7 +402,7 @@ export function Dialog({
               <FormControl fullWidth variant="standard" sx={{ fontSize: "9pt" }}>
                 <InputLabel sx={{ fontSize: "9pt" }}>Type</InputLabel>
                 <Select
-                  value={formData.type}
+                  value={formData.type || ""} // Ensure a fallback value
                   onChange={(e) => {
                     handleInputChange("type", e.target.value);
                     handleInputChange("result", getResultOptions(e.target.value));
@@ -421,8 +427,17 @@ export function Dialog({
               <FormControl fullWidth variant="standard" sx={{ fontSize: "9pt" }}>
                 <InputLabel sx={{ fontSize: "9pt" }}>Result</InputLabel>
                 <Select
-                  value={formData.result}
-                  onChange={(e) => handleInputChange("result", e.target.value)}
+                  value={formData.result || ""} // Ensure a fallback value
+                  onChange={(e) => {
+                    const selectedResult = e.target.value;
+                    handleInputChange("result", selectedResult);
+
+                    // Autopopulate the type if a mapping exists
+                    const correspondingType = typeMapping[selectedResult];
+                    if (correspondingType) {
+                      handleInputChange("type", correspondingType);
+                    }
+                  }}
                   label="Result"
                   sx={{
                     "& .MuiSelect-select": {
@@ -494,7 +509,7 @@ export function Dialog({
               <Autocomplete
                 options={durationOptions}
                 getOptionLabel={(option) => option.toString()}
-                value={formData?.duration}
+                value={formData?.duration || null} // Provide a fallback value
                 onChange={(event, newValue) => handleInputChange("duration", newValue)}
                 renderInput={(params) => (
                   <TextField
@@ -523,6 +538,7 @@ export function Dialog({
                   },
                 }}
               />
+
 
             </Grid>
           </Grid>
@@ -649,7 +665,7 @@ export function Dialog({
           >
             Delete
           </Button>
-          <Box sx={{display: "flex", gap: 1}}>          <Button
+          <Box sx={{ display: "flex", gap: 1 }}>          <Button
             onClick={handleCloseDialog}
             variant="outlined"
             sx={{ fontSize: "9pt" }}
