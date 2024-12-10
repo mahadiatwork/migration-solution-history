@@ -48,7 +48,7 @@ export default function ContactField({
         ID_Number: contact.ID_Number || "N/A",
       }));
       setSelectedParticipants(formattedContacts);
-      handleInputChange("scheduledWith", formattedContacts); // Sync with parent
+      handleInputChange("Participants", formattedContacts); // Sync with parent
     }
   }, [selectedContacts, handleInputChange]);
 
@@ -119,7 +119,7 @@ export default function ContactField({
         JSON.stringify(updatedParticipants) !==
         JSON.stringify(selectedParticipants)
       ) {
-        handleInputChange("scheduledWith", updatedParticipants); // Sync with parent
+        handleInputChange("Participants", updatedParticipants); // Sync with parent
       }
 
       return updatedParticipants;
@@ -128,9 +128,19 @@ export default function ContactField({
 
   // Save selected participants to parent state
   const handleOk = () => {
-    handleInputChange("scheduledWith", selectedParticipants); // Sync with parent
+    const formattedContacts = selectedParticipants.map((contact) => ({
+      id: contact.id,
+      Full_Name: contact.Full_Name,
+      Email: contact.Email,
+      Mobile: contact.Mobile,
+    }));
+  
+    // Pass the updated contacts to the parent
+    handleInputChange("Participants", formattedContacts); // Use "Participants" or the relevant field key
+  
     setIsModalOpen(false);
   };
+  
 
   const commonStyles = {
     "& .MuiInputBase-root": {

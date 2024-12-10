@@ -78,13 +78,23 @@ const App = () => {
         if (updatedRowData) {
             setRelatedListData((prevData) =>
                 prevData.map((item) =>
-                    item.id === updatedRowData.id ? { ...item, ...updatedRowData } : item
+                    item.id === updatedRowData.id
+                        ? {
+                            ...item,
+                            ...updatedRowData,
+                            name: updatedRowData.Participants
+                                ? updatedRowData.Participants.map((c) => c.Full_Name).join(", ")
+                                : item.name,
+                        }
+                        : item
                 )
             );
             setHighlightedRecordId(updatedRowData.id); // Set the highlighted record ID
         }
         setOpenEditDialog(false);
     };
+
+
 
 
 
@@ -147,10 +157,24 @@ const App = () => {
 
     const [highlightedRecordId, setHighlightedRecordId] = React.useState(null);
 
-    const handleRecordAdded = (newRecord) => {
-        setRelatedListData((prevData) => [newRecord, ...prevData]); // Add the new record to the top
-        setHighlightedRecordId(newRecord.id); // Set the highlighted record ID
-    };
+const handleRecordAdded = (newRecord) => {
+  setRelatedListData((prevData) => {
+    const newData = [
+      {
+        ...newRecord,
+        name: newRecord.Participants
+          ? newRecord.Participants.map((c) => c.Full_Name).join(", ")
+          : newRecord.name,
+      },
+      ...prevData,
+    ];
+    console.log("Updated Related List Data:", newData); // Debug
+    return newData;
+  });
+  setHighlightedRecordId(newRecord.id); // Highlight the new record
+};
+
+
 
     const handleRightSideDataShow = (currentRegarding, currentDetails) => {
         setRegarding(currentRegarding || "No Regarding");
@@ -158,12 +182,37 @@ const App = () => {
     };
 
     const handleRecordUpdate = (updatedRecord) => {
-        setRelatedListData((prevData) =>
-            prevData.map((row) =>
-                row.id === updatedRecord.id ? { ...row, ...updatedRecord } : row
-            )
-        );
-        setHighlightedRecordId(updatedRecord.id); // Set the highlighted record ID
+        console.log("Updated Record:", updatedRecord);
+
+        // Normalize updatedRecord keys to match relatedListData keys
+        const normalizedRecord = {
+            ...updatedRecord,
+            type: updatedRecord.History_Type,
+            result: updatedRecord.History_Result,
+            duration: updatedRecord.Duration,
+            regarding: updatedRecord.Regarding,
+            details: updatedRecord.History_Details_Plain,
+            // name: updatedRecord.Participants
+            //     ? updatedRecord.Participants.map((c) => c.Full_Name).join(", ")
+            //     : updatedRecord.name,
+        };
+
+        setRelatedListData((prevData) => {
+            const updatedData = prevData.map((row) => {
+                if (row.id === updatedRecord.id) {
+                    return {
+                        ...row,
+                        ...normalizedRecord,
+                    };
+                }
+                return row;
+            });
+
+            console.log("Updated Related List Data:", updatedData);
+            return updatedData;
+        });
+
+        setHighlightedRecordId(updatedRecord.id); // Highlight the updated record
     };
 
 

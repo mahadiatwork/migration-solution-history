@@ -118,10 +118,20 @@ function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
   );
 }
 
-export function Table({ rows,  highlightedRecordId, handleClickOpenEditDialog, handleRightSideDataShow }) {
+export function Table({
+  rows,
+  highlightedRecordId,
+  handleClickOpenEditDialog,
+  handleRightSideDataShow,
+}) {
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("name");
-  const [selectedRowId, setSelectedRowId] = React.useState(null);
+  const [selectedRowId, setSelectedRowId] = React.useState(highlightedRecordId); // Sync with highlightedRecordId
+
+  // Ensure selectedRowId matches highlightedRecordId on updates
+  React.useEffect(() => {
+    setSelectedRowId(highlightedRecordId);
+  }, [highlightedRecordId]);
 
   const handleRequestSort = (event, property) => {
     const isAsc = orderBy === property && order === "asc";
@@ -144,6 +154,10 @@ export function Table({ rows,  highlightedRecordId, handleClickOpenEditDialog, h
     () => [...(rows || [])].sort(getComparator(order, orderBy)),
     [order, rows, orderBy]
   );
+
+  React.useEffect(() => {
+    console.log("Table rows updated:", rows); // Debugging rows
+  }, [rows]);
 
   return (
     <Paper sx={{ height: "25.5rem", overflowY: "auto" }}>
@@ -177,13 +191,15 @@ export function Table({ rows,  highlightedRecordId, handleClickOpenEditDialog, h
                   sx={{
                     cursor: "pointer",
                     borderBottom: "1px solid #ddd",
-                    backgroundColor: isSelected ? "primary.main" : "inherit", // Highlight selected row
-                    color: isSelected ? "white" : "inherit", // Change text color for selected row
+                    backgroundColor: isSelected ? "primary.main" : "inherit",
+                    color: isSelected ? "white" : "inherit",
                     "&:hover": {
-                      backgroundColor: isSelected ? "primary.main" : "rgba(0, 0, 0, 0.04)", // Apply hover only if not selected
+                      backgroundColor: isSelected
+                        ? "primary.main"
+                        : "rgba(0, 0, 0, 0.04)",
                     },
                     "& .MuiTableCell-root": {
-                      color: isSelected ? "white" : "inherit", // Ensure text color for cells
+                      color: isSelected ? "white" : "inherit",
                       padding: "4px 8px",
                       fontSize: "9pt",
                       borderBottom: "1px solid #ddd",
@@ -211,7 +227,13 @@ export function Table({ rows,  highlightedRecordId, handleClickOpenEditDialog, h
                     {row.historyDetails?.name || row.name || "Unknown Name"}
                   </TableCell>
                   <TableCell size="small">
-                    <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-start",
+                      }}
+                    >
                       <span>{dayjs(row.date_time).format("DD/MM/YYYY")}</span>
                       <span>{dayjs(row.date_time).format("h:mm A")}</span>
                     </Box>
@@ -256,9 +278,14 @@ export function Table({ rows,  highlightedRecordId, handleClickOpenEditDialog, h
                     </Box>
                   </TableCell>
                   <TableCell size="small">
-                    <DownloadButton rowId={row.id} rowIcon={<DownloadIcon />} />
+                    <DownloadButton
+                      rowId={row.id}
+                      rowIcon={<DownloadIcon />}
+                    />
                   </TableCell>
-                  <TableCell size="small">{row.ownerName || "Unknown Owner"}</TableCell>
+                  <TableCell size="small">
+                    {row.ownerName || "Unknown Owner"}
+                  </TableCell>
                 </TableRow>
               );
             })}
@@ -268,5 +295,6 @@ export function Table({ rows,  highlightedRecordId, handleClickOpenEditDialog, h
     </Paper>
   );
 }
+
 
 
