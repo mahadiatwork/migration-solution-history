@@ -191,7 +191,7 @@ export function Table({
                   sx={{
                     cursor: "pointer",
                     borderBottom: "1px solid #ddd",
-                    backgroundColor: isSelected ? "primary.main" : "inherit",
+                    backgroundColor: isSelected ? "rgba(0, 123, 255, 0.1)" : "inherit",
                     color: isSelected ? "white" : "inherit",
                     "&:hover": {
                       backgroundColor: isSelected

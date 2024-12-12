@@ -157,22 +157,39 @@ const App = () => {
 
     const [highlightedRecordId, setHighlightedRecordId] = React.useState(null);
 
-const handleRecordAdded = (newRecord) => {
-  setRelatedListData((prevData) => {
-    const newData = [
-      {
-        ...newRecord,
-        name: newRecord.Participants
-          ? newRecord.Participants.map((c) => c.Full_Name).join(", ")
-          : newRecord.name,
-      },
-      ...prevData,
-    ];
-    console.log("Updated Related List Data:", newData); // Debug
-    return newData;
-  });
-  setHighlightedRecordId(newRecord.id); // Highlight the new record
-};
+    const handleRecordAdded = (newRecord) => {
+        // Normalize the new record to match the existing structure
+        const normalizedRecord = {
+          id: newRecord.id,
+          name: newRecord.Participants
+            ? newRecord.Participants.map((c) => c.Full_Name).join(", ")
+            : newRecord.name || "Unknown Name",
+          date_time: newRecord.Date || dayjs().format(), // Ensure date is consistent
+          type: newRecord.History_Type || "Unknown Type",
+          result: newRecord.History_Result || "No Result",
+          duration: newRecord.Duration || "N/A",
+          regarding: newRecord.Regarding || "No Regarding",
+          details: newRecord.History_Details_Plain || "No Details",
+          ownerName: newRecord.Owner?.full_name || "Unknown Owner",
+          historyDetails: {
+            ...newRecord.historyDetails,
+            name: newRecord.Participants
+              ? newRecord.Participants.map((c) => c.Full_Name).join(", ")
+              : newRecord.historyDetails?.name || "Unknown",
+          },
+          stakeHolder: newRecord.Stakeholder || null,
+        };
+      
+        // Add the normalized record to the top of the table
+        setRelatedListData((prevData) => [normalizedRecord, ...prevData]);
+      
+        // Highlight the newly added record
+        setHighlightedRecordId(newRecord.id);
+      
+        // Debug logs
+        console.log("New Record Normalized:", normalizedRecord);
+      };
+      
 
 
 
