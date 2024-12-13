@@ -191,13 +191,13 @@ export function Table({
                   sx={{
                     cursor: "pointer",
                     borderBottom: "1px solid #ddd",
-                    backgroundColor: isSelected ? "rgba(0, 123, 255, 0.1)" : "inherit",
+                    backgroundColor: isSelected ? "primary.main" : "inherit",
                     color: isSelected ? "white" : "inherit",
-                    "&:hover": {
-                      backgroundColor: isSelected
-                        ? "primary.main"
-                        : "rgba(0, 0, 0, 0.04)",
-                    },
+                    // "&:hover": {
+                    //   backgroundColor: isSelected
+                    //     ? "primary.main"
+                    //     : "rgba(0, 0, 0, 0.04)",
+                    // },
                     "& .MuiTableCell-root": {
                       color: isSelected ? "white" : "inherit",
                       padding: "4px 8px",

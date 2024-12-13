@@ -85,7 +85,7 @@ export function Dialog({
   // Reinitialize dialog state when `openDialog` or `obj` changes
   React.useEffect(() => {
     if (openDialog) {
-      setFormData((prev) => ({
+      setFormData({
         Participants: selectedRowData?.Participants || [],
         result: selectedRowData?.result || "",
         type: selectedRowData?.type || "",
@@ -93,17 +93,19 @@ export function Dialog({
         regarding: selectedRowData?.regarding || "",
         details: selectedRowData?.details || "",
         stakeHolder: selectedRowData?.stakeHolder || null,
-        date_time: selectedRowData?.date_time ? dayjs(selectedRowData.date_time) : dayjs(), // Default to current date
-      }));
-
-      // Set default values for related fields
+        date_time: selectedRowData?.date_time ? dayjs(selectedRowData.date_time) : dayjs(),
+      });
       setSelectedContacts(selectedRowData?.Participants || [currentContact] || []);
       setHistoryName(
         (selectedRowData?.Participants?.map((p) => p.Full_Name).join(", ")) || ""
       );
       setSelectedOwner(loggedInUser || null);
+    } else {
+      // Reset formData to avoid stale data
+      setFormData({});
     }
   }, [openDialog, selectedRowData, loggedInUser, currentContact]);
+
 
 
 
@@ -728,7 +730,7 @@ export function Dialog({
               multiline
               variant="standard"
               minRows={3}
-              defaultValue={formData?.details || ""}
+              value={formData?.details || ""} // Use controlled input
               onChange={(e) => handleInputChange("details", e.target.value)}
               sx={{
                 "& .MuiInputBase-input": {
@@ -736,6 +738,7 @@ export function Dialog({
                 },
               }}
             />
+
           </Box>
         </DialogContent>
         <DialogActions sx={{ display: "flex", justifyContent: "space-between" }}>

@@ -68,11 +68,13 @@ const App = () => {
     const handleCloseCreateDialog = () => {
         setOpenCreateDialog(false);
     };
-
     const handleClickOpenEditDialog = (rowData) => {
-        setOpenEditDialog(true);
-        setSelectedRowData(rowData);
+        setSelectedRowData(rowData); // Set the selected row data
+        setRegarding(rowData?.regarding || ""); // Initialize regarding data
+        setDetails(rowData?.details || ""); // Initialize details data
+        setOpenEditDialog(true); // Open the dialog
     };
+
 
     const handleCloseEditDialog = (updatedRowData) => {
         if (updatedRowData) {
@@ -91,8 +93,12 @@ const App = () => {
             );
             setHighlightedRecordId(updatedRowData.id); // Set the highlighted record ID
         }
-        setOpenEditDialog(false);
+        setSelectedRowData(null); // Clear selectedRowData
+        setOpenEditDialog(false); // Close the dialog
+        setRegarding(""); // Clear the regarding field
+        setDetails(""); // Clear the details field
     };
+
 
 
 
@@ -160,36 +166,36 @@ const App = () => {
     const handleRecordAdded = (newRecord) => {
         // Normalize the new record to match the existing structure
         const normalizedRecord = {
-          id: newRecord.id,
-          name: newRecord.Participants
-            ? newRecord.Participants.map((c) => c.Full_Name).join(", ")
-            : newRecord.name || "Unknown Name",
-          date_time: newRecord.Date || dayjs().format(), // Ensure date is consistent
-          type: newRecord.History_Type || "Unknown Type",
-          result: newRecord.History_Result || "No Result",
-          duration: newRecord.Duration || "N/A",
-          regarding: newRecord.Regarding || "No Regarding",
-          details: newRecord.History_Details_Plain || "No Details",
-          ownerName: newRecord.Owner?.full_name || "Unknown Owner",
-          historyDetails: {
-            ...newRecord.historyDetails,
+            id: newRecord.id,
             name: newRecord.Participants
-              ? newRecord.Participants.map((c) => c.Full_Name).join(", ")
-              : newRecord.historyDetails?.name || "Unknown",
-          },
-          stakeHolder: newRecord.Stakeholder || null,
+                ? newRecord.Participants.map((c) => c.Full_Name).join(", ")
+                : newRecord.name || "Unknown Name",
+            date_time: newRecord.Date || dayjs().format(), // Ensure date is consistent
+            type: newRecord.History_Type || "Unknown Type",
+            result: newRecord.History_Result || "No Result",
+            duration: newRecord.Duration || "N/A",
+            regarding: newRecord.Regarding || "No Regarding",
+            details: newRecord.History_Details_Plain || "No Details",
+            ownerName: newRecord.Owner?.full_name || "Unknown Owner",
+            historyDetails: {
+                ...newRecord.historyDetails,
+                name: newRecord.Participants
+                    ? newRecord.Participants.map((c) => c.Full_Name).join(", ")
+                    : newRecord.historyDetails?.name || "Unknown",
+            },
+            stakeHolder: newRecord.Stakeholder || null,
         };
-      
+
         // Add the normalized record to the top of the table
         setRelatedListData((prevData) => [normalizedRecord, ...prevData]);
-      
+
         // Highlight the newly added record
         setHighlightedRecordId(newRecord.id);
-      
+
         // Debug logs
         console.log("New Record Normalized:", normalizedRecord);
-      };
-      
+    };
+
 
 
 
