@@ -69,7 +69,7 @@ const App = () => {
         setOpenCreateDialog(false);
     };
     const handleClickOpenEditDialog = (rowData) => {
-        setSelectedRowData(rowData); // Set the selected row data
+        setSelectedRowData(rowData); // Set the selected row data  
         setRegarding(rowData?.regarding || ""); // Initialize regarding data
         setDetails(rowData?.details || ""); // Initialize details data
         setOpenEditDialog(true); // Open the dialog
@@ -239,7 +239,7 @@ const App = () => {
     };
 
 
-
+console.log({currentContact})
 
     return (
         <React.Fragment>

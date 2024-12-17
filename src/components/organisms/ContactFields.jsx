@@ -32,6 +32,12 @@ export default function ContactField({
   const [isModalOpen, setIsModalOpen] = useState(false); // Modal state
   const didMount = useRef(false); // Track initial render
 
+  useEffect(() => {
+    if (currentContact && selectedParticipants.length === 0) {
+      setSelectedParticipants([currentContact]);
+    }
+  }, [currentContact]);
+
   // Initialize `selectedParticipants` from `selectedContacts`
   useEffect(() => {
     if (selectedContacts.length > 0 && !didMount.current) {
@@ -162,6 +168,8 @@ export default function ContactField({
       fontSize: "9pt",
     },
   };
+
+  console.log({currentContactInContactField: currentContact})
 
   return (
     <Box>
