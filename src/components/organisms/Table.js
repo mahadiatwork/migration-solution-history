@@ -177,118 +177,116 @@ export function Table({
             rowCount={rows?.length}
           />
           <TableBody>
-            {visibleRows.map((row, index) => {
-              if (!row || typeof row.name === "undefined") {
-                console.warn("Skipping malformed row:", row);
-                return null;
-              }
+            {visibleRows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} align="center" sx={{ fontStyle: "italic", color: "gray" }}>
+                  No data available
+                </TableCell>
+              </TableRow>
+            ) : (
+              visibleRows.map((row, index) => {
+                if (!row || typeof row.name === "undefined") {
+                  console.warn("Skipping malformed row:", row);
+                  return null;
+                }
 
-              const isSelected = row.id === selectedRowId;
+                const isSelected = row.id === selectedRowId;
 
-              return (
-                <TableRow
-                  key={row.id || index}
-                  sx={{
-                    cursor: "pointer",
-                    borderBottom: "1px solid #ddd",
-                    backgroundColor: isSelected ? "primary.main" : "inherit",
-                    color: isSelected ? "white" : "inherit",
-                    // "&:hover": {
-                    //   backgroundColor: isSelected
-                    //     ? "primary.main"
-                    //     : "rgba(0, 0, 0, 0.04)",
-                    // },
-                    "& .MuiTableCell-root": {
-                      color: isSelected ? "white" : "inherit",
-                      padding: "4px 8px",
-                      fontSize: "9pt",
-                      borderBottom: "1px solid #ddd",
-                    },
-                  }}
-                  onDoubleClick={() => handleClickOpenEditDialog(row)}
-                  onClick={() => handleRowClick(row)}
-                >
-                  <TableCell
-                    size="small"
+                return (
+                  <TableRow
+                    key={row.id || index}
                     sx={{
                       cursor: "pointer",
-                      textDecoration: "underline",
-                      color: isSelected ? "white" : "primary.main",
+                      borderBottom: "1px solid #ddd",
+                      backgroundColor: isSelected ? "primary.main" : "inherit",
+                      color: isSelected ? "white" : "inherit",
+                      "& .MuiTableCell-root": {
+                        color: isSelected ? "white" : "inherit",
+                        padding: "4px 8px",
+                        fontSize: "9pt",
+                        borderBottom: "1px solid #ddd",
+                      },
                     }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      row.historyDetails?.id &&
-                        window.open(
-                          `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${row.historyDetails.id}`,
-                          "_blank"
-                        );
-                    }}
+                    onDoubleClick={() => handleClickOpenEditDialog(row)}
+                    onClick={() => handleRowClick(row)}
                   >
-                    {row.historyDetails?.name || row.name || "Unknown Name"}
-                  </TableCell>
-                  <TableCell size="small">
-                    <Box
+                    <TableCell
+                      size="small"
                       sx={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "flex-start",
+                        cursor: "pointer",
+                        textDecoration: "underline",
+                        color: isSelected ? "white" : "primary.main",
+                      }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        row.historyDetails?.id &&
+                          window.open(
+                            `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${row.historyDetails.id}`,
+                            "_blank"
+                          );
                       }}
                     >
-                      <span>{dayjs(row.date_time).format("DD/MM/YYYY")}</span>
-                      <span>{dayjs(row.date_time).format("h:mm A")}</span>
-                    </Box>
-                  </TableCell>
-                  <TableCell size="small">{row.type || "Unknown Type"}</TableCell>
-                  <TableCell size="small">{row.result || "No Result"}</TableCell>
-                  <TableCell size="small">{row.duration || "N/A"}</TableCell>
-                  <TableCell
-                    size="small"
-                    sx={{
-                      width: "400px",
-                      whiteSpace: "normal",
-                      wordWrap: "break-word",
-                      overflow: "hidden",
-                    }}
-                  >
-                    <Box
+                      {row.historyDetails?.name || row.name || "Unknown Name"}
+                    </TableCell>
+                    <TableCell size="small">
+                      <Box
+                        sx={{
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "flex-start",
+                        }}
+                      >
+                        <span>{dayjs(row.date_time).format("DD/MM/YYYY")}</span>
+                        <span>{dayjs(row.date_time).format("h:mm A")}</span>
+                      </Box>
+                    </TableCell>
+                    <TableCell size="small">{row.type || "Unknown Type"}</TableCell>
+                    <TableCell size="small">{row.result || "No Result"}</TableCell>
+                    <TableCell size="small">{row.duration || "N/A"}</TableCell>
+                    <TableCell
+                      size="small"
                       sx={{
-                        display: "-webkit-box",
-                        WebkitLineClamp: 8,
-                        WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
+                        width: "400px",
                         whiteSpace: "normal",
-                        padding: "4px",
-                      }}
-                    >
-                      {row.regarding || "No Regarding"}
-                    </Box>
-                    <Box
-                      sx={{
-                        display: "-webkit-box",
-                        WebkitLineClamp: 8,
-                        WebkitBoxOrient: "vertical",
+                        wordWrap: "break-word",
                         overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "normal",
-                        padding: "4px",
                       }}
                     >
-                      {row.details || "No Details"}
-                    </Box>
-                  </TableCell>
-                  <TableCell size="small">
-                    <DownloadButton
-                      rowId={row.id}
-                      rowIcon={<DownloadIcon />}
-                    />
-                  </TableCell>
-                  <TableCell size="small">
-                    {row.ownerName || "Unknown Owner"}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                      <Box
+                        sx={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 8,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "normal",
+                          padding: "4px",
+                        }}
+                      >
+                        {row.regarding || "No Regarding"}
+                      </Box>
+                      <Box
+                        sx={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 8,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "normal",
+                          padding: "4px",
+                        }}
+                      >
+                        {row.details || "No Details"}
+                      </Box>
+                    </TableCell>
+                    <TableCell size="small">
+                      <DownloadButton rowId={row.id} rowIcon={<DownloadIcon />} />
+                    </TableCell>
+                    <TableCell size="small">{row.ownerName || "Unknown Owner"}</TableCell>
+                  </TableRow>
+                );
+              })
+            )}
           </TableBody>
         </MUITable>
       </TableContainer>
