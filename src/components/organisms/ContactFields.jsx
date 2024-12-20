@@ -32,31 +32,43 @@ export default function ContactField({
   const [isModalOpen, setIsModalOpen] = useState(false); // Modal state
   const didMount = useRef(false); // Track initial render
 
+  // Fetch history data when `selectedRowData` changes
   useEffect(() => {
-    if (currentContact && selectedParticipants.length === 0) {
-      setSelectedParticipants([currentContact]);
-    }
-  }, [currentContact]);
 
-  // Initialize `selectedParticipants` from `selectedContacts`
-  useEffect(() => {
-    if (selectedContacts.length > 0 && !didMount.current) {
-      didMount.current = true; // Set flag after first render
-      const formattedContacts = selectedContacts.map((contact) => ({
-        id: contact.id,
-        Full_Name: contact.Full_Name,
-        Email: contact.Email || "No Email",
-        Mobile: contact.Mobile || "N/A",
-        First_Name:
-          contact.First_Name || contact.Full_Name?.split(" ")[0] || "N/A",
-        Last_Name:
-          contact.Last_Name || contact.Full_Name?.split(" ")[1] || "N/A",
-        ID_Number: contact.ID_Number || "N/A",
-      }));
-      setSelectedParticipants(formattedContacts);
-      handleInputChange("Participants", formattedContacts); // Sync with parent
-    }
-  }, [selectedContacts, handleInputChange]);
+    console.log("checking data", selectedRowData?.historyDetails)
+    const fetchHistoryData = async () => {
+      if (selectedRowData?.historyDetails) {
+        try {
+          const data = await ZOHO.CRM.API.getRelatedRecords({
+            Entity: "History1",
+            RecordID: selectedRowData?.historyDetails?.id,
+            RelatedList: "Contacts3",
+            page: 1,
+            per_page: 200,
+          });
+
+          // Map the data to the required format
+          const contactDetailsArray = data.data.map((record) => ({
+            Full_Name: record.Contact_Details?.name || "Unknown Name",
+            id: record.Contact_Details?.id || "Unknown ID",
+          }));
+
+          setContacts(contactDetailsArray);
+          setSelectedParticipants(contactDetailsArray);
+          handleInputChange("Participants", contactDetailsArray); // Sync with parent
+        } catch (error) {
+          console.error("Error fetching related contacts:", error);
+        }
+      }else{
+        setContacts([currentContact]);
+        setSelectedParticipants([currentContact]);
+        handleInputChange("Participants", [currentContact]); // Sync with parent
+        console.log("currentContectIn", currentContact)
+      }
+    };
+
+    fetchHistoryData();
+  }, [selectedRowData, ZOHO, handleInputChange]);
 
   // Open modal and reset filtered contacts
   const handleOpen = () => {
@@ -140,13 +152,12 @@ export default function ContactField({
       Email: contact.Email,
       Mobile: contact.Mobile,
     }));
-  
+
     // Pass the updated contacts to the parent
     handleInputChange("Participants", formattedContacts); // Use "Participants" or the relevant field key
-  
+
     setIsModalOpen(false);
   };
-  
 
   const commonStyles = {
     "& .MuiInputBase-root": {
@@ -169,16 +180,16 @@ export default function ContactField({
     },
   };
 
-  console.log({currentContactInContactField: currentContact})
-
   return (
     <Box>
       <Box display="flex" alignItems="center" gap={2} sx={{ mt: 1 }}>
         <TextField
           fullWidth
           value={selectedParticipants
-            .map((c) => c.Full_Name || `${c.First_Name} ${c.Last_Name}`)
+            .filter((c) => c && (c.Full_Name || c.First_Name || c.Last_Name)) // Filter out invalid entries
+            .map((c) => c.Full_Name || `${c.First_Name || "N/A"} ${c.Last_Name || "N/A"}`)
             .join(", ")}
+          
           variant="standard"
           placeholder="Selected contacts"
           InputProps={{
@@ -287,49 +298,6 @@ export default function ContactField({
               </TableBody>
             </Table>
           </TableContainer>
-          <Box mt={3}>
-            <Typography variant="h6">Selected Contacts:</Typography>
-            <TableContainer>
-              <Table size="small" sx={commonStyles}>
-                <TableHead>
-                  <TableRow>
-                    <TableCell
-                      sx={{ width: "50px", fontWeight: "bold" }}
-                    ></TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>
-                      First Name
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>Last Name</TableCell>
-                    <TableCell sx={{ width: "30%", fontWeight: "bold" }}>
-                      Email
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>Mobile</TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>
-                      MS File Number
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {selectedParticipants.map((contact) => (
-                    <TableRow key={contact.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked
-                          onChange={() => toggleContactSelection(contact)}
-                          sx={commonStyles}
-                        />
-                      </TableCell>
-                      <TableCell>{contact.First_Name}</TableCell>
-                      <TableCell>{contact.Last_Name}</TableCell>
-                      <TableCell>{contact.Email}</TableCell>
-                      <TableCell>{contact.Mobile}</TableCell>
-                      <TableCell>{contact.ID_Number}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCancel} variant="outlined" sx={commonStyles}>

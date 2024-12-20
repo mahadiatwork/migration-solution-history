@@ -70,10 +70,11 @@ export function Dialog({
   ZOHO, // Zoho instance for API calls
   selectedRowData,
   currentContact,
-  onRecordAdded
+  onRecordAdded,
+  selectedContacts,
+  setSelectedContacts,
 }) {
 
-  const [selectedContacts, setSelectedContacts] = React.useState([]);
   const [historyName, setHistoryName] = React.useState("");
   const [historyContacts, setHistoryContacts] = React.useState([]);
   const [selectedOwner, setSelectedOwner] = React.useState(loggedInUser || null);
@@ -82,14 +83,17 @@ export function Dialog({
   const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "success" });
 
 
+  // console.log({ selectedRowData })
+
+
   // Reinitialize dialog state when `openDialog` or `obj` changes
   React.useEffect(() => {
     if (openDialog) {
       setFormData({
         Participants: selectedRowData?.Participants || [],
-        result: selectedRowData?.result || "",
-        type: selectedRowData?.type || "",
-        duration: selectedRowData?.duration || "",
+        result: selectedRowData?.result || "Meeting Held",
+        type: selectedRowData?.type || "Meeting",
+        duration: selectedRowData?.duration || "60",
         regarding: selectedRowData?.regarding || "",
         details: selectedRowData?.details || "",
         stakeHolder: selectedRowData?.stakeHolder || null,
@@ -100,6 +104,8 @@ export function Dialog({
         (selectedRowData?.Participants?.map((p) => p.Full_Name).join(", ")) || ""
       );
       setSelectedOwner(loggedInUser || null);
+
+      setHistoryContacts(selectedRowData?.Participants || [])
     } else {
       // Reset formData to avoid stale data
       setFormData({});
@@ -129,6 +135,10 @@ export function Dialog({
 
           setHistoryContacts(contactDetailsArray);
           setSelectedContacts(contactDetailsArray);
+          setFormData((prevFormData) => ({
+            ...prevFormData, // Spread the previous formData
+            Participants: contactDetailsArray, // Update only the Participants field
+          }));
         } catch (error) {
           console.error("Error fetching related contacts:", error);
         }
@@ -160,7 +170,13 @@ export function Dialog({
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const selectedParticipants = formData.Participants;
+    console.log(formData)
+
+    let selectedParticipants = formData.Participants;
+
+    if (selectedParticipants.length == 0) {
+      selectedParticipants = [currentContact];
+    }
 
     // Generate history name based on selected contacts
     const updatedHistoryName = selectedParticipants.map((c) => c.Full_Name).join(", ");
@@ -461,6 +477,7 @@ export function Dialog({
     "E-mail Attachment",
   ];
 
+
   return (
     <>
       <MUIDialog
@@ -479,6 +496,9 @@ export function Dialog({
           },
         }}
       >
+        {/* {
+          JSON.stringify(formData)
+        } */}
         <DialogContent
           sx={{
             display: "flex",
@@ -618,15 +638,22 @@ export function Dialog({
                     }}
                   />
                 )}
-                sx={{
-                  "& .MuiAutocomplete-option": {
-                    fontSize: "9pt", // Font size for dropdown options
+                componentsProps={{
+                  popper: {
+                    sx: {
+                      "& .MuiAutocomplete-listbox": {
+                        fontSize: "9pt", // Font size for dropdown options
+                      },
+                    },
                   },
+                }}
+                sx={{
                   "& .MuiAutocomplete-input": {
                     fontSize: "9pt", // Font size for the input field inside the Autocomplete
                   },
                 }}
               />
+
 
 
             </Grid>
@@ -734,27 +761,33 @@ export function Dialog({
               onChange={(e) => handleInputChange("details", e.target.value)}
               sx={{
                 "& .MuiInputBase-input": {
-                  fontSize: "9pt",
+                  fontSize: "9pt", // Input text font size
+                },
+                "& .MuiInputLabel-root": {
+                  fontSize: "9pt", // Label font size
                 },
               }}
             />
 
+
           </Box>
         </DialogContent>
         <DialogActions sx={{ display: "flex", justifyContent: "space-between" }}>
-          <Button
-            onClick={handleDelete}
-            variant="outlined"
-            color="error"
-            sx={{
-              fontSize: "9pt",
-              marginLeft: "8px",
-              textTransform: "none",
-              padding: "4px 8px",
-            }}
-          >
-            Delete
-          </Button>
+          {
+            selectedRowData !== undefined ? <Button
+              onClick={handleDelete}
+              variant="outlined"
+              color="error"
+              sx={{
+                fontSize: "9pt",
+                marginLeft: "8px",
+                textTransform: "none",
+                padding: "4px 8px",
+              }}
+            >
+              Delete
+            </Button> : <div></div>
+          }
           <Box sx={{ display: "flex", gap: 1 }}>          <Button
             onClick={handleCloseDialog}
             variant="outlined"

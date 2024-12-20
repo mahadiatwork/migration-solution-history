@@ -60,6 +60,7 @@ const App = () => {
     const [zohoLoaded, setZohoLoaded] = React.useState(false);
     const [regarding, setRegarding] = React.useState("");
     const [details, setDetails] = React.useState("");
+      const [selectedContacts, setSelectedContacts] = React.useState([]);
 
     const handleClickOpenCreateDialog = () => {
         setOpenCreateDialog(true);
@@ -125,6 +126,8 @@ const App = () => {
                     approved: "both",
                     RecordID: recordId,
                 });
+
+                console.log("currentContactData", currentContactResponse)
                 setCurrentContact(currentContactResponse?.data?.[0] || null);
 
                 const tempData = data?.map((obj) => ({
@@ -165,6 +168,20 @@ const App = () => {
 
     const handleRecordAdded = (newRecord) => {
         // Normalize the new record to match the existing structure
+        let participantsArray = [];
+        if (newRecord.Participants.length > 0) {
+            participantsArray = newRecord.Participants.map((participant) => ({
+                id: participant.id || "N/A",
+                Full_Name: participant.Full_Name || "Unknown",
+                Email: participant.Email || "No Email",
+                Mobile: participant.Mobile || "N/A",
+                First_Name: participant.First_Name || "Unknown",
+                Last_Name: participant.Last_Name || "Unknown",
+                ID_Number: participant.ID_Number || "N/A",
+            }));
+        }
+
+
         const normalizedRecord = {
             id: newRecord.id,
             name: newRecord.Participants
@@ -184,6 +201,7 @@ const App = () => {
                     : newRecord.historyDetails?.name || "Unknown",
             },
             stakeHolder: newRecord.Stakeholder || null,
+            Participants: participantsArray
         };
 
         // Add the normalized record to the top of the table
@@ -192,6 +210,9 @@ const App = () => {
         // Highlight the newly added record
         setHighlightedRecordId(newRecord.id);
 
+        setRegarding(normalizedRecord.regarding || "No Regarding");
+        setDetails(normalizedRecord.details || "No Details");
+        setSelectedContacts(newRecord.Participants)
         // Debug logs
         console.log("New Record Normalized:", normalizedRecord);
     };
@@ -239,7 +260,7 @@ const App = () => {
     };
 
 
-console.log({currentContact})
+    console.log({ currentContact })
 
     return (
         <React.Fragment>
@@ -276,7 +297,7 @@ console.log({currentContact})
                                     },
                                     "& .MuiInputLabel-root": {
                                         fontSize: "9pt", // Adjust label font size
-                                    }
+                                    },
                                 }}
                                 renderInput={(params) => (
                                     <TextField
@@ -286,8 +307,18 @@ console.log({currentContact})
                                         InputLabelProps={{ style: { fontSize: "9pt" } }} // Additional inline styling for the label
                                     />
                                 )}
+                                componentsProps={{
+                                    popper: {
+                                        sx: {
+                                            "& .MuiAutocomplete-listbox": {
+                                                fontSize: "9pt", // Font size for dropdown options
+                                            },
+                                        },
+                                    },
+                                }}
                                 onChange={(e, value) => setDateRange(value)}
                             />
+
 
                             <Autocomplete
                                 size="small"
@@ -299,9 +330,18 @@ console.log({currentContact})
                                     },
                                     "& .MuiInputLabel-root": {
                                         fontSize: "9pt", // Adjust label font size
-                                    }
+                                    },
                                 }}
                                 renderInput={(params) => <TextField {...params} label="Types" size="small" />}
+                                componentsProps={{
+                                    popper: {
+                                        sx: {
+                                            "& .MuiAutocomplete-listbox": {
+                                                fontSize: "9pt", // Font size for dropdown options
+                                            },
+                                        },
+                                    },
+                                }}
                                 onChange={(e, value) => setSelectedType(value)}
                             />
                             <TextField
@@ -312,11 +352,16 @@ console.log({currentContact})
                                     width: "8rem",
                                     "& .MuiInputBase-root": {
                                         height: "33px",
+                                        fontSize: "9pt", // Font size for input text
                                     },
                                     "& .MuiInputLabel-root": {
                                         fontSize: "9pt", // Adjust label font size
-                                    }
-
+                                    },
+                                }}
+                                InputProps={{
+                                    style: {
+                                        fontSize: "9pt", // Additional inline styling for input text
+                                    },
                                 }}
                                 onChange={(e) => setKeyword(e.target.value)}
                             />
@@ -333,12 +378,21 @@ console.log({currentContact})
                                     },
                                     "& .MuiInputLabel-root": {
                                         fontSize: "9pt", // Adjust label font size
-                                    }
-
+                                    },
                                 }}
                                 renderInput={(params) => <TextField {...params} label="Users" size="small" />}
+                                componentsProps={{
+                                    popper: {
+                                        sx: {
+                                            "& .MuiAutocomplete-listbox": {
+                                                fontSize: "9pt", // Font size for dropdown options
+                                            },
+                                        },
+                                    },
+                                }}
                                 onChange={(e, value) => setSelectedOwner(value)}
                             />
+
                         </Grid>
                         <Grid item xs={3} sx={{ display: "flex", justifyContent: "flex-end" }}>
                             <Button
@@ -371,6 +425,7 @@ console.log({currentContact})
 
                         </Grid>
                         <Grid item xs={3}>
+                            {/* sidebar - details component */}
                             <Paper sx={{ height: "100%", position: "relative" }}>
                                 <Box
                                     sx={{
@@ -540,6 +595,8 @@ console.log({currentContact})
                 ZOHO={ZOHO}
                 selectedRowData={selectedRowData}
                 onRecordAdded={handleRecordUpdate} // Update the existing record
+                selectedContacts={selectedContacts}
+                setSelectedContacts={setSelectedContacts}
             />
             <Dialog
                 openDialog={openCreateDialog}
@@ -550,6 +607,8 @@ console.log({currentContact})
                 ZOHO={ZOHO}
                 onRecordAdded={handleRecordAdded} // Pass the callback
                 currentContact={currentContact}
+                selectedContacts={selectedContacts}
+                setSelectedContacts={setSelectedContacts}
             />
 
         </React.Fragment>
