@@ -166,18 +166,18 @@ export function Dialog({
   };
 
 
-
   const handleSubmit = async (event) => {
     event.preventDefault();
+    let selectedParticipants = [];
 
-    console.log(formData)
-
-    let selectedParticipants = formData.Participants;
-
-    if (selectedParticipants.length == 0) {
-      selectedParticipants = [currentContact];
+    if(formData.Participants){
+      selectedParticipants = formData.Participants;
     }
 
+    if (selectedParticipants.length === 0) {
+      selectedParticipants = [currentContact];
+    }
+  
     // Generate history name based on selected contacts
     const updatedHistoryName = selectedParticipants.map((c) => c.Full_Name).join(", ");
     const finalData = {
@@ -186,10 +186,10 @@ export function Dialog({
       Regarding: formData.regarding,
       Owner: selectedOwner
         ? {
-          id: selectedOwner.id,
-          full_name: selectedOwner.full_name,
-          email: selectedOwner.email,
-        }
+            id: selectedOwner.id,
+            full_name: selectedOwner.full_name,
+            email: selectedOwner.email,
+          }
         : null,
       History_Result: formData.result || "",
       Stakeholder: formData.stakeHolder ? { id: formData.stakeHolder.id } : null,
@@ -200,150 +200,14 @@ export function Dialog({
         : null,
     };
 
+    console.log("data before updating", finalData)
+  
     try {
-      let historyId;
-
       if (selectedRowData) {
-        // Update the existing History1 record
-        const updateConfig = {
-          Entity: "History1",
-          RecordID: selectedRowData?.historyDetails?.id,
-          APIData: {
-            id: selectedRowData?.historyDetails?.id,
-            ...finalData,
-          },
-          Trigger: ["workflow"],
-        };
-
-        const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
-        if (updateResponse?.data[0]?.code === "SUCCESS") {
-          historyId = selectedRowData?.historyDetails?.id;
-
-          // Fetch existing History_X_Contacts records
-          const relatedRecordsResponse = await ZOHO.CRM.API.getRelatedRecords({
-            Entity: "History1",
-            RecordID: historyId,
-            RelatedList: "Contacts3",
-          });
-
-          const existingContacts = relatedRecordsResponse?.data || [];
-          const existingContactIds = existingContacts.map(
-            (contact) => contact.Contact_Details?.id
-          );
-
-          // Find contacts to add and to delete
-          const selectedContactIds = selectedParticipants.map((c) => c.id);
-          const toDeleteContactIds = existingContactIds.filter(
-            (id) => !selectedContactIds.includes(id)
-          );
-          const toAddContacts = selectedParticipants.filter(
-            (contact) => !existingContactIds.includes(contact.id)
-          );
-
-          // Delete records for removed contacts
-          if (toDeleteContactIds.length > 0) {
-            const deletePromises = toDeleteContactIds.map((id) => {
-              const recordToDelete = existingContacts.find(
-                (contact) => contact.Contact_Details?.id === id
-              );
-
-              if (recordToDelete?.id) {
-                return ZOHO.CRM.API.deleteRecord({
-                  Entity: "History_X_Contacts",
-                  RecordID: recordToDelete.id,
-                });
-              }
-              return Promise.resolve(); // Skip if no `id` is found
-            });
-            await Promise.all(deletePromises);
-          }
-
-          // Add new records for newly selected contacts
-          if (toAddContacts.length > 0) {
-            const addPromises = toAddContacts.map((contact) =>
-              ZOHO.CRM.API.insertRecord({
-                Entity: "History_X_Contacts",
-                APIData: {
-                  Contact_History_Info: { id: historyId },
-                  Contact_Details: { id: contact.id },
-                },
-                Trigger: ["workflow"],
-              })
-            );
-            await Promise.all(addPromises);
-          }
-
-          // Prepare the updated records to pass back
-          const updatedRelatedContacts = relatedRecordsResponse?.data.map((contact) => ({
-            id: contact.id, // History_X_Contacts id
-            Contact_Details: contact.Contact_Details,
-            ...finalData,
-            name: selectedParticipants.map((c) => c.Full_Name).join(", "),
-          }));
-
-          // Pass the updated related contacts to the parent
-          if (onRecordAdded) onRecordAdded(updatedRelatedContacts);
-
-          setSnackbar({
-            open: true,
-            message: "Record and contacts updated successfully!",
-            severity: "success",
-          });
-        } else {
-          throw new Error("Failed to update record.");
-        }
+        await updateHistory(selectedRowData, finalData, selectedParticipants);
       } else {
-        // Create new History1 record
-        const createConfig = {
-          Entity: "History1",
-          APIData: {
-            ...finalData,
-          },
-          Trigger: ["workflow"],
-        };
-
-        const createResponse = await ZOHO.CRM.API.insertRecord(createConfig);
-        if (createResponse?.data[0]?.code === "SUCCESS") {
-          historyId = createResponse.data[0].details.id;
-
-          // Create History_X_Contacts records for each contact
-          if (selectedParticipants?.length > 0) {
-            const createPromises = selectedParticipants.map((contact) =>
-              ZOHO.CRM.API.insertRecord({
-                Entity: "History_X_Contacts",
-                APIData: {
-                  Contact_History_Info: { id: historyId },
-                  Contact_Details: { id: contact.id },
-                },
-                Trigger: ["workflow"],
-              })
-            );
-            await Promise.all(createPromises);
-          }
-
-          setSnackbar({
-            open: true,
-            message: "Record created successfully!",
-            severity: "success",
-          });
-        } else {
-          throw new Error("Failed to create record.");
-        }
+        await createHistory(finalData, selectedParticipants);
       }
-
-      // Notify parent about the updated or created record
-      const updatedRecord = {
-        ...selectedRowData,
-        id: selectedRowData?.id,
-        ...finalData,
-        Participants: selectedParticipants,
-        historyDetails: {
-          ...selectedRowData?.historyDetails,
-          name: selectedParticipants.map((c) => c.Full_Name).join(", "), // Update the name in historyDetails
-        },
-      };
-
-      if (onRecordAdded) onRecordAdded(updatedRecord);
     } catch (error) {
       console.error("Error saving records:", error);
       setSnackbar({
@@ -355,6 +219,179 @@ export function Dialog({
       handleCloseDialog();
     }
   };
+
+  const createHistory = async (finalData, selectedParticipants) => {
+    try {
+      const createConfig = {
+        Entity: "History1",
+        APIData: {
+          ...finalData,
+        },
+        Trigger: ["workflow"],
+      };
+  
+      // Create the History1 record
+      const createResponse = await ZOHO.CRM.API.insertRecord(createConfig);
+      if (createResponse?.data[0]?.code === "SUCCESS") {
+        const historyId = createResponse.data[0].details.id;
+  
+        let contactRecordIds = [];
+  
+        // Create History_X_Contacts records for each contact
+        for (const contact of selectedParticipants) {
+          try {
+            const contactResponse = await ZOHO.CRM.API.insertRecord({
+              Entity: "History_X_Contacts",
+              APIData: {
+                Contact_History_Info: { id: historyId },
+                Contact_Details: { id: contact.id },
+              },
+              Trigger: ["workflow"],
+            });
+  
+            // Collect the ID from the insertion response
+            if (contactResponse?.data[0]?.code === "SUCCESS") {
+              contactRecordIds.push(contactResponse.data[0].details.id);
+            } else {
+              console.warn(
+                `Failed to insert History_X_Contacts record for contact ID ${contact.id}`
+              );
+            }
+          } catch (error) {
+            console.error(
+              `Error inserting History_X_Contacts record for contact ID ${contact.id}:`,
+              error
+            );
+          }
+        }
+  
+        setSnackbar({
+          open: true,
+          message: "Record created successfully!",
+          severity: "success",
+        });
+  
+        // Notify parent about the created record
+        const updatedRecord = {
+          id: contactRecordIds[0] || null, // Set the first inserted History_X_Contacts ID (or null if none succeeded)
+          ...finalData,
+          Participants: selectedParticipants,
+          historyDetails: {
+            name: selectedParticipants.map((c) => c.Full_Name).join(", "),
+            id: historyId, // Add the History1 record ID to historyDetails
+          },
+        };
+  
+        if (onRecordAdded) onRecordAdded(updatedRecord);
+      } else {
+        throw new Error("Failed to create History1 record.");
+      }
+    } catch (error) {
+      console.error("Error creating history:", error);
+      throw error;
+    }
+  };
+  
+
+  
+  const updateHistory = async (selectedRowData, finalData, selectedParticipants) => {
+    try {
+      const updateConfig = {
+        Entity: "History1",
+        RecordID: selectedRowData?.historyDetails?.id,
+        APIData: {
+          id: selectedRowData?.historyDetails?.id,
+          ...finalData,
+        },
+        Trigger: ["workflow"],
+      };
+  
+      const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
+      if (updateResponse?.data[0]?.code === "SUCCESS") {
+        const historyId = selectedRowData?.historyDetails?.id;
+  
+        // Fetch existing History_X_Contacts records
+        const relatedRecordsResponse = await ZOHO.CRM.API.getRelatedRecords({
+          Entity: "History1",
+          RecordID: historyId,
+          RelatedList: "Contacts3",
+        });
+  
+        const existingContacts = relatedRecordsResponse?.data || [];
+        const existingContactIds = existingContacts.map(
+          (contact) => contact.Contact_Details?.id
+        );
+  
+        // Find contacts to add and to delete
+        const selectedContactIds = selectedParticipants.map((c) => c.id);
+        const toDeleteContactIds = existingContactIds.filter(
+          (id) => !selectedContactIds.includes(id)
+        );
+        const toAddContacts = selectedParticipants.filter(
+          (contact) => !existingContactIds.includes(contact.id)
+        );
+  
+        // Delete records for removed contacts
+        for (const id of toDeleteContactIds) {
+          const recordToDelete = existingContacts.find(
+            (contact) => contact.Contact_Details?.id === id
+          );
+  
+          if (recordToDelete?.id) {
+            await ZOHO.CRM.API.deleteRecord({
+              Entity: "History_X_Contacts",
+              RecordID: recordToDelete.id,
+            });
+          }
+        }
+  
+        // Add new records for newly selected contacts
+        for (const contact of toAddContacts) {
+          try {
+            await ZOHO.CRM.API.insertRecord({
+              Entity: "History_X_Contacts",
+              APIData: {
+                Contact_History_Info: { id: historyId },
+                Contact_Details: { id: contact.id },
+              },
+              Trigger: ["workflow"],
+            });
+          } catch (error) {
+            console.error(
+              `Error inserting record for contact ID ${contact.id}:`,
+              error
+            );
+          }
+        }
+  
+        // Notify parent about the updated record
+        const updatedRecord = {
+          id: selectedRowData.id || null, // Use the ID from the first related record
+          ...finalData,
+          Participants: selectedParticipants,
+          historyDetails: {
+            ...selectedRowData?.historyDetails,
+            name: selectedParticipants.map((c) => c.Full_Name).join(", "),
+          },
+        };
+  
+        if (onRecordAdded) onRecordAdded(updatedRecord);
+  
+        setSnackbar({
+          open: true,
+          message: "Record and contacts updated successfully!",
+          severity: "success",
+        });
+      } else {
+        throw new Error("Failed to update record.");
+      }
+    } catch (error) {
+      console.error("Error updating history:", error);
+      throw error;
+    }
+  };
+  
+
 
 
   const handleDelete = async () => {
@@ -496,9 +533,6 @@ export function Dialog({
           },
         }}
       >
-        {/* {
-          JSON.stringify(formData)
-        } */}
         <DialogContent
           sx={{
             display: "flex",

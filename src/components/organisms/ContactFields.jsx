@@ -17,147 +17,27 @@ import {
   Typography,
 } from "@mui/material";
 
+
+const commonStyles = {
+  fontSize: "9pt", // Uniform font size
+  "& .MuiOutlinedInput-input": { fontSize: "9pt" }, // Input text
+  "& .MuiInputBase-input": { fontSize: "9pt" }, // Base input text
+  "& .MuiTypography-root": { fontSize: "9pt" }, // Typography text
+  "& .MuiFormLabel-root": { fontSize: "9pt" }, // Form labels
+};
+
 export default function ContactField({
   handleInputChange,
   ZOHO,
   selectedRowData = {}, // Default to an empty object
-  currentContact,
-  selectedContacts = [], // Provided selected contacts
+  currentContact, // New prop
 }) {
-  const [contacts, setContacts] = useState([]); // Fetched contacts
-  const [selectedParticipants, setSelectedParticipants] = useState([]); // Selected participants
-  const [searchType, setSearchType] = useState("First_Name"); // Search criteria
-  const [searchText, setSearchText] = useState(""); // Search input
-  const [filteredContacts, setFilteredContacts] = useState([]); // Filtered contacts for display
-  const [isModalOpen, setIsModalOpen] = useState(false); // Modal state
-  const didMount = useRef(false); // Track initial render
-
-  // Fetch history data when `selectedRowData` changes
-  useEffect(() => {
-
-    console.log("checking data", selectedRowData?.historyDetails)
-    const fetchHistoryData = async () => {
-      if (selectedRowData?.historyDetails) {
-        try {
-          const data = await ZOHO.CRM.API.getRelatedRecords({
-            Entity: "History1",
-            RecordID: selectedRowData?.historyDetails?.id,
-            RelatedList: "Contacts3",
-            page: 1,
-            per_page: 200,
-          });
-
-          // Map the data to the required format
-          const contactDetailsArray = data.data.map((record) => ({
-            Full_Name: record.Contact_Details?.name || "Unknown Name",
-            id: record.Contact_Details?.id || "Unknown ID",
-          }));
-
-          setContacts(contactDetailsArray);
-          setSelectedParticipants(contactDetailsArray);
-          handleInputChange("Participants", contactDetailsArray); // Sync with parent
-        } catch (error) {
-          console.error("Error fetching related contacts:", error);
-        }
-      }else{
-        setContacts([currentContact]);
-        setSelectedParticipants([currentContact]);
-        handleInputChange("Participants", [currentContact]); // Sync with parent
-        console.log("currentContectIn", currentContact)
-      }
-    };
-
-    fetchHistoryData();
-  }, [selectedRowData, ZOHO, handleInputChange]);
-
-  // Open modal and reset filtered contacts
-  const handleOpen = () => {
-    setFilteredContacts([]);
-    setIsModalOpen(true);
-  };
-
-  // Close modal
-  const handleCancel = () => {
-    setIsModalOpen(false);
-  };
-
-  // Fetch and filter contacts
-  const handleSearch = async () => {
-    if (!ZOHO || !searchText.trim()) return;
-
-    try {
-      let searchResults;
-
-      if (searchType === "Email") {
-        searchResults = await ZOHO.CRM.API.searchRecord({
-          Entity: "Contacts",
-          Type: "email",
-          Query: searchText.trim(),
-        });
-      } else {
-        searchResults = await ZOHO.CRM.API.searchRecord({
-          Entity: "Contacts",
-          Type: "criteria",
-          Query: `(${searchType}:equals:${searchText.trim()})`,
-        });
-      }
-
-      if (searchResults.data && searchResults.data.length > 0) {
-        const formattedContacts = searchResults.data.map((contact) => ({
-          id: contact.id,
-          Full_Name: `${contact.First_Name || "N/A"} ${
-            contact.Last_Name || "N/A"
-          }`,
-          Email: contact.Email || "No Email",
-          Mobile: contact.Mobile || "N/A",
-          First_Name: contact.First_Name || "N/A",
-          Last_Name: contact.Last_Name || "N/A",
-          ID_Number: contact.ID_Number || "N/A",
-        }));
-        setFilteredContacts(formattedContacts);
-      } else {
-        setFilteredContacts([]);
-      }
-    } catch (error) {
-      console.error("Error during search:", error);
-      setFilteredContacts([]);
-    }
-  };
-
-  // Toggle selection of a contact
-  const toggleContactSelection = (contact) => {
-    setSelectedParticipants((prev) => {
-      const alreadySelected = prev.some((c) => c.id === contact.id);
-      const updatedParticipants = alreadySelected
-        ? prev.filter((c) => c.id !== contact.id) // Remove if already selected
-        : [...prev, contact]; // Add if not selected
-
-      // Prevent redundant updates
-      if (
-        JSON.stringify(updatedParticipants) !==
-        JSON.stringify(selectedParticipants)
-      ) {
-        handleInputChange("Participants", updatedParticipants); // Sync with parent
-      }
-
-      return updatedParticipants;
-    });
-  };
-
-  // Save selected participants to parent state
-  const handleOk = () => {
-    const formattedContacts = selectedParticipants.map((contact) => ({
-      id: contact.id,
-      Full_Name: contact.Full_Name,
-      Email: contact.Email,
-      Mobile: contact.Mobile,
-    }));
-
-    // Pass the updated contacts to the parent
-    handleInputChange("Participants", formattedContacts); // Use "Participants" or the relevant field key
-
-    setIsModalOpen(false);
-  };
+  const [contacts, setContacts] = useState([]);
+  const [selectedParticipants, setSelectedParticipants] = useState([]);
+  const [searchType, setSearchType] = useState("First_Name");
+  const [searchText, setSearchText] = useState("");
+  const [filteredContacts, setFilteredContacts] = useState([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const commonStyles = {
     "& .MuiInputBase-root": {
@@ -179,17 +59,148 @@ export default function ContactField({
       fontSize: "9pt",
     },
   };
+  useEffect(() => {
+    const fetchParticipantsDetails = async () => {
+      if (selectedRowData?.historyDetails?.id && ZOHO) {
+        try {
+          // Fetch related list data to get contact IDs
+          const relatedListData = await ZOHO.CRM.API.getRelatedRecords({
+            Entity: "History1",
+            RecordID: selectedRowData?.historyDetails?.id,
+            RelatedList: "Contacts3",
+            page: 1,
+            per_page: 200,
+          });
+  
+          // Fetch full contact details for each contact ID
+          const participants = await Promise.all(
+            relatedListData.data.map(async (record) => {
+              try {
+                const contactDetails = await ZOHO.CRM.API.getRecord({
+                  Entity: "Contacts",
+                  RecordID: record.Contact_Details.id,
+                });
+  
+                if (contactDetails.data && contactDetails.data.length > 0) {
+                  const contact = contactDetails.data[0];
+                  return {
+                    id: contact.id,
+                    First_Name: contact.First_Name || "N/A",
+                    Last_Name: contact.Last_Name || "N/A",
+                    Email: contact.Email || "No Email",
+                    Mobile: contact.Mobile || "N/A",
+                    Full_Name: `${contact.First_Name || "N/A"} ${
+                      contact.Last_Name || "N/A"
+                    }`,
+                    ID_Number: contact.ID_Number || "N/A",
+                  };
+                } else {
+                  return null; // Return null for invalid records
+                }
+              } catch (error) {
+                console.error(
+                  `Error fetching contact details for ID ${record.Contact_Details.id}:`,
+                  error
+                );
+                return null; // Return null for failed fetches
+              }
+            })
+          );
+  
+          // Filter out null participants and update state
+          setSelectedParticipants(participants.filter((participant) => participant !== null));
+        } catch (error) {
+          console.error("Error fetching related contacts:", error);
+        }
+      }
+    };
+  
+    fetchParticipantsDetails();
+  }, [selectedRowData, ZOHO]);
+  
+  
+
+  const handleOpen = () => {
+    setFilteredContacts([]);
+    setIsModalOpen(true);
+  };
+
+  const handleCancel = () => {
+    setIsModalOpen(false);
+  };
+
+  const handleSearch = async () => {
+    if (!ZOHO || !searchText.trim()) return;
+
+    try {
+      let searchResults = await ZOHO.CRM.API.searchRecord({
+        Entity: "Contacts",
+        Type: searchType === "Email" ? "email" : "criteria",
+        Query:
+          searchType === "Email"
+            ? searchText.trim()
+            : `(${searchType}:equals:${searchText.trim()})`,
+      });
+
+      if (searchResults.data && searchResults.data.length > 0) {
+        const formattedContacts = searchResults.data.map((contact) => ({
+          id: contact.id,
+          First_Name: contact.First_Name || "N/A",
+          Last_Name: contact.Last_Name || "N/A",
+          Email: contact.Email || "No Email",
+          Mobile: contact.Mobile || "N/A",
+          Full_Name: `${contact.First_Name || "N/A"} ${
+            contact.Last_Name || "N/A"
+          }`,
+          ID_Number: contact.ID_Number || "N/A",
+        }));
+        setFilteredContacts(formattedContacts);
+      } else {
+        setFilteredContacts([]);
+      }
+    } catch (error) {
+      console.error("Error during search:", error);
+      setFilteredContacts([]);
+    }
+  };
+
+  const toggleContactSelection = (contact) => {
+    setSelectedParticipants((prev) =>
+      prev.some((c) => c.id === contact.id)
+        ? prev.filter((c) => c.id !== contact.id)
+        : [...prev, contact]
+    );
+  };
+
+  const handleOk = () => {
+    const updatedParticipants = selectedParticipants.map((participant) => ({
+      Full_Name:
+        participant.Full_Name ||
+        `${participant.First_Name} ${participant.Last_Name}`,
+      Email: participant.Email,
+      participant: participant.id,
+      type: "contact",
+      id: participant.id,
+    }));
+
+    handleInputChange("Participants", updatedParticipants);
+    setIsModalOpen(false);
+  };
 
   return (
     <Box>
-      <Box display="flex" alignItems="center" gap={2} sx={{ mt: 1 }}>
+      <Box display="flex" alignItems="center" gap={2}>
+      {/* {
+          JSON.stringify(selectedRowData)
+        } */}
         <TextField
           fullWidth
           value={selectedParticipants
-            .filter((c) => c && (c.Full_Name || c.First_Name || c.Last_Name)) // Filter out invalid entries
-            .map((c) => c.Full_Name || `${c.First_Name || "N/A"} ${c.Last_Name || "N/A"}`)
+            .filter((c) => c && (c.Full_Name || c.First_Name || c.Last_Name))
+            .map(
+              (c) => c.Full_Name || `${c.First_Name || "N/A"} ${c.Last_Name || "N/A"}`
+            )
             .join(", ")}
-          
           variant="standard"
           placeholder="Selected contacts"
           InputProps={{
@@ -201,14 +212,12 @@ export default function ContactField({
         <Button
           variant="contained"
           onClick={handleOpen}
-          size="small"
           sx={{ width: "100px", ...commonStyles }}
         >
           Contacts
         </Button>
       </Box>
 
-      {/* Modal */}
       <Dialog open={isModalOpen} onClose={handleCancel} fullWidth maxWidth="md">
         <DialogContent sx={commonStyles}>
           <Box display="flex" gap={2} mb={2}>
@@ -297,6 +306,53 @@ export default function ContactField({
                 )}
               </TableBody>
             </Table>
+             <Box mt={3}>
+            <Typography variant="h6">
+              Selected Contacts:
+            </Typography>
+            <TableContainer>
+              <Table
+                size="small"
+                sx={{ tableLayout: "fixed", fontSize: "9pt" }}
+              >
+                <TableHead>
+                  <TableRow>
+                    <TableCell
+                      sx={{ fontWeight: "bold", width: "5%" }}
+                    ></TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>
+                      First Name
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>Last Name</TableCell>
+                    <TableCell sx={{ fontWeight: "bold", width: "30%" }}>
+                      Email
+                    </TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>Mobile</TableCell>
+                    <TableCell sx={{ fontWeight: "bold" }}>
+                      MS File Number
+                    </TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {selectedParticipants.map((contact) => (
+                    <TableRow key={contact?.id}>
+                      <TableCell>
+                        <Checkbox
+                          checked
+                          onChange={() => toggleContactSelection(contact)}
+                        />
+                      </TableCell>
+                      <TableCell>{contact?.First_Name}</TableCell>
+                      <TableCell>{contact?.Last_Name}</TableCell>
+                      <TableCell>{contact?.Email}</TableCell>
+                      <TableCell>{contact?.Mobile}</TableCell>
+                      <TableCell>{contact?.ID_Number}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Box>
           </TableContainer>
         </DialogContent>
         <DialogActions>
