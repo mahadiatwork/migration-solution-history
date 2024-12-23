@@ -14,6 +14,7 @@ import {
   Snackbar,
   Alert,
   Grid,
+  InputAdornment,
 } from "@mui/material";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
@@ -24,7 +25,9 @@ import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { getResultOptions } from "./helperFunc";
 import ContactField from "./ContactFields";
 import RegardingField from "./RegardingField";
-import DownloadIcon from '@mui/icons-material/Download';
+import IconButton from "@mui/material/IconButton"; // For the clickable icon button
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth"; // For the calendar icon
+
 
 
 const debounce = (func, delay) => {
@@ -170,14 +173,14 @@ export function Dialog({
     event.preventDefault();
     let selectedParticipants = [];
 
-    if(formData.Participants){
+    if (formData.Participants) {
       selectedParticipants = formData.Participants;
     }
 
     if (selectedParticipants.length === 0) {
       selectedParticipants = [currentContact];
     }
-  
+
     // Generate history name based on selected contacts
     const updatedHistoryName = selectedParticipants.map((c) => c.Full_Name).join(", ");
     const finalData = {
@@ -186,10 +189,10 @@ export function Dialog({
       Regarding: formData.regarding,
       Owner: selectedOwner
         ? {
-            id: selectedOwner.id,
-            full_name: selectedOwner.full_name,
-            email: selectedOwner.email,
-          }
+          id: selectedOwner.id,
+          full_name: selectedOwner.full_name,
+          email: selectedOwner.email,
+        }
         : null,
       History_Result: formData.result || "",
       Stakeholder: formData.stakeHolder ? { id: formData.stakeHolder.id } : null,
@@ -201,7 +204,7 @@ export function Dialog({
     };
 
     console.log("data before updating", finalData)
-  
+
     try {
       if (selectedRowData) {
         await updateHistory(selectedRowData, finalData, selectedParticipants);
@@ -229,14 +232,14 @@ export function Dialog({
         },
         Trigger: ["workflow"],
       };
-  
+
       // Create the History1 record
       const createResponse = await ZOHO.CRM.API.insertRecord(createConfig);
       if (createResponse?.data[0]?.code === "SUCCESS") {
         const historyId = createResponse.data[0].details.id;
-  
+
         let contactRecordIds = [];
-  
+
         // Create History_X_Contacts records for each contact
         for (const contact of selectedParticipants) {
           try {
@@ -248,7 +251,7 @@ export function Dialog({
               },
               Trigger: ["workflow"],
             });
-  
+
             // Collect the ID from the insertion response
             if (contactResponse?.data[0]?.code === "SUCCESS") {
               contactRecordIds.push(contactResponse.data[0].details.id);
@@ -264,13 +267,13 @@ export function Dialog({
             );
           }
         }
-  
+
         setSnackbar({
           open: true,
           message: "Record created successfully!",
           severity: "success",
         });
-  
+
         // Notify parent about the created record
         const updatedRecord = {
           id: contactRecordIds[0] || null, // Set the first inserted History_X_Contacts ID (or null if none succeeded)
@@ -281,7 +284,7 @@ export function Dialog({
             id: historyId, // Add the History1 record ID to historyDetails
           },
         };
-  
+
         if (onRecordAdded) onRecordAdded(updatedRecord);
       } else {
         throw new Error("Failed to create History1 record.");
@@ -291,9 +294,9 @@ export function Dialog({
       throw error;
     }
   };
-  
 
-  
+
+
   const updateHistory = async (selectedRowData, finalData, selectedParticipants) => {
     try {
       const updateConfig = {
@@ -305,23 +308,23 @@ export function Dialog({
         },
         Trigger: ["workflow"],
       };
-  
+
       const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
       if (updateResponse?.data[0]?.code === "SUCCESS") {
         const historyId = selectedRowData?.historyDetails?.id;
-  
+
         // Fetch existing History_X_Contacts records
         const relatedRecordsResponse = await ZOHO.CRM.API.getRelatedRecords({
           Entity: "History1",
           RecordID: historyId,
           RelatedList: "Contacts3",
         });
-  
+
         const existingContacts = relatedRecordsResponse?.data || [];
         const existingContactIds = existingContacts.map(
           (contact) => contact.Contact_Details?.id
         );
-  
+
         // Find contacts to add and to delete
         const selectedContactIds = selectedParticipants.map((c) => c.id);
         const toDeleteContactIds = existingContactIds.filter(
@@ -330,13 +333,13 @@ export function Dialog({
         const toAddContacts = selectedParticipants.filter(
           (contact) => !existingContactIds.includes(contact.id)
         );
-  
+
         // Delete records for removed contacts
         for (const id of toDeleteContactIds) {
           const recordToDelete = existingContacts.find(
             (contact) => contact.Contact_Details?.id === id
           );
-  
+
           if (recordToDelete?.id) {
             await ZOHO.CRM.API.deleteRecord({
               Entity: "History_X_Contacts",
@@ -344,7 +347,7 @@ export function Dialog({
             });
           }
         }
-  
+
         // Add new records for newly selected contacts
         for (const contact of toAddContacts) {
           try {
@@ -363,7 +366,7 @@ export function Dialog({
             );
           }
         }
-  
+
         // Notify parent about the updated record
         const updatedRecord = {
           id: selectedRowData.id || null, // Use the ID from the first related record
@@ -374,9 +377,9 @@ export function Dialog({
             name: selectedParticipants.map((c) => c.Full_Name).join(", "),
           },
         };
-  
+
         if (onRecordAdded) onRecordAdded(updatedRecord);
-  
+
         setSnackbar({
           open: true,
           message: "Record and contacts updated successfully!",
@@ -390,7 +393,7 @@ export function Dialog({
       throw error;
     }
   };
-  
+
 
 
 
@@ -620,7 +623,7 @@ export function Dialog({
                   <DemoContainer
                     components={["DateTimePicker"]}
                     sx={{
-                      overflow: "hidden", // Prevent overflow in the DemoContainer
+                      // overflow: "hidden", // Prevent overflow in the DemoContainer
                     }}
                   >
                     <DateTimePicker
@@ -628,20 +631,37 @@ export function Dialog({
                       label="Date & Time"
                       name="date_time"
                       value={formData.date_time || dayjs()}
-                      onChange={(newValue) =>
-                        handleInputChange("date_time", newValue || dayjs())
-                      }
+                      onChange={(newValue) => handleInputChange("date_time", newValue || dayjs())}
                       format="DD/MM/YYYY hh:mm A"
                       sx={{
                         "& .MuiInputBase-input": {
                           fontSize: "9pt",
                         },
+                        "& .MuiInputAdornment-root": {
+                          marginLeft: "-8px", // Move the icon slightly to the left
+                        },
+                        "& .MuiSvgIcon-root": {
+                          fontSize: "20px", // Adjust the icon size
+                        },
                         overflow: "hidden", // Prevent overflow in the DateTimePicker
                       }}
                       slotProps={{
-                        textField: { variant: "standard", margin: "dense" },
+                        textField: {
+                          variant: "standard",
+                          margin: "dense",
+                          InputProps: {
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton>
+                                  <CalendarMonthIcon sx={{ fontSize: "20px" }} />
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          },
+                        },
                       }}
                     />
+
                   </DemoContainer>
                 </LocalizationProvider>
               </Box>

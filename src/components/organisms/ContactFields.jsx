@@ -17,7 +17,6 @@ import {
   Typography,
 } from "@mui/material";
 
-
 const commonStyles = {
   fontSize: "9pt", // Uniform font size
   "& .MuiOutlinedInput-input": { fontSize: "9pt" }, // Input text
@@ -59,19 +58,24 @@ export default function ContactField({
       fontSize: "9pt",
     },
   };
+
+  const selectedContact = selectedRowData?.historyDetails?.id
+    ? selectedRowData
+    : currentContact;
+
   useEffect(() => {
     const fetchParticipantsDetails = async () => {
-      if (selectedRowData?.historyDetails?.id && ZOHO) {
+      if (selectedContact?.historyDetails?.id && ZOHO) {
         try {
           // Fetch related list data to get contact IDs
           const relatedListData = await ZOHO.CRM.API.getRelatedRecords({
             Entity: "History1",
-            RecordID: selectedRowData?.historyDetails?.id,
+            RecordID: selectedContact?.historyDetails?.id,
             RelatedList: "Contacts3",
             page: 1,
             per_page: 200,
           });
-  
+
           // Fetch full contact details for each contact ID
           const participants = await Promise.all(
             relatedListData.data.map(async (record) => {
@@ -80,7 +84,7 @@ export default function ContactField({
                   Entity: "Contacts",
                   RecordID: record.Contact_Details.id,
                 });
-  
+
                 if (contactDetails.data && contactDetails.data.length > 0) {
                   const contact = contactDetails.data[0];
                   return {
@@ -106,19 +110,19 @@ export default function ContactField({
               }
             })
           );
-  
+
           // Filter out null participants and update state
-          setSelectedParticipants(participants.filter((participant) => participant !== null));
+          setSelectedParticipants(
+            participants.filter((participant) => participant !== null)
+          );
         } catch (error) {
           console.error("Error fetching related contacts:", error);
         }
       }
     };
-  
+
     fetchParticipantsDetails();
   }, [selectedRowData, ZOHO]);
-  
-  
 
   const handleOpen = () => {
     setFilteredContacts([]);
@@ -187,18 +191,23 @@ export default function ContactField({
     setIsModalOpen(false);
   };
 
+  useEffect(() => {
+    if (selectedRowData.id == null || selectedRowData.id == undefined) {
+      setSelectedParticipants([currentContact]);
+    }
+  }, []);
+
   return (
     <Box>
       <Box display="flex" alignItems="center" gap={2}>
-      {/* {
-          JSON.stringify(selectedRowData)
-        } */}
         <TextField
           fullWidth
           value={selectedParticipants
             .filter((c) => c && (c.Full_Name || c.First_Name || c.Last_Name))
             .map(
-              (c) => c.Full_Name || `${c.First_Name || "N/A"} ${c.Last_Name || "N/A"}`
+              (c) =>
+                c.Full_Name ||
+                `${c.First_Name || "N/A"} ${c.Last_Name || "N/A"}`
             )
             .join(", ")}
           variant="standard"
@@ -306,53 +315,53 @@ export default function ContactField({
                 )}
               </TableBody>
             </Table>
-             <Box mt={3}>
-            <Typography variant="h6">
-              Selected Contacts:
-            </Typography>
-            <TableContainer>
-              <Table
-                size="small"
-                sx={{ tableLayout: "fixed", fontSize: "9pt" }}
-              >
-                <TableHead>
-                  <TableRow>
-                    <TableCell
-                      sx={{ fontWeight: "bold", width: "5%" }}
-                    ></TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>
-                      First Name
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>Last Name</TableCell>
-                    <TableCell sx={{ fontWeight: "bold", width: "30%" }}>
-                      Email
-                    </TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>Mobile</TableCell>
-                    <TableCell sx={{ fontWeight: "bold" }}>
-                      MS File Number
-                    </TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {selectedParticipants.map((contact) => (
-                    <TableRow key={contact?.id}>
-                      <TableCell>
-                        <Checkbox
-                          checked
-                          onChange={() => toggleContactSelection(contact)}
-                        />
+            <Box mt={3}>
+              <Typography variant="h6">Selected Contacts:</Typography>
+              <TableContainer>
+                <Table
+                  size="small"
+                  sx={{ tableLayout: "fixed", fontSize: "9pt" }}
+                >
+                  <TableHead>
+                    <TableRow>
+                      <TableCell
+                        sx={{ fontWeight: "bold", width: "5%" }}
+                      ></TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        First Name
                       </TableCell>
-                      <TableCell>{contact?.First_Name}</TableCell>
-                      <TableCell>{contact?.Last_Name}</TableCell>
-                      <TableCell>{contact?.Email}</TableCell>
-                      <TableCell>{contact?.Mobile}</TableCell>
-                      <TableCell>{contact?.ID_Number}</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        Last Name
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: "bold", width: "30%" }}>
+                        Email
+                      </TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>Mobile</TableCell>
+                      <TableCell sx={{ fontWeight: "bold" }}>
+                        MS File Number
+                      </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
+                  </TableHead>
+                  <TableBody>
+                    {selectedParticipants.map((contact) => (
+                      <TableRow key={contact?.id}>
+                        <TableCell>
+                          <Checkbox
+                            checked
+                            onChange={() => toggleContactSelection(contact)}
+                          />
+                        </TableCell>
+                        <TableCell>{contact?.First_Name}</TableCell>
+                        <TableCell>{contact?.Last_Name}</TableCell>
+                        <TableCell>{contact?.Email}</TableCell>
+                        <TableCell>{contact?.Mobile}</TableCell>
+                        <TableCell>{contact?.ID_Number}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
           </TableContainer>
         </DialogContent>
         <DialogActions>

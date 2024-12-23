@@ -18,6 +18,15 @@ import { Table } from "./components/organisms/Table";
 import { Dialog } from "./components/organisms/Dialog";
 import { TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
 
+import { DialogTitle, DialogContent, DialogActions } from "@mui/material";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+
+import {
+    Dialog as MUIDialog,
+} from "@mui/material";
+
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -36,10 +45,17 @@ function isInLastNDays(date, pre) {
 }
 
 const dateOptions = [
-    { label: "All" },
-    { label: "Last 7 days", preDay: 7 },
-    { label: "Last 30 days", preDay: 30 },
+    { label: "Default", preDay: null },
+    { label: "Last 7 Days", preDay: 7 },
+    { label: "Last 30 Days", preDay: 30 },
+    { label: "Last 90 Days", preDay: 90 },
+    { label: "Current Week", custom: () => dayjs().startOf("week").format() },
+    { label: "Current Month", custom: () => dayjs().startOf("month").format() },
+    { label: "Next Week", custom: () => dayjs().add(1, "week").startOf("week").format() },
+    { label: "Custom Range", customRange: true },
 ];
+
+
 
 const App = () => {
     const { module, recordId } = useZohoInit();
@@ -60,7 +76,15 @@ const App = () => {
     const [zohoLoaded, setZohoLoaded] = React.useState(false);
     const [regarding, setRegarding] = React.useState("");
     const [details, setDetails] = React.useState("");
-      const [selectedContacts, setSelectedContacts] = React.useState([]);
+    const [selectedContacts, setSelectedContacts] = React.useState([]);
+
+    const [isCustomRangeDialogOpen, setIsCustomRangeDialogOpen] = React.useState(false);
+    const [customRange, setCustomRange] = React.useState({
+        startDate: null,
+        endDate: null,
+    });
+
+
 
     const handleClickOpenCreateDialog = () => {
         setOpenCreateDialog(true);
@@ -71,8 +95,8 @@ const App = () => {
     };
     const handleClickOpenEditDialog = (rowData) => {
         setSelectedRowData(rowData); // Set the selected row data  
-        setRegarding(rowData?.regarding || ""); // Initialize regarding data
-        setDetails(rowData?.details || ""); // Initialize details data
+        // setRegarding(rowData?.regarding || ""); // Initialize regarding data
+        // setDetails(rowData?.details || ""); // Initialize details data
         setOpenEditDialog(true); // Open the dialog
     };
 
@@ -96,8 +120,8 @@ const App = () => {
         }
         setSelectedRowData(null); // Clear selectedRowData
         setOpenEditDialog(false); // Close the dialog
-        setRegarding(""); // Clear the regarding field
-        setDetails(""); // Clear the details field
+        // setRegarding(""); // Clear the regarding field
+        // setDetails(""); // Clear the details field
     };
 
 
@@ -150,7 +174,32 @@ const App = () => {
                 const types = data
                     ?.map((el) => el.History_Type)
                     ?.filter((el) => el !== undefined && el !== null);
-                setTypeList([...new Set(types)]);
+
+                const sortedTypes = [...new Set(types)].sort((a, b) => a.localeCompare(b)); // Sort alphabetically
+
+                const additionalTypes = ["Meeting",
+                    "To-Do",
+                    "Call",
+                    "Appointment",
+                    "Boardroom",
+                    "Call Billing",
+                    "Email Billing",
+                    "Initial Consultation",
+                    "Mail",
+                    "Meeting Billing",
+                    "Personal Activity",
+                    "Room 1",
+                    "Room 2",
+                    "Room 3",
+                    "Todo Billing",
+                    "Vacation"]; // Example additional options
+
+                const sortedTypesWithAdditional = [
+                    ...new Set([...additionalTypes, ...sortedTypes]), // Merge additional options with existing ones
+                ].sort((a, b) => a.localeCompare(b)); // Sort alphabetically
+
+                setTypeList(sortedTypesWithAdditional);
+
 
                 setInitPageContent(null);
             } catch (error) {
@@ -205,7 +254,11 @@ const App = () => {
         };
 
         // Add the normalized record to the top of the table
-        setRelatedListData((prevData) => [normalizedRecord, ...prevData]);
+        const finalData = [normalizedRecord, ...relatedListData];
+
+        setRelatedListData(finalData);
+
+
 
         // Highlight the newly added record
         setHighlightedRecordId(newRecord.id);
@@ -226,7 +279,7 @@ const App = () => {
     };
 
     const handleRecordUpdate = (updatedRecord) => {
-        console.log("Updated Record:", updatedRecord);
+        console.log("Updated Record by maddie:", updatedRecord);
 
         // Normalize updatedRecord keys to match relatedListData keys
         const normalizedRecord = {
@@ -240,6 +293,7 @@ const App = () => {
             //     ? updatedRecord.Participants.map((c) => c.Full_Name).join(", ")
             //     : updatedRecord.name,
         };
+
 
         setRelatedListData((prevData) => {
             const updatedData = prevData.map((row) => {
@@ -255,12 +309,48 @@ const App = () => {
             console.log("Updated Related List Data:", updatedData);
             return updatedData;
         });
-
+        console.log("updatedRecord.Regarding", updatedRecord.Regarding)
+        setRegarding(updatedRecord.Regarding || "No Regarding");
+        setDetails(updatedRecord.History_Details_Plain || "No Details");
         setHighlightedRecordId(updatedRecord.id); // Highlight the updated record
     };
 
 
-    console.log({ currentContact })
+    const filteredData = relatedListData
+        ?.filter((el) => (selectedOwner ? el.ownerName === selectedOwner?.full_name : true))
+        ?.filter((el) => (selectedType ? el?.type === selectedType : true))
+        ?.filter((el) => {
+            if (dateRange?.preDay) {
+                const isValidDate = dayjs(el?.date_time).isValid();
+                return isValidDate && isInLastNDays(el?.date_time, dateRange?.preDay);
+            }
+
+            if (dateRange?.startDate && dateRange?.endDate) {
+                return (
+                    dayjs(el?.date_time).isAfter(dayjs(dateRange.startDate), "day") &&
+                    dayjs(el?.date_time).isBefore(dayjs(dateRange.endDate), "day")
+                );
+            }
+
+            if (dateRange?.custom) {
+                const startDate = dayjs(dateRange.custom());
+                const endDate = dayjs();
+                return dayjs(el?.date_time).isBetween(startDate, endDate, null, "[]");
+            }
+            return true; // Show all if no date range is selected
+        })
+        ?.filter((el) => {
+            if (keyword.trim()) {
+                const lowerCaseKeyword = keyword.trim().toLowerCase();
+                return (
+                    el.name?.toLowerCase().includes(lowerCaseKeyword) ||
+                    el.details?.toLowerCase().includes(lowerCaseKeyword) ||
+                    el.regarding?.toLowerCase().includes(lowerCaseKeyword)
+                );
+            }
+            return true; // Show all if no keyword is entered
+        });
+
 
     return (
         <React.Fragment>
@@ -294,6 +384,46 @@ const App = () => {
                                 sx={{
                                     "& .MuiInputBase-root": {
                                         height: "33px",
+                                        fontSize: "9pt",
+                                    },
+                                    "& .MuiInputLabel-root": {
+                                        fontSize: "9pt",
+                                    },
+                                }}
+                                renderInput={(params) => (
+                                    <TextField
+                                        {...params}
+                                        label="Dates"
+                                        size="small"
+                                        InputLabelProps={{ style: { fontSize: "9pt" } }}
+                                    />
+                                )}
+                                componentsProps={{
+                                    popper: {
+                                        sx: {
+                                            "& .MuiAutocomplete-listbox": {
+                                                fontSize: "9pt",
+                                            },
+                                        },
+                                    },
+                                }}
+                                onChange={(e, value) => {
+                                    if (value?.customRange) {
+                                        setIsCustomRangeDialogOpen(true); // Open custom range dialog
+                                    } else {
+                                        setDateRange(value); // Set normal date range
+                                    }
+                                }}
+                            />
+
+                            <Autocomplete
+                                size="small"
+                                options={typeList}
+                                sx={{
+                                    width: "8rem",
+                                    "& .MuiInputBase-root": {
+                                        height: "33px",
+                                        fontSize: "9pt", // Adjust font size for selected value
                                     },
                                     "& .MuiInputLabel-root": {
                                         fontSize: "9pt", // Adjust label font size
@@ -302,9 +432,9 @@ const App = () => {
                                 renderInput={(params) => (
                                     <TextField
                                         {...params}
-                                        label="Dates"
+                                        label="Types"
                                         size="small"
-                                        InputLabelProps={{ style: { fontSize: "9pt" } }} // Additional inline styling for the label
+                                        InputLabelProps={{ style: { fontSize: "9pt" } }}
                                     />
                                 )}
                                 componentsProps={{
@@ -316,34 +446,9 @@ const App = () => {
                                         },
                                     },
                                 }}
-                                onChange={(e, value) => setDateRange(value)}
-                            />
-
-
-                            <Autocomplete
-                                size="small"
-                                options={typeList}
-                                sx={{
-                                    width: "8rem",
-                                    "& .MuiInputBase-root": {
-                                        height: "33px",
-                                    },
-                                    "& .MuiInputLabel-root": {
-                                        fontSize: "9pt", // Adjust label font size
-                                    },
-                                }}
-                                renderInput={(params) => <TextField {...params} label="Types" size="small" />}
-                                componentsProps={{
-                                    popper: {
-                                        sx: {
-                                            "& .MuiAutocomplete-listbox": {
-                                                fontSize: "9pt", // Font size for dropdown options
-                                            },
-                                        },
-                                    },
-                                }}
                                 onChange={(e, value) => setSelectedType(value)}
                             />
+
                             <TextField
                                 size="small"
                                 label="Keyword"
@@ -413,10 +518,7 @@ const App = () => {
                         <Grid item xs={9}>
 
                             <Table
-                                rows={relatedListData
-                                    ?.filter((el) => (selectedOwner ? el.ownerName === selectedOwner?.full_name : true))
-                                    ?.filter((el) => (selectedType ? el?.type === selectedType : true))
-                                    ?.filter((el) => (dateRange?.preDay ? isInLastNDays(el?.date_time, dateRange?.preDay) : true))}
+                                rows={filteredData}
                                 setSelectedRecordId={setSelectedRecordId}
                                 handleClickOpenEditDialog={handleClickOpenEditDialog}
                                 handleRightSideDataShow={handleRightSideDataShow}
@@ -610,6 +712,97 @@ const App = () => {
                 selectedContacts={selectedContacts}
                 setSelectedContacts={setSelectedContacts}
             />
+            {isCustomRangeDialogOpen && (
+                <MUIDialog
+                    open={isCustomRangeDialogOpen}
+                    onClose={() => setIsCustomRangeDialogOpen(false)}
+                    fullWidth
+                    maxWidth="xs"
+                    sx={{
+                        "& .MuiDialogContent-root": {
+                            padding: "8px", // Reduce padding for compactness
+                        },
+                    }}
+                >
+                    <DialogTitle sx={{ fontSize: "14px", padding: "8px" }}>Select Custom Date Range</DialogTitle>
+                    <DialogContent>
+                        <LocalizationProvider dateAdapter={AdapterDayjs}>
+                            <Box display="flex" flexDirection="column" gap={1.5}>
+                                <DatePicker
+                                    label="Start Date"
+                                    value={customRange.startDate}
+                                    onChange={(newValue) =>
+                                        setCustomRange((prev) => ({ ...prev, startDate: newValue }))
+                                    }
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{
+                                                width: "8rem", // Match other fields
+                                                "& .MuiInputBase-root": {
+                                                    height: "20px", // Match small field height
+                                                    fontSize: "9pt",
+                                                },
+                                                "& .MuiInputLabel-root": {
+                                                    fontSize: "9pt", // Match label size
+                                                },
+                                            }}
+                                        />
+                                    )}
+                                    slotProps={{ popper: { placement: "right-start" }, textField: { size: 'small' } }}
+                                />
+                                <DatePicker
+                                    label="End Date"
+                                    value={customRange.endDate}
+                                    onChange={(newValue) =>
+                                        setCustomRange((prev) => ({ ...prev, endDate: newValue }))
+                                    }
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{
+                                                width: "8rem", // Match other fields
+                                                "& .MuiInputBase-root": {
+                                                    height: "20px", // Match small field height
+                                                    fontSize: "12px",
+                                                },
+                                                "& .MuiInputLabel-root": {
+                                                    fontSize: "9pt", // Match label size
+                                                },
+                                            }}
+                                        />
+                                    )}
+                                    slotProps={{ popper: { placement: "right-start" }, textField: { size: 'small' } }}
+                                />
+                            </Box>
+                        </LocalizationProvider>
+                    </DialogContent>
+                    <DialogActions sx={{ padding: "8px" }}>
+                        <Button
+                            onClick={() => setIsCustomRangeDialogOpen(false)}
+                            color="secondary"
+                            size="small"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                setDateRange(customRange); // Save custom range to dateRange
+                                setIsCustomRangeDialogOpen(false);
+                            }}
+                            color="primary"
+                            size="small"
+                        >
+                            Apply
+                        </Button>
+                    </DialogActions>
+                </MUIDialog>
+            )}
+
 
         </React.Fragment>
     );

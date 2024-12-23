@@ -150,14 +150,14 @@ export function Table({
     }
   };
 
-  const visibleRows = React.useMemo(
-    () => [...(rows || [])].sort(getComparator(order, orderBy)),
-    [order, rows, orderBy]
-  );
+  // const visibleRows = React.useMemo(
+  //   () => [...(rows || [])].sort(getComparator(order, orderBy)),
+  //   [order, rows, orderBy]
+  // );
 
-  React.useEffect(() => {
-    console.log("Table rows updated:", rows); // Debugging rows
-  }, [rows]);
+  // React.useEffect(() => {
+  //   console.log("Table rows updated:", rows); // Debugging rows
+  // }, [rows]);
 
   return (
     <Paper sx={{ height: "25.5rem", overflowY: "auto" }}>
@@ -177,14 +177,14 @@ export function Table({
             rowCount={rows?.length}
           />
           <TableBody>
-            {visibleRows.length === 0 ? (
+            {rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} align="center" sx={{ fontStyle: "italic", color: "gray" }}>
                   No data available
                 </TableCell>
               </TableRow>
             ) : (
-              visibleRows.map((row, index) => {
+              rows.map((row, index) => {
                 if (!row || typeof row.name === "undefined") {
                   console.warn("Skipping malformed row:", row);
                   return null;
