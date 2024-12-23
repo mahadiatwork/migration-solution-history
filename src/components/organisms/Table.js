@@ -177,7 +177,7 @@ export function Table({
             rowCount={rows?.length}
           />
           <TableBody>
-            {rows.length === 0 ? (
+            { rows === undefined || rows.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={8} align="center" sx={{ fontStyle: "italic", color: "gray" }}>
                   No data available
