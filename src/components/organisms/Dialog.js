@@ -27,8 +27,20 @@ import ContactField from "./ContactFields";
 import RegardingField from "./RegardingField";
 import IconButton from "@mui/material/IconButton"; // For the clickable icon button
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth"; // For the calendar icon
+import { styled } from "@mui/material/styles";
+import { zohoApi } from "../../zohoApi";
 
-
+const VisuallyHiddenInput = styled("input")({
+  clip: "rect(0 0 0 0)",
+  clipPath: "inset(50%)",
+  height: 1,
+  overflow: "hidden",
+  position: "absolute",
+  bottom: 0,
+  left: 0,
+  whiteSpace: "nowrap",
+  width: 1,
+});
 
 const debounce = (func, delay) => {
   let timer;
@@ -38,26 +50,25 @@ const debounce = (func, delay) => {
   };
 };
 
-
 const durationOptions = Array.from({ length: 24 }, (_, i) => (i + 1) * 10);
 
 const resultMapping = {
-  "Meeting": "Meeting Held",
+  Meeting: "Meeting Held",
   "To-Do": "To-do Done",
-  "Appointment": "Appointment Completed",
-  "Boardroom": "Boardroom - Completed",
+  Appointment: "Appointment Completed",
+  Boardroom: "Boardroom - Completed",
   "Call Billing": "Call Billing - Completed",
   "Email Billing": "Mail - Completed",
   "Initial Consultation": "Initial Consultation - Completed",
-  "Call": "Call Completed",
-  "Mail": "Mail Sent",
+  Call: "Call Completed",
+  Mail: "Mail Sent",
   "Meeting Billing": "Meeting Billing - Completed",
   "Personal Activity": "Personal Activity - Completed",
   "Room 1": "Room 1 - Completed",
   "Room 2": "Room 2 - Completed",
   "Room 3": "Room 3 - Completed",
   "To Do Billing": "To Do Billing - Completed",
-  "Vacation": "Vacation - Completed",
+  Vacation: "Vacation - Completed",
 };
 
 const typeMapping = Object.fromEntries(
@@ -77,17 +88,58 @@ export function Dialog({
   selectedContacts,
   setSelectedContacts,
 }) {
-
   const [historyName, setHistoryName] = React.useState("");
   const [historyContacts, setHistoryContacts] = React.useState([]);
-  const [selectedOwner, setSelectedOwner] = React.useState(loggedInUser || null);
-  const [regarding, setRegarding] = React.useState(selectedRowData?.regarding || "");
+  const [selectedOwner, setSelectedOwner] = React.useState(
+    loggedInUser || null
+  );
+  const [regarding, setRegarding] = React.useState(
+    selectedRowData?.regarding || ""
+  );
   const [formData, setFormData] = React.useState(selectedRowData || {}); // Form data state
-  const [snackbar, setSnackbar] = React.useState({ open: false, message: "", severity: "success" });
+  console.log({ formData });
+  const [snackbar, setSnackbar] = React.useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
 
+  const handleSelectFile = async (e) => {
+    e.preventDefault();
+    if ([...e.target.files]?.length > 1) {
+      return;
+    }
+    if (e.target.files) {
+      const el = [...e?.target?.files]?.[0];
+      if (el) {
+        handleInputChange("attachment", el);
+      }
+    }
+  };
+
+  React.useEffect(() => {
+    let load = true;
+    const getAttachment = async ({ rowData }) => {
+      const { data } = await zohoApi.file.getAttachments({
+        module: "History1",
+        recordId: rowData?.historyDetails?.id,
+      });
+      console.log({ data });
+      setFormData((prev) => ({
+        ...prev,
+        attachment: { name: data?.[0]?.File_Name },
+      }));
+    };
+    if (selectedRowData?.id && load) {
+      load = false;
+      getAttachment({ rowData: selectedRowData });
+      // getAttachment({
+      //   selectedRowData: { historyDetails: { id: "76775000001772113" } },
+      // });
+    }
+  }, [selectedRowData]);
 
   // console.log({ selectedRowData })
-
 
   // Reinitialize dialog state when `openDialog` or `obj` changes
   React.useEffect(() => {
@@ -100,24 +152,24 @@ export function Dialog({
         regarding: selectedRowData?.regarding || "",
         details: selectedRowData?.details || "",
         stakeHolder: selectedRowData?.stakeHolder || null,
-        date_time: selectedRowData?.date_time ? dayjs(selectedRowData.date_time) : dayjs(),
+        date_time: selectedRowData?.date_time
+          ? dayjs(selectedRowData.date_time)
+          : dayjs(),
       });
-      setSelectedContacts(selectedRowData?.Participants || [currentContact] || []);
+      setSelectedContacts(
+        selectedRowData?.Participants || [currentContact] || []
+      );
       setHistoryName(
-        (selectedRowData?.Participants?.map((p) => p.Full_Name).join(", ")) || ""
+        selectedRowData?.Participants?.map((p) => p.Full_Name).join(", ") || ""
       );
       setSelectedOwner(loggedInUser || null);
 
-      setHistoryContacts(selectedRowData?.Participants || [])
+      setHistoryContacts(selectedRowData?.Participants || []);
     } else {
       // Reset formData to avoid stale data
       setFormData({});
     }
   }, [openDialog, selectedRowData, loggedInUser, currentContact]);
-
-
-
-
 
   React.useEffect(() => {
     const fetchHistoryData = async () => {
@@ -153,21 +205,20 @@ export function Dialog({
     }
   }, [selectedRowData?.historyDetails, openDialog]);
 
-
   const handleRegardingChange = (event) => {
     setRegarding(event.target.value); // Update the state with user input
   };
 
-
   React.useEffect(() => {
-    const names = selectedContacts.map((contact) => contact?.Full_Name).join(", ");
+    const names = selectedContacts
+      .map((contact) => contact?.Full_Name)
+      .join(", ");
     setHistoryName(names);
   }, [selectedContacts]);
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
-
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -182,20 +233,24 @@ export function Dialog({
     }
 
     // Generate history name based on selected contacts
-    const updatedHistoryName = selectedParticipants.map((c) => c.Full_Name).join(", ");
+    const updatedHistoryName = selectedParticipants
+      .map((c) => c.Full_Name)
+      .join(", ");
     const finalData = {
       Name: updatedHistoryName,
       History_Details_Plain: formData.details,
       Regarding: formData.regarding,
       Owner: selectedOwner
         ? {
-          id: selectedOwner.id,
-          full_name: selectedOwner.full_name,
-          email: selectedOwner.email,
-        }
+            id: selectedOwner.id,
+            full_name: selectedOwner.full_name,
+            email: selectedOwner.email,
+          }
         : null,
       History_Result: formData.result || "",
-      Stakeholder: formData.stakeHolder ? { id: formData.stakeHolder.id } : null,
+      Stakeholder: formData.stakeHolder
+        ? { id: formData.stakeHolder.id }
+        : null,
       History_Type: formData.type || "",
       Duration: formData.duration ? String(formData.duration) : null,
       Date: formData.date_time
@@ -203,7 +258,7 @@ export function Dialog({
         : null,
     };
 
-    console.log("data before updating", finalData)
+    console.log("data before updating", finalData);
 
     try {
       if (selectedRowData) {
@@ -237,6 +292,13 @@ export function Dialog({
       const createResponse = await ZOHO.CRM.API.insertRecord(createConfig);
       if (createResponse?.data[0]?.code === "SUCCESS") {
         const historyId = createResponse.data[0].details.id;
+
+        const fileResp = await zohoApi.file.uploadAttachment({
+          module: "History1",
+          recordId: historyId,
+          data: formData?.attachment,
+        });
+        // console.log({ fileResp });
 
         let contactRecordIds = [];
 
@@ -295,9 +357,11 @@ export function Dialog({
     }
   };
 
-
-
-  const updateHistory = async (selectedRowData, finalData, selectedParticipants) => {
+  const updateHistory = async (
+    selectedRowData,
+    finalData,
+    selectedParticipants
+  ) => {
     try {
       const updateConfig = {
         Entity: "History1",
@@ -394,9 +458,6 @@ export function Dialog({
     }
   };
 
-
-
-
   const handleDelete = async () => {
     if (!selectedRowData) return; // No record selected
 
@@ -415,7 +476,6 @@ export function Dialog({
             RecordID: record.id,
           })
         );
-
 
         await Promise.all(deletePromises);
       }
@@ -441,11 +501,13 @@ export function Dialog({
       }
     } catch (error) {
       console.error("Error deleting record or related records:", error);
-      setSnackbar({ open: true, message: "Error deleting records.", severity: "error" });
+      setSnackbar({
+        open: true,
+        message: "Error deleting records.",
+        severity: "error",
+      });
     }
   };
-
-
 
   const handleCloseSnackbar = () => {
     setSnackbar({ open: false, message: "", severity: "success" });
@@ -468,10 +530,8 @@ export function Dialog({
     "Room 3",
     "To Do Billing",
     "Vacation",
-    "Other"
+    "Other",
   ];
-
-
 
   const resultOptions = [
     "Call Attempted",
@@ -517,7 +577,6 @@ export function Dialog({
     "E-mail Attachment",
   ];
 
-
   return (
     <>
       <MUIDialog
@@ -545,13 +604,20 @@ export function Dialog({
         >
           <Grid container spacing={1}>
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth variant="standard" sx={{ fontSize: "9pt" }}>
+              <FormControl
+                fullWidth
+                variant="standard"
+                sx={{ fontSize: "9pt" }}
+              >
                 <InputLabel sx={{ fontSize: "9pt" }}>Type</InputLabel>
                 <Select
                   value={formData.type || ""} // Ensure a fallback value
                   onChange={(e) => {
                     handleInputChange("type", e.target.value);
-                    handleInputChange("result", getResultOptions(e.target.value));
+                    handleInputChange(
+                      "result",
+                      getResultOptions(e.target.value)
+                    );
                   }}
                   label="Type"
                   sx={{
@@ -570,7 +636,11 @@ export function Dialog({
             </Grid>
 
             <Grid item xs={12} sm={6}>
-              <FormControl fullWidth variant="standard" sx={{ fontSize: "9pt" }}>
+              <FormControl
+                fullWidth
+                variant="standard"
+                sx={{ fontSize: "9pt" }}
+              >
                 <InputLabel sx={{ fontSize: "9pt" }}>Result</InputLabel>
                 <Select
                   value={formData.result || ""} // Ensure a fallback value
@@ -592,7 +662,11 @@ export function Dialog({
                   }}
                 >
                   {resultOptions.map((result) => (
-                    <MenuItem key={result} value={result} sx={{ fontSize: "9pt" }}>
+                    <MenuItem
+                      key={result}
+                      value={result}
+                      sx={{ fontSize: "9pt" }}
+                    >
                       {result}
                     </MenuItem>
                   ))}
@@ -615,23 +689,27 @@ export function Dialog({
               xs={6}
               sx={{
                 overflow: "hidden", // Ensure the grid container doesn't allow overflow
-                width: "98%"
+                width: "98%",
               }}
             >
               <Box sx={{ width: "99%", mt: -1 }}>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <DemoContainer
                     components={["DateTimePicker"]}
-                    sx={{
-                      // overflow: "hidden", // Prevent overflow in the DemoContainer
-                    }}
+                    sx={
+                      {
+                        // overflow: "hidden", // Prevent overflow in the DemoContainer
+                      }
+                    }
                   >
                     <DateTimePicker
                       id="date_time"
                       label="Date & Time"
                       name="date_time"
                       value={formData.date_time || dayjs()}
-                      onChange={(newValue) => handleInputChange("date_time", newValue || dayjs())}
+                      onChange={(newValue) =>
+                        handleInputChange("date_time", newValue || dayjs())
+                      }
                       format="DD/MM/YYYY hh:mm A"
                       sx={{
                         "& .MuiInputBase-input": {
@@ -653,7 +731,9 @@ export function Dialog({
                             endAdornment: (
                               <InputAdornment position="end">
                                 <IconButton>
-                                  <CalendarMonthIcon sx={{ fontSize: "20px" }} />
+                                  <CalendarMonthIcon
+                                    sx={{ fontSize: "20px" }}
+                                  />
                                 </IconButton>
                               </InputAdornment>
                             ),
@@ -661,19 +741,19 @@ export function Dialog({
                         },
                       }}
                     />
-
                   </DemoContainer>
                 </LocalizationProvider>
               </Box>
             </Grid>
-
 
             <Grid item xs={6}>
               <Autocomplete
                 options={durationOptions}
                 getOptionLabel={(option) => option.toString()}
                 value={formData?.duration || null} // Provide a fallback value
-                onChange={(event, newValue) => handleInputChange("duration", newValue)}
+                onChange={(event, newValue) =>
+                  handleInputChange("duration", newValue)
+                }
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -707,9 +787,6 @@ export function Dialog({
                   },
                 }}
               />
-
-
-
             </Grid>
           </Grid>
 
@@ -787,7 +864,8 @@ export function Dialog({
                 }}
               >
                 Attachment
-                <input
+                <VisuallyHiddenInput type="file" onChange={handleSelectFile} />
+                {/* <input
                   type="file"
                   hidden
                   onChange={(e) => {
@@ -796,7 +874,7 @@ export function Dialog({
                       handleInputChange("attachment", file);
                     }
                   }}
-                />
+                /> */}
               </Button>
             </Box>
           </Box>
@@ -822,13 +900,13 @@ export function Dialog({
                 },
               }}
             />
-
-
           </Box>
         </DialogContent>
-        <DialogActions sx={{ display: "flex", justifyContent: "space-between" }}>
-          {
-            selectedRowData !== undefined ? <Button
+        <DialogActions
+          sx={{ display: "flex", justifyContent: "space-between" }}
+        >
+          {selectedRowData !== undefined ? (
+            <Button
               onClick={handleDelete}
               variant="outlined"
               color="error"
@@ -840,18 +918,23 @@ export function Dialog({
               }}
             >
               Delete
-            </Button> : <div></div>
-          }
-          <Box sx={{ display: "flex", gap: 1 }}>          <Button
-            onClick={handleCloseDialog}
-            variant="outlined"
-            sx={{ fontSize: "9pt" }}
-          >
-            Cancel
-          </Button>
+            </Button>
+          ) : (
+            <div></div>
+          )}
+          <Box sx={{ display: "flex", gap: 1 }}>
+            {" "}
+            <Button
+              onClick={handleCloseDialog}
+              variant="outlined"
+              sx={{ fontSize: "9pt" }}
+            >
+              Cancel
+            </Button>
             <Button type="submit" variant="contained" sx={{ fontSize: "9pt" }}>
               Save
-            </Button></Box>
+            </Button>
+          </Box>
         </DialogActions>
       </MUIDialog>
 

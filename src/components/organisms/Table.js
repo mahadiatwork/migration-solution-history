@@ -15,7 +15,7 @@ import CircularProgress from "@mui/material/CircularProgress";
 import { visuallyHidden } from "@mui/utils";
 import { useSnackbar } from "notistack";
 import { zohoApi } from "../../zohoApi";
-import DownloadIcon from '@mui/icons-material/Download';
+import DownloadIcon from "@mui/icons-material/Download";
 
 const DownloadButton = ({ rowId, rowIcon }) => {
   const { enqueueSnackbar } = useSnackbar();
@@ -30,13 +30,15 @@ const DownloadButton = ({ rowId, rowIcon }) => {
           module: "History1",
           recordId: rowId,
         });
+
         if (data?.length > 0) {
-          await zohoApi.file.downloadAttachmentById({
+          const downloadResp = await zohoApi.file.downloadAttachmentById({
             module: "History1",
             recordId: rowId,
             attachmentId: data?.[0]?.id,
             fileName: data?.[0]?.File_Name,
           });
+          console.log({ data, rowId, downloadResp });
           setWaitingForDownload(false);
         } else {
           enqueueSnackbar("No file.", { variant: "error" });
@@ -76,8 +78,18 @@ function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
     { id: "type", numeric: false, label: "Type" },
     { id: "result", numeric: false, label: "Result" },
     { id: "duration", numeric: false, label: "Duration" },
-    { id: "regarding", numeric: false, label: "Regarding & Details", width: "400px" }, // Set width here
-    { id: "icon", numeric: false, label: <AttachmentIcon />, dontShowSort: true },
+    {
+      id: "regarding",
+      numeric: false,
+      label: "Regarding & Details",
+      width: "400px",
+    }, // Set width here
+    {
+      id: "icon",
+      numeric: false,
+      label: <AttachmentIcon />,
+      dontShowSort: true,
+    },
     { id: "ownerName", numeric: false, label: "Record Owner" },
   ];
 
@@ -104,7 +116,9 @@ function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
                 {headCell.label}
                 {orderBy === headCell.id ? (
                   <Box component="span" sx={visuallyHidden}>
-                    {order === "desc" ? "sorted descending" : "sorted ascending"}
+                    {order === "desc"
+                      ? "sorted descending"
+                      : "sorted ascending"}
                   </Box>
                 ) : null}
               </TableSortLabel>
@@ -177,9 +191,13 @@ export function Table({
             rowCount={rows?.length}
           />
           <TableBody>
-            { rows === undefined || rows.length === 0 ? (
+            {rows === undefined || rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} align="center" sx={{ fontStyle: "italic", color: "gray" }}>
+                <TableCell
+                  colSpan={8}
+                  align="center"
+                  sx={{ fontStyle: "italic", color: "gray" }}
+                >
                   No data available
                 </TableCell>
               </TableRow>
@@ -240,8 +258,12 @@ export function Table({
                         <span>{dayjs(row.date_time).format("h:mm A")}</span>
                       </Box>
                     </TableCell>
-                    <TableCell size="small">{row.type || "Unknown Type"}</TableCell>
-                    <TableCell size="small">{row.result || "No Result"}</TableCell>
+                    <TableCell size="small">
+                      {row.type || "Unknown Type"}
+                    </TableCell>
+                    <TableCell size="small">
+                      {row.result || "No Result"}
+                    </TableCell>
                     <TableCell size="small">{row.duration || "N/A"}</TableCell>
                     <TableCell
                       size="small"
@@ -280,9 +302,15 @@ export function Table({
                       </Box>
                     </TableCell>
                     <TableCell size="small">
-                      <DownloadButton rowId={row.id} rowIcon={<DownloadIcon />} />
+                      <DownloadButton
+                        // rowId={row?.id}
+                        rowId={row.historyDetails?.id}
+                        rowIcon={<DownloadIcon />}
+                      />
                     </TableCell>
-                    <TableCell size="small">{row.ownerName || "Unknown Owner"}</TableCell>
+                    <TableCell size="small">
+                      {row.ownerName || "Unknown Owner"}
+                    </TableCell>
                   </TableRow>
                 );
               })
@@ -293,6 +321,3 @@ export function Table({
     </Paper>
   );
 }
-
-
-

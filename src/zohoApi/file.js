@@ -8,6 +8,25 @@ import {
 
 const ZOHO = window.ZOHO;
 
+async function uploadAttachment({ module, recordId, data }) {
+  try {
+    const uploadAttachmentResp = await ZOHO.CRM.API.attachFile({
+      Entity: module,
+      RecordID: recordId,
+      File: { Name: data?.name, Content: data },
+    });
+    return {
+      data: uploadAttachmentResp?.data,
+      error: null,
+    };
+  } catch (uploadFileError) {
+    return {
+      data: null,
+      error: "Something went wrong",
+    };
+  }
+}
+
 async function getAttachments({ module, recordId }) {
   try {
     const url = `${dataCenterMap.AU}/crm/v6/${module}/${recordId}/Attachments?fields=id,File_Name,$file_id`;
@@ -169,7 +188,7 @@ async function downloadAttachmentById({
       responseType: "blob",
     };
     const resp = await axios.request(config);
-    // console.log({ resp });
+    console.log({ resp });
 
     downloadFile(resp?.data, fileName);
   } catch (downloadAttachmentByIdError) {
@@ -182,6 +201,7 @@ async function downloadAttachmentById({
 }
 
 export const file = {
+  uploadAttachment,
   getAttachments,
   downloadAttachmentById,
 };
