@@ -749,6 +749,7 @@ const App = () => {
         onRecordAdded={handleRecordUpdate} // Update the existing record
         selectedContacts={selectedContacts}
         setSelectedContacts={setSelectedContacts}
+        buttonText="Update"
       />
       <Dialog
         openDialog={openCreateDialog}
@@ -761,6 +762,7 @@ const App = () => {
         currentContact={currentContact}
         selectedContacts={selectedContacts}
         setSelectedContacts={setSelectedContacts}
+        buttonText="Save"
       />
       {isCustomRangeDialogOpen && (
         <MUIDialog

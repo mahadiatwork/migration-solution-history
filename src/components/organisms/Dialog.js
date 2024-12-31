@@ -87,17 +87,20 @@ export function Dialog({
   onRecordAdded,
   selectedContacts,
   setSelectedContacts,
+  buttonText = "Save",
 }) {
   const [historyName, setHistoryName] = React.useState("");
   const [historyContacts, setHistoryContacts] = React.useState([]);
   const [selectedOwner, setSelectedOwner] = React.useState(
     loggedInUser || null
   );
+  const [loadedAttachmentFromRecord, setLoadedAttachmentFromRecord] =
+    React.useState();
   const [regarding, setRegarding] = React.useState(
     selectedRowData?.regarding || ""
   );
   const [formData, setFormData] = React.useState(selectedRowData || {}); // Form data state
-  console.log({ formData });
+  // console.log({ formData });
   const [snackbar, setSnackbar] = React.useState({
     open: false,
     message: "",
@@ -124,11 +127,11 @@ export function Dialog({
         module: "History1",
         recordId: rowData?.historyDetails?.id,
       });
-      console.log({ data });
       setFormData((prev) => ({
         ...prev,
         attachment: { name: data?.[0]?.File_Name },
       }));
+      setLoadedAttachmentFromRecord(data);
     };
     if (selectedRowData?.id && load) {
       load = false;
@@ -376,6 +379,20 @@ export function Dialog({
       const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
       if (updateResponse?.data[0]?.code === "SUCCESS") {
         const historyId = selectedRowData?.historyDetails?.id;
+
+        // Delete attachment
+        const deleteFileResp = await zohoApi.file.deleteAttachment({
+          module: "History1",
+          recordId: selectedRowData?.historyDetails?.id,
+          attachment_id: loadedAttachmentFromRecord?.[0]?.id,
+        });
+
+        // Add new attachment
+        const uploadFileResp = await zohoApi.file.uploadAttachment({
+          module: "History1",
+          recordId: historyId,
+          data: formData?.attachment,
+        });
 
         // Fetch existing History_X_Contacts records
         const relatedRecordsResponse = await ZOHO.CRM.API.getRelatedRecords({
@@ -932,7 +949,7 @@ export function Dialog({
               Cancel
             </Button>
             <Button type="submit" variant="contained" sx={{ fontSize: "9pt" }}>
-              Save
+              {buttonText}
             </Button>
           </Box>
         </DialogActions>

@@ -200,8 +200,39 @@ async function downloadAttachmentById({
   }
 }
 
+async function deleteAttachment({ module, recordId, attachment_id }) {
+  try {
+    const url = `${dataCenterMap.AU}/crm/v6/${module}/${recordId}/Attachments/${attachment_id}`;
+
+    var req_data = {
+      url,
+      param_type: 1,
+      headers: {},
+      method: "DELETE",
+    };
+
+    const deleteAttachmentResp = await ZOHO.CRM.CONNECTION.invoke(
+      conn_name,
+      req_data
+    );
+    const respId = await deleteAttachmentResp?.details?.statusMessage?.data?.[0]
+      ?.details?.id;
+
+    return {
+      data: respId,
+      error: null,
+    };
+  } catch (deleteFileError) {
+    return {
+      data: null,
+      error: "Something went wrong",
+    };
+  }
+}
+
 export const file = {
   uploadAttachment,
   getAttachments,
   downloadAttachmentById,
+  deleteAttachment,
 };

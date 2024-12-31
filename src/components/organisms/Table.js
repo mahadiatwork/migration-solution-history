@@ -17,7 +17,7 @@ import { useSnackbar } from "notistack";
 import { zohoApi } from "../../zohoApi";
 import DownloadIcon from "@mui/icons-material/Download";
 
-const DownloadButton = ({ rowId, rowIcon }) => {
+const DownloadButton = ({ rowId, rowIcon, isSelected }) => {
   const { enqueueSnackbar } = useSnackbar();
   const [waitingForDownload, setWaitingForDownload] = React.useState(false);
   return (
@@ -46,7 +46,14 @@ const DownloadButton = ({ rowId, rowIcon }) => {
         }
       }}
     >
-      {waitingForDownload ? <CircularProgress size={16} /> : rowIcon}
+      {waitingForDownload ? (
+        <CircularProgress
+          size={16}
+          sx={{ color: isSelected ? "white" : "primary.main" }}
+        />
+      ) : (
+        rowIcon
+      )}
     </IconButton>
   );
 };
@@ -304,6 +311,7 @@ export function Table({
                     <TableCell size="small">
                       <DownloadButton
                         // rowId={row?.id}
+                        isSelected={isSelected}
                         rowId={row.historyDetails?.id}
                         rowIcon={<DownloadIcon />}
                       />
