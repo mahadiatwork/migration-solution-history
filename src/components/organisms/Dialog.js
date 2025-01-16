@@ -245,10 +245,10 @@ export function Dialog({
       Regarding: formData.regarding,
       Owner: selectedOwner
         ? {
-            id: selectedOwner.id,
-            full_name: selectedOwner.full_name,
-            email: selectedOwner.email,
-          }
+          id: selectedOwner.id,
+          full_name: selectedOwner.full_name,
+          email: selectedOwner.email,
+        }
         : null,
       History_Result: formData.result || "",
       Stakeholder: formData.stakeHolder
@@ -295,13 +295,14 @@ export function Dialog({
       const createResponse = await ZOHO.CRM.API.insertRecord(createConfig);
       if (createResponse?.data[0]?.code === "SUCCESS") {
         const historyId = createResponse.data[0].details.id;
-
-        const fileResp = await zohoApi.file.uploadAttachment({
-          module: "History1",
-          recordId: historyId,
-          data: formData?.attachment,
-        });
-        // console.log({ fileResp });
+        if (formData?.attachment) {
+          const fileResp = await zohoApi.file.uploadAttachment({
+            module: "History1",
+            recordId: historyId,
+            data: formData?.attachment,
+          });
+          // console.log({ fileResp });
+        }
 
         let contactRecordIds = [];
 
