@@ -29,6 +29,8 @@ import IconButton from "@mui/material/IconButton"; // For the clickable icon but
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth"; // For the calendar icon
 import { styled } from "@mui/material/styles";
 import { zohoApi } from "../../zohoApi";
+import ApplicationTable from "./ApplicationTable";
+import ApplicationDialog from "./ApplicationTable";
 
 const VisuallyHiddenInput = styled("input")({
   clip: "rect(0 0 0 0)",
@@ -78,7 +80,6 @@ const typeMapping = Object.fromEntries(
 export function Dialog({
   openDialog,
   handleCloseDialog,
-  title,
   ownerList,
   loggedInUser,
   ZOHO, // Zoho instance for API calls
@@ -119,6 +120,7 @@ export function Dialog({
       }
     }
   };
+
 
   React.useEffect(() => {
     let load = true;
@@ -245,9 +247,7 @@ export function Dialog({
       Regarding: formData.regarding,
       Owner: selectedOwner
         ? {
-          id: selectedOwner.id,
-          full_name: selectedOwner.full_name,
-          email: selectedOwner.email,
+          id: selectedOwner.id
         }
         : null,
       History_Result: formData.result || "",
@@ -378,6 +378,7 @@ export function Dialog({
       };
 
       const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
+
       if (updateResponse?.data[0]?.code === "SUCCESS") {
         const historyId = selectedRowData?.historyDetails?.id;
 
@@ -595,6 +596,103 @@ export function Dialog({
     "E-mail Attachment",
   ];
 
+  const [openApplicationDialog, setOpenApplicationDialog] = React.useState(false);
+  const [applications, setApplications] = React.useState([]);
+  const [selectedApplicationId, setSelectedApplicationId] = React.useState(null);
+
+  const handleMoveToApplication = async () => {
+
+    try {
+      // Fetch related applications for the current contact
+      const response = await ZOHO.CRM.API.getRelatedRecords({
+        Entity: "Contacts",
+        RecordID: "76775000001564008",
+        RelatedList: "Applications",
+        page: 1,
+        per_page: 200,
+      });
+      if (response?.data) {
+        setApplications(response.data || []);
+        setOpenApplicationDialog(true); // Open the application selection dialog
+      } else {
+        throw new Error("No related applications found.");
+      }
+    } catch (error) {
+      console.error("Error fetching related applications:", error);
+      setSnackbar({
+        open: true,
+        message: "Failed to fetch related applications.",
+        severity: "error",
+      });
+    }
+  };
+
+  const handleApplicationSelect = async () => {
+    if (!selectedApplicationId) {
+      setSnackbar({
+        open: true,
+        message: "Please select an application.",
+        severity: "warning",
+      });
+      return;
+    }
+
+    try {
+      // Delete the current history and associated contacts
+      await handleDelete();
+
+      // Create a new application history in the selected application
+      const createApplicationHistory = await ZOHO.CRM.API.insertRecord({
+        Entity: "Application History",
+        APIData: {
+          Name: formData.Name,
+          Application: { id: selectedApplicationId },
+          Details: formData.details,
+          Date: formData.date_time,
+        },
+        Trigger: ["workflow"],
+      });
+
+      if (createApplicationHistory?.data[0]?.code === "SUCCESS") {
+        const newHistoryId = createApplicationHistory.data[0].details.id;
+
+        // Create ApplicationxContacts for all associated contacts
+        for (const contact of historyContacts) {
+          await ZOHO.CRM.API.insertRecord({
+            Entity: "ApplicationxContacts",
+            APIData: {
+              Application_History: { id: newHistoryId },
+              Contact: { id: contact.id },
+            },
+            Trigger: ["workflow"],
+          });
+        }
+
+        setSnackbar({
+          open: true,
+          message: "History moved successfully!",
+          severity: "success",
+        });
+      } else {
+        throw new Error("Failed to create new application history.");
+      }
+    } catch (error) {
+      console.error("Error moving history:", error);
+      setSnackbar({
+        open: true,
+        message: "Failed to move history.",
+        severity: "error",
+      });
+    } finally {
+      handleApplicationDialogClose();
+    }
+  };
+
+  const handleApplicationDialogClose = () => {
+    setOpenApplicationDialog(false);
+    setSelectedApplicationId(null);
+  };
+
   return (
     <>
       <MUIDialog
@@ -745,17 +843,17 @@ export function Dialog({
                         textField: {
                           variant: "standard",
                           margin: "dense",
-                          InputProps: {
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <IconButton>
-                                  <CalendarMonthIcon
-                                    sx={{ fontSize: "20px" }}
-                                  />
-                                </IconButton>
-                              </InputAdornment>
-                            ),
-                          },
+                          // InputProps: {
+                          //   endAdornment: (
+                          //     <InputAdornment position="end">
+                          //       <IconButton>
+                          //         <CalendarMonthIcon
+                          //           sx={{ fontSize: "20px" }}
+                          //         />
+                          //       </IconButton>
+                          //     </InputAdornment>
+                          //   ),
+                          // },
                         },
                       }}
                     />
@@ -814,7 +912,10 @@ export function Dialog({
                 options={ownerList}
                 getOptionLabel={(option) => option.full_name || ""}
                 value={selectedOwner}
-                onChange={(event, newValue) => setSelectedOwner(newValue)}
+                onChange={(event, newValue) => {
+                  setSelectedOwner(newValue)
+                  handleInputChange("ownerName", newValue)
+                }}
                 renderInput={(params) => (
                   <TextField
                     {...params}
@@ -924,19 +1025,34 @@ export function Dialog({
           sx={{ display: "flex", justifyContent: "space-between" }}
         >
           {selectedRowData !== undefined ? (
-            <Button
-              onClick={handleDelete}
-              variant="outlined"
-              color="error"
-              sx={{
-                fontSize: "9pt",
-                marginLeft: "8px",
-                textTransform: "none",
-                padding: "4px 8px",
-              }}
-            >
-              Delete
-            </Button>
+            <div>
+              <Button
+                onClick={handleDelete}
+                variant="outlined"
+                color="error"
+                sx={{
+                  fontSize: "9pt",
+                  marginLeft: "8px",
+                  textTransform: "none",
+                  padding: "4px 8px",
+                }}
+              >
+                Delete
+              </Button>
+              <Button
+                onClick={handleMoveToApplication}
+                variant="outlined"
+                color="success"
+                sx={{
+                  fontSize: "9pt",
+                  marginLeft: "8px",
+                  textTransform: "none",
+                  padding: "4px 8px",
+                }}
+              >
+                Move to Application
+              </Button>
+            </div>
           ) : (
             <div></div>
           )}
@@ -955,7 +1071,17 @@ export function Dialog({
           </Box>
         </DialogActions>
       </MUIDialog>
-
+      <ApplicationDialog
+        openApplicationDialog={openApplicationDialog}
+        handleApplicationDialogClose={handleApplicationDialogClose}
+        applications={applications}
+        ZOHO={ZOHO}
+        handleDelete={handleDelete}
+        formData={formData}
+        historyContacts={historyContacts}
+        selectedRowData={selectedRowData}
+        currentContact={currentContact}
+      />
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}

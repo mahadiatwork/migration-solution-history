@@ -23,7 +23,7 @@ import {
   TableHead,
   TableRow,
 } from "@mui/material";
-
+import { setCurrentGlobalContact, getCurrentContact } from "./GlobalState";
 import { DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -34,6 +34,7 @@ import { useSnackbar } from "notistack";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+
 
 const ZOHO = window.ZOHO;
 
@@ -154,13 +155,18 @@ const App = () => {
         setLoggedInUser(currentUserResponse?.users?.[0] || null);
 
         const currentContactResponse = await ZOHO.CRM.API.getRecord({
-          Entity: module,
+          Entity: "Contacts",
           approved: "both",
           RecordID: recordId,
         });
 
         console.log("currentContactData", currentContactResponse);
         setCurrentContact(currentContactResponse?.data?.[0] || null);
+
+        if (currentContact) {
+          setCurrentGlobalContact(currentContact);
+         
+        }
 
         const tempData = data?.map((obj) => ({
           name: obj?.Name || "No Name",
@@ -533,6 +539,7 @@ const App = () => {
                 handleClickOpenEditDialog={handleClickOpenEditDialog}
                 handleRightSideDataShow={handleRightSideDataShow}
                 highlightedRecordId={highlightedRecordId} // Pass highlighted ID to the table
+                keyword={keyword}
               />
             </Grid>
             <Grid item xs={3}>

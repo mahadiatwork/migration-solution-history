@@ -17,6 +17,22 @@ import { useSnackbar } from "notistack";
 import { zohoApi } from "../../zohoApi";
 import DownloadIcon from "@mui/icons-material/Download";
 
+
+const highlightText = (text, keyword) => {
+  if (!keyword) return text;
+  const regex = new RegExp(`(${keyword})`, "gi");
+  const parts = text.split(regex);
+  return parts.map((part, index) =>
+    regex.test(part) ? (
+      <mark key={index} style={{ backgroundColor: "yellow" }}>
+        {part}
+      </mark>
+    ) : (
+      part
+    )
+  );
+};
+
 const DownloadButton = ({ rowId, rowIcon, isSelected }) => {
   const { enqueueSnackbar } = useSnackbar();
   const [waitingForDownload, setWaitingForDownload] = React.useState(false);
@@ -144,6 +160,7 @@ export function Table({
   highlightedRecordId,
   handleClickOpenEditDialog,
   handleRightSideDataShow,
+  keyword
 }) {
   const [order, setOrder] = React.useState("asc");
   const [orderBy, setOrderBy] = React.useState("name");
@@ -292,7 +309,7 @@ export function Table({
                           padding: "4px",
                         }}
                       >
-                        {row.regarding || "No Regarding"}
+                        {highlightText(row.regarding || "No Regarding", keyword)}
                       </Box>
                       <Box
                         sx={{
@@ -305,7 +322,7 @@ export function Table({
                           padding: "4px",
                         }}
                       >
-                        {row.details || "No Details"}
+                        {highlightText(row.details || "No Details", keyword)}
                       </Box>
                     </TableCell>
                     <TableCell size="small">
