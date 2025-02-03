@@ -1039,7 +1039,7 @@ export function Dialog({
               >
                 Delete
               </Button>
-              <Button
+              {/* <Button
                 onClick={handleMoveToApplication}
                 variant="outlined"
                 color="success"
@@ -1051,7 +1051,19 @@ export function Dialog({
                 }}
               >
                 Move to Application
-              </Button>
+              </Button>              {/* <Button
+                onClick={handleMoveToApplication}
+                variant="outlined"
+                color="success"
+                sx={{
+                  fontSize: "9pt",
+                  marginLeft: "8px",
+                  textTransform: "none",
+                  padding: "4px 8px",
+                }}
+              >
+                Move to Application
+              </Button> */}
             </div>
           ) : (
             <div></div>
