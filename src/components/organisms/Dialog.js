@@ -914,7 +914,7 @@ export function Dialog({
                 value={selectedOwner}
                 onChange={(event, newValue) => {
                   setSelectedOwner(newValue)
-                  handleInputChange("ownerName", newValue)
+                  // handleInputChange("ownerName", newValue)
                 }}
                 renderInput={(params) => (
                   <TextField
