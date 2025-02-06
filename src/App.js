@@ -115,14 +115,14 @@ const App = () => {
         prevData.map((item) =>
           item.id === updatedRowData.id
             ? {
-                ...item,
-                ...updatedRowData,
-                name: updatedRowData.Participants
-                  ? updatedRowData.Participants.map((c) => c.Full_Name).join(
-                      ", "
-                    )
-                  : item.name,
-              }
+              ...item,
+              ...updatedRowData,
+              name: updatedRowData.Participants
+                ? updatedRowData.Participants.map((c) => c.Full_Name).join(
+                  ", "
+                )
+                : item.name,
+            }
             : item
         )
       );
@@ -165,7 +165,7 @@ const App = () => {
 
         if (currentContact) {
           setCurrentGlobalContact(currentContact);
-         
+
         }
 
         const tempData = data?.map((obj) => ({
@@ -270,7 +270,7 @@ const App = () => {
     };
 
     // Add the normalized record to the top of the table
-    const finalData = [normalizedRecord, ...relatedListData];
+    const finalData = [...relatedListData, normalizedRecord];
 
     setRelatedListData(finalData);
 
@@ -290,7 +290,7 @@ const App = () => {
   };
 
   const handleRecordUpdate = (updatedRecord) => {
-    console.log("Updated Record by maddie:", updatedRecord);
+    console.log("Updated before by maddie:", updatedRecord);
 
     // Normalize updatedRecord keys to match relatedListData keys
     const normalizedRecord = {
@@ -300,10 +300,14 @@ const App = () => {
       duration: updatedRecord.Duration,
       regarding: updatedRecord.Regarding,
       details: updatedRecord.History_Details_Plain,
+      ownerName: updatedRecord?.Owner?.full_name,
+      date_time: updatedRecord?.Date, // Ensure date is consistent
       // name: updatedRecord.Participants
       //     ? updatedRecord.Participants.map((c) => c.Full_Name).join(", ")
       //     : updatedRecord.name,
     };
+
+    console.log("Updated after by maddie:", updatedRecord);
 
     setRelatedListData((prevData) => {
       const updatedData = prevData.map((row) => {
@@ -722,8 +726,8 @@ const App = () => {
                           <TableCell>
                             {row.date_time
                               ? dayjs(row.date_time).format(
-                                  "DD/MM/YYYY HH:mm A"
-                                )
+                                "DD/MM/YYYY HH:mm A"
+                              )
                               : "No Date"}
                           </TableCell>
                           <TableCell>

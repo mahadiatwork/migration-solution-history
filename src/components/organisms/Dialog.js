@@ -245,11 +245,7 @@ export function Dialog({
       Name: updatedHistoryName,
       History_Details_Plain: formData.details,
       Regarding: formData.regarding,
-      Owner: selectedOwner
-        ? {
-          id: selectedOwner.id
-        }
-        : null,
+      Owner: selectedOwner,
       History_Result: formData.result || "",
       Stakeholder: formData.stakeHolder
         ? { id: formData.stakeHolder.id }
