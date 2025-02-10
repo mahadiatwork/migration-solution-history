@@ -828,7 +828,7 @@ export function Dialog({
                           fontSize: "9pt",
                         },
                         "& .MuiInputAdornment-root": {
-                          marginLeft: "-8px", // Move the icon slightly to the left
+                          marginLeft: "-11px", // Move the icon slightly to the left
                         },
                         "& .MuiSvgIcon-root": {
                           fontSize: "20px", // Adjust the icon size
@@ -836,6 +836,16 @@ export function Dialog({
                         overflow: "hidden", // Prevent overflow in the DateTimePicker
                       }}
                       slotProps={{
+                        popper: {
+                          modifiers: [
+                            {
+                              name: 'offset',
+                              options: {
+                                offset: [0, -80], // You can adjust the offset if necessary
+                              },
+                            },
+                          ],
+                        },
                         textField: {
                           variant: "standard",
                           margin: "dense",

@@ -270,7 +270,7 @@ const App = () => {
     };
 
     // Add the normalized record to the top of the table
-    const finalData = [...relatedListData, normalizedRecord];
+    const finalData = [normalizedRecord, ...relatedListData];
 
     setRelatedListData(finalData);
 

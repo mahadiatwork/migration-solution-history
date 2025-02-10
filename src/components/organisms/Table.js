@@ -162,7 +162,7 @@ export function Table({
   handleRightSideDataShow,
   keyword
 }) {
-  const [order, setOrder] = React.useState("asc");
+  const [order, setOrder] = React.useState("desc");
   const [orderBy, setOrderBy] = React.useState("name");
   const [selectedRowId, setSelectedRowId] = React.useState(highlightedRecordId); // Sync with highlightedRecordId
 
