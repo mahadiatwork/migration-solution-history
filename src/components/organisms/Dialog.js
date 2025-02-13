@@ -1045,7 +1045,7 @@ export function Dialog({
               >
                 Delete
               </Button>
-              {/* <Button
+              <Button
                 onClick={handleMoveToApplication}
                 variant="outlined"
                 color="success"
@@ -1057,7 +1057,9 @@ export function Dialog({
                 }}
               >
                 Move to Application
-              </Button>              {/* <Button
+              </Button>             
+{/*               
+              <Button
                 onClick={handleMoveToApplication}
                 variant="outlined"
                 color="success"
