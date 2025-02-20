@@ -103,11 +103,76 @@ function App() {
         ?.filter((el) => el !== null);
       setOwnerList([...new Set(owners)]);
 
+<<<<<<< Updated upstream
       const types = data
         ?.map((el) => el.History_Type)
         ?.filter((el) => el !== undefined)
         ?.filter((el) => el !== null);
       setTypeList([...new Set(types)]);
+=======
+        console.log("currentContactData", currentContactResponse);
+        setCurrentContact(currentContactResponse?.data?.[0] || null);
+
+        if (currentContact) {
+          setCurrentGlobalContact(currentContact);
+        }
+
+        const tempData = data?.map((obj) => ({
+          name: obj?.Name || "No Name",
+          id: obj?.id,
+          date_time: obj?.History_Date_Time,
+          type: obj?.History_Type || "Unknown Type",
+          result: obj?.History_Result || "No Result",
+          duration: obj?.duration_min || "N/A",
+          regarding: obj?.Regarding || "No Regarding",
+          details: obj?.History_Details || "No Details",
+          icon: <DownloadIcon />,
+          owner: obj?.Owner || "Unknown Owner",
+          historyDetails: obj?.Contact_History_Info,
+          stakeHolder: obj?.Stakeholder,
+        }));
+
+        setRelatedListData(tempData || []);
+
+        const types = data
+          ?.map((el) => el.History_Type)
+          ?.filter((el) => el !== undefined && el !== null);
+
+        const sortedTypes = [...new Set(types)].sort((a, b) =>
+          a.localeCompare(b)
+        ); // Sort alphabetically
+
+        const additionalTypes = [
+          "Meeting",
+          "To-Do",
+          "Call",
+          "Appointment",
+          "Boardroom",
+          "Call Billing",
+          "Email Billing",
+          "Initial Consultation",
+          "Mail",
+          "Meeting Billing",
+          "Personal Activity",
+          "Room 1",
+          "Room 2",
+          "Room 3",
+          "Todo Billing",
+          "Vacation",
+        ]; // Example additional options
+
+        const sortedTypesWithAdditional = [
+          ...new Set([...additionalTypes, ...sortedTypes]), // Merge additional options with existing ones
+        ].sort((a, b) => a.localeCompare(b)); // Sort alphabetically
+
+        setTypeList(sortedTypesWithAdditional);
+
+        setInitPageContent(null);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+        setInitPageContent("Error loading data.");
+      }
+>>>>>>> Stashed changes
     };
 
     if (module && recordId) {

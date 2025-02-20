@@ -108,12 +108,16 @@ function EnhancedTableHead({ order, orderBy, handleRequestSort }) {
       label: <AttachmentIcon />,
       dontShowSort: true,
     },
+<<<<<<< Updated upstream
     {
       id: "ownerName",
       numeric: false,
       disablePadding: false,
       label: "Record Manager",
     },
+=======
+    { id: "owner", numeric: false, label: "Record Owner" },
+>>>>>>> Stashed changes
   ];
 
   return (
@@ -266,6 +270,7 @@ export function Table({
                         WebkitBoxOrient: "vertical",
                       }}
                     >
+<<<<<<< Updated upstream
                       {row.details}
                     </span>
                   </TableCell>
@@ -278,6 +283,50 @@ export function Table({
                 </TableRow>
               );
             })}
+=======
+                      <Box
+                        sx={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 8,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "normal",
+                          padding: "4px",
+                        }}
+                      >
+                        {highlightText(row.regarding || "No Regarding", keyword)}
+                      </Box>
+                      <Box
+                        sx={{
+                          display: "-webkit-box",
+                          WebkitLineClamp: 8,
+                          WebkitBoxOrient: "vertical",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "normal",
+                          padding: "4px",
+                        }}
+                      >
+                        {highlightText(row.details || "No Details", keyword)}
+                      </Box>
+                    </TableCell>
+                    <TableCell size="small">
+                      <DownloadButton
+                        // rowId={row?.id}
+                        isSelected={isSelected}
+                        rowId={row.historyDetails?.id}
+                        rowIcon={<DownloadIcon />}
+                      />
+                    </TableCell>
+                    <TableCell size="small">
+                      {row?.owner?.name || "Unknown Owner"}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+>>>>>>> Stashed changes
           </TableBody>
         </MUITable>
       </TableContainer>
