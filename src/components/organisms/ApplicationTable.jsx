@@ -112,13 +112,7 @@ const ApplicationDialog = ({
     }
   }, [currentContact]);
 
-  const handleApplicationSelect = async (currentContact) => {
-
-    const contact = getCurrentContact(); // Access the contact again if needed
-
-    console.log("Global Current Contact:", contact);
-
-    return;
+  const handleApplicationSelect = async () => {
 
     if (!selectedApplicationId) {
       setSnackbar({

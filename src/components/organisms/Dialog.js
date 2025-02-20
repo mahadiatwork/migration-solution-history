@@ -31,6 +31,7 @@ import { styled } from "@mui/material/styles";
 import { zohoApi } from "../../zohoApi";
 import ApplicationTable from "./ApplicationTable";
 import ApplicationDialog from "./ApplicationTable";
+import Stakeholder from "../atoms/Stakeholder";
 
 const VisuallyHiddenInput = styled("input")({
   clip: "rect(0 0 0 0)",
@@ -89,6 +90,10 @@ export function Dialog({
   selectedContacts,
   setSelectedContacts,
   buttonText = "Save",
+  handleMoveToApplication,
+  applications,
+  openApplicationDialog,
+  setOpenApplicationDialog
 }) {
   const [historyName, setHistoryName] = React.useState("");
   const [historyContacts, setHistoryContacts] = React.useState([]);
@@ -363,12 +368,14 @@ export function Dialog({
     selectedParticipants
   ) => {
     try {
+
       const updateConfig = {
         Entity: "History1",
         RecordID: selectedRowData?.historyDetails?.id,
         APIData: {
           id: selectedRowData?.historyDetails?.id,
           ...finalData,
+          Owner: {id: finalData?.Owner?.id}
         },
         Trigger: ["workflow"],
       };
@@ -592,36 +599,11 @@ export function Dialog({
     "E-mail Attachment",
   ];
 
-  const [openApplicationDialog, setOpenApplicationDialog] = React.useState(false);
-  const [applications, setApplications] = React.useState([]);
+
+
   const [selectedApplicationId, setSelectedApplicationId] = React.useState(null);
 
-  const handleMoveToApplication = async () => {
 
-    try {
-      // Fetch related applications for the current contact
-      const response = await ZOHO.CRM.API.getRelatedRecords({
-        Entity: "Contacts",
-        RecordID: "76775000001564008",
-        RelatedList: "Applications",
-        page: 1,
-        per_page: 200,
-      });
-      if (response?.data) {
-        setApplications(response.data || []);
-        setOpenApplicationDialog(true); // Open the application selection dialog
-      } else {
-        throw new Error("No related applications found.");
-      }
-    } catch (error) {
-      console.error("Error fetching related applications:", error);
-      setSnackbar({
-        open: true,
-        message: "Failed to fetch related applications.",
-        severity: "error",
-      });
-    }
-  };
 
   const handleApplicationSelect = async () => {
     if (!selectedApplicationId) {
@@ -636,7 +618,6 @@ export function Dialog({
     try {
       // Delete the current history and associated contacts
       await handleDelete();
-
       // Create a new application history in the selected application
       const createApplicationHistory = await ZOHO.CRM.API.insertRecord({
         Entity: "Application History",
@@ -795,6 +776,12 @@ export function Dialog({
             selectedContacts={historyContacts}
           />
 
+          <Stakeholder
+            formData={formData}
+            handleInputChange={handleInputChange}
+            ZOHO={ZOHO}
+          />
+
           <Grid container spacing={1}>
             <Grid
               item
@@ -929,12 +916,30 @@ export function Dialog({
                     name="history_owner"
                     variant="standard"
                     sx={{
-                      "& .MuiInputBase-input": {
-                        fontSize: "9pt",
-                      },
+                      "& .MuiInputLabel-root": { fontSize: "9pt" },  // Label size
+                      "& .MuiInputBase-input": { fontSize: "9pt" }   // Input text size
                     }}
                   />
                 )}
+                slotProps={{
+                  popper: {
+                    modifiers: [
+                      {
+                        name: "preventOverflow",
+                        options: {
+                          boundary: "window"
+                        }
+                      }
+                    ]
+                  },
+                  paper: {
+                    sx: {
+                      "& .MuiAutocomplete-listbox": {
+                        fontSize: "9pt"  // Option size
+                      }
+                    }
+                  }
+                }}
               />
             </Grid>
             <Grid item xs={6}>
@@ -1057,8 +1062,8 @@ export function Dialog({
                 }}
               >
                 Move to Application
-              </Button>             
-{/*               
+              </Button>
+              {/*               
               <Button
                 onClick={handleMoveToApplication}
                 variant="outlined"

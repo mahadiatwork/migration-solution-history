@@ -42,7 +42,10 @@ export default function Stakeholder({ formData, handleInputChange, ZOHO }) {
     setInputValue(newValue);
 
     if (newValue) {
-      const debounceTimeout = setTimeout(() => fetchStakeholders(newValue), 500);
+      const debounceTimeout = setTimeout(
+        () => fetchStakeholders(newValue),
+        500
+      );
       return () => clearTimeout(debounceTimeout);
     }
   };
@@ -61,7 +64,15 @@ export default function Stakeholder({ formData, handleInputChange, ZOHO }) {
       inputValue={inputValue}
       onInputChange={handleInputChangeWithDebounce}
       renderInput={(params) => (
-        <TextField {...params} label="Stakeholder" variant="standard" />
+        <TextField
+          {...params}
+          label="Stakeholder"
+          variant="standard"
+          sx={{ 
+            "& .MuiInputLabel-root": { fontSize: "9pt" },  // Label size
+            "& .MuiInputBase-input": { fontSize: "9pt" }   // Input text size
+          }}
+        />
       )}
     />
   );

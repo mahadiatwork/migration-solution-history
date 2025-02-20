@@ -165,7 +165,6 @@ const App = () => {
 
         if (currentContact) {
           setCurrentGlobalContact(currentContact);
-
         }
 
         const tempData = data?.map((obj) => ({
@@ -365,6 +364,36 @@ const App = () => {
       }
       return true; // Show all if no keyword is entered
     });
+
+  const [applications, setApplications] = React.useState([]);
+  const [openApplicationDialog, setOpenApplicationDialog] = React.useState(false);
+
+  const handleMoveToApplication = async () => {
+
+    try {
+      // Fetch related applications for the current contact
+      const response = await ZOHO.CRM.API.getRelatedRecords({
+        Entity: "Contacts",
+        RecordID: currentContact?.id,
+        RelatedList: "Applications",
+        page: 1,
+        per_page: 200,
+      });
+      if (response?.data) {
+        setApplications(response.data || []);
+        setOpenApplicationDialog(true); // Open the application selection dialog
+      } else {
+        throw new Error("No related applications found.");
+      }
+    } catch (error) {
+      console.error("Error fetching related applications:", error);
+      // setSnackbar({
+      //   open: true,
+      //   message: "Failed to fetch related applications.",
+      //   severity: "error",
+      // });
+    }
+  };
 
   return (
     <React.Fragment>
@@ -761,6 +790,10 @@ const App = () => {
         selectedContacts={selectedContacts}
         setSelectedContacts={setSelectedContacts}
         buttonText="Update"
+        handleMoveToApplication={handleMoveToApplication}
+        applications={applications}
+        openApplicationDialog={openApplicationDialog}
+        setOpenApplicationDialog={setOpenApplicationDialog}
       />
       <Dialog
         openDialog={openCreateDialog}
