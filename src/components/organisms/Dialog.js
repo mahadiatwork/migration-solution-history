@@ -93,13 +93,14 @@ export function Dialog({
   handleMoveToApplication,
   applications,
   openApplicationDialog,
-  setOpenApplicationDialog
+  setOpenApplicationDialog,
 }) {
   const [historyName, setHistoryName] = React.useState("");
   const [historyContacts, setHistoryContacts] = React.useState([]);
   const [selectedOwner, setSelectedOwner] = React.useState(
     loggedInUser || null
   );
+  const [selectedType, setSelectedType] = React.useState();
   const [loadedAttachmentFromRecord, setLoadedAttachmentFromRecord] =
     React.useState();
   const [regarding, setRegarding] = React.useState(
@@ -125,7 +126,6 @@ export function Dialog({
       }
     }
   };
-
 
   React.useEffect(() => {
     let load = true;
@@ -368,14 +368,13 @@ export function Dialog({
     selectedParticipants
   ) => {
     try {
-
       const updateConfig = {
         Entity: "History1",
         RecordID: selectedRowData?.historyDetails?.id,
         APIData: {
           id: selectedRowData?.historyDetails?.id,
           ...finalData,
-          Owner: {id: finalData?.Owner?.id}
+          Owner: { id: finalData?.Owner?.id },
         },
         Trigger: ["workflow"],
       };
@@ -555,55 +554,110 @@ export function Dialog({
     "Other",
   ];
 
-  const resultOptions = [
-    "Call Attempted",
-    "Call Completed",
-    "Call Left Message",
-    "Call Received",
-    "Meeting Held",
-    "Meeting Not Held",
-    "To-do Done",
-    "To-do Not Done",
-    "Appointment Completed",
-    "Appointment Not Completed",
-    "Boardroom - Completed",
-    "Boardroom - Not Completed",
-    "Call Billing - Completed",
-    "Initial Consultation - Completed",
-    "Initial Consultation - Not Completed",
-    "Mail - Completed",
-    "Mail - Not Completed",
-    "Meeting Billing - Completed",
-    "Meeting Billing - Not Completed",
-    "Personal Activity - Completed",
-    "Personal Activity - Not Completed",
-    "Note",
-    "Mail Received",
-    "Mail Sent",
-    "Email Received",
-    "Courier Sent",
-    "Email Sent",
-    "Payment Received",
-    "Room 1 - Completed",
-    "Room 1 - Not Completed",
-    "Room 2 - Completed",
-    "Room 2 - Not Completed",
-    "Room 3 - Completed",
-    "Room 3 - Not Completed",
-    "To Do Billing - Completed",
-    "To Do Billing - Not Completed",
-    "Vacation - Completed",
-    "Vacation - Not Completed",
-    "Vacation Cancelled",
-    "Attachment",
-    "E-mail Attachment",
-  ];
+  const resultOptions = React.useMemo(() => {
+    if (selectedType === "Meeting") {
+      return ["Meeting Held", "Meeting Not Held"];
+    }
+    if (selectedType === "To-Do") {
+      return ["To-do Done", "To-do Not Done"];
+    }
+    if (selectedType === "Appointment") {
+      return ["Appointment Completed", "Appointment Not Completed"];
+    }
+    if (selectedType === "Boardroom") {
+      return ["Boardroom - Completed", "Boardroom - Not Completed"];
+    }
+    if (selectedType === "Call Billing") {
+      return [];
+    }
+    if (selectedType === "Email Billing") {
+      return [];
+    }
+    if (selectedType === "Initial Consultation") {
+      return [];
+    }
+    if (selectedType === "Call") {
+      return [];
+    }
+    if (selectedType === "Mail") {
+      return [];
+    }
+    if (selectedType === "Meeting Billing") {
+      return [];
+    }
+    if (selectedType === "Personal Activity") {
+      return [];
+    }
+    if (selectedType === "Room 1") {
+      return ["Room 1 - Completed", "Room 1 - Not Completed"];
+    }
+    if (selectedType === "Room 2") {
+      return ["Room 2 - Completed", "Room 2 - Not Completed"];
+    }
+    if (selectedType === "Room 3") {
+      return ["Room 3 - Completed", "Room 3 - Not Completed"];
+    }
+    if (selectedType === "To Do Billing") {
+      return ["To Do Billing - Completed", "To Do Billing - Not Completed"];
+    }
+    if (selectedType === "Vacation") {
+      return [
+        "Vacation - Completed",
+        "Vacation - Not Completed",
+        "Vacation Cancelled",
+      ];
+    }
+    if (selectedType === "Other") {
+      return [];
+    }
 
+    return [
+      "Call Attempted",
+      "Call Completed",
+      "Call Left Message",
+      "Call Received",
+      "Meeting Held",
+      "Meeting Not Held",
+      "To-do Done",
+      "To-do Not Done",
+      "Appointment Completed",
+      "Appointment Not Completed",
+      "Boardroom - Completed",
+      "Boardroom - Not Completed",
+      "Call Billing - Completed",
+      "Initial Consultation - Completed",
+      "Initial Consultation - Not Completed",
+      "Mail - Completed",
+      "Mail - Not Completed",
+      "Meeting Billing - Completed",
+      "Meeting Billing - Not Completed",
+      "Personal Activity - Completed",
+      "Personal Activity - Not Completed",
+      "Note",
+      "Mail Received",
+      "Mail Sent",
+      "Email Received",
+      "Courier Sent",
+      "Email Sent",
+      "Payment Received",
+      "Room 1 - Completed",
+      "Room 1 - Not Completed",
+      "Room 2 - Completed",
+      "Room 2 - Not Completed",
+      "Room 3 - Completed",
+      "Room 3 - Not Completed",
+      "To Do Billing - Completed",
+      "To Do Billing - Not Completed",
+      "Vacation - Completed",
+      "Vacation - Not Completed",
+      "Vacation Cancelled",
+      "Attachment",
+      "E-mail Attachment",
+    ];
+  }, [selectedType]);
 
-
-  const [selectedApplicationId, setSelectedApplicationId] = React.useState(null);
-
-
+  const [selectedApplicationId, setSelectedApplicationId] =
+    React.useState(null);
 
   const handleApplicationSelect = async () => {
     if (!selectedApplicationId) {
@@ -711,6 +765,7 @@ export function Dialog({
                       "result",
                       getResultOptions(e.target.value)
                     );
+                    setSelectedType(e.target.value);
                   }}
                   label="Type"
                   sx={{
@@ -826,7 +881,7 @@ export function Dialog({
                         popper: {
                           modifiers: [
                             {
-                              name: 'offset',
+                              name: "offset",
                               options: {
                                 offset: [0, -80], // You can adjust the offset if necessary
                               },
@@ -906,7 +961,7 @@ export function Dialog({
                 getOptionLabel={(option) => option.full_name || ""}
                 value={selectedOwner}
                 onChange={(event, newValue) => {
-                  setSelectedOwner(newValue)
+                  setSelectedOwner(newValue);
                   // handleInputChange("ownerName", newValue)
                 }}
                 renderInput={(params) => (
@@ -916,8 +971,8 @@ export function Dialog({
                     name="history_owner"
                     variant="standard"
                     sx={{
-                      "& .MuiInputLabel-root": { fontSize: "9pt" },  // Label size
-                      "& .MuiInputBase-input": { fontSize: "9pt" }   // Input text size
+                      "& .MuiInputLabel-root": { fontSize: "9pt" }, // Label size
+                      "& .MuiInputBase-input": { fontSize: "9pt" }, // Input text size
                     }}
                   />
                 )}
@@ -927,18 +982,18 @@ export function Dialog({
                       {
                         name: "preventOverflow",
                         options: {
-                          boundary: "window"
-                        }
-                      }
-                    ]
+                          boundary: "window",
+                        },
+                      },
+                    ],
                   },
                   paper: {
                     sx: {
                       "& .MuiAutocomplete-listbox": {
-                        fontSize: "9pt"  // Option size
-                      }
-                    }
-                  }
+                        fontSize: "9pt", // Option size
+                      },
+                    },
+                  },
                 }}
               />
             </Grid>
