@@ -35,7 +35,6 @@ import { useSnackbar } from "notistack";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-
 const ZOHO = window.ZOHO;
 
 const parentContainerStyle = {
@@ -102,7 +101,10 @@ const App = () => {
   const handleCloseCreateDialog = () => {
     setOpenCreateDialog(false);
   };
+
   const handleClickOpenEditDialog = (rowData) => {
+    console.log({ rowData });
+
     setSelectedRowData(rowData); // Set the selected row data
     // setRegarding(rowData?.regarding || ""); // Initialize regarding data
     // setDetails(rowData?.details || ""); // Initialize details data
@@ -115,14 +117,14 @@ const App = () => {
         prevData.map((item) =>
           item.id === updatedRowData.id
             ? {
-              ...item,
-              ...updatedRowData,
-              name: updatedRowData.Participants
-                ? updatedRowData.Participants.map((c) => c.Full_Name).join(
-                  ", "
-                )
-                : item.name,
-            }
+                ...item,
+                ...updatedRowData,
+                name: updatedRowData.Participants
+                  ? updatedRowData.Participants.map((c) => c.Full_Name).join(
+                      ", "
+                    )
+                  : item.name,
+              }
             : item
         )
       );
@@ -366,10 +368,10 @@ const App = () => {
     });
 
   const [applications, setApplications] = React.useState([]);
-  const [openApplicationDialog, setOpenApplicationDialog] = React.useState(false);
+  const [openApplicationDialog, setOpenApplicationDialog] =
+    React.useState(false);
 
   const handleMoveToApplication = async () => {
-
     try {
       // Fetch related applications for the current contact
       const response = await ZOHO.CRM.API.getRelatedRecords({
@@ -755,8 +757,8 @@ const App = () => {
                           <TableCell>
                             {row.date_time
                               ? dayjs(row.date_time).format(
-                                "DD/MM/YYYY HH:mm A"
-                              )
+                                  "DD/MM/YYYY HH:mm A"
+                                )
                               : "No Date"}
                           </TableCell>
                           <TableCell>

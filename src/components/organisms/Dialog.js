@@ -72,6 +72,7 @@ const resultMapping = {
   "Room 3": "Room 3 - Completed",
   "To Do Billing": "To Do Billing - Completed",
   Vacation: "Vacation - Completed",
+  Other: "Attachment", // Just added it.
 };
 
 const typeMapping = Object.fromEntries(
@@ -98,7 +99,11 @@ export function Dialog({
   const [historyName, setHistoryName] = React.useState("");
   const [historyContacts, setHistoryContacts] = React.useState([]);
   const [selectedOwner, setSelectedOwner] = React.useState(
-    loggedInUser || null
+    ownerList?.find(
+      (owner) => owner?.full_name === selectedRowData?.ownerName
+    ) ||
+      loggedInUser ||
+      null
   );
   const [selectedType, setSelectedType] = React.useState("Meeting");
   const [loadedAttachmentFromRecord, setLoadedAttachmentFromRecord] =
@@ -172,7 +177,14 @@ export function Dialog({
       setHistoryName(
         selectedRowData?.Participants?.map((p) => p.Full_Name).join(", ") || ""
       );
-      setSelectedOwner(loggedInUser || null);
+      // setSelectedOwner(loggedInUser || null);
+      setSelectedOwner(
+        ownerList?.find(
+          (owner) => owner?.full_name === selectedRowData?.ownerName
+        ) ||
+          loggedInUser ||
+          null
+      );
 
       setHistoryContacts(selectedRowData?.Participants || []);
     } else {
@@ -215,16 +227,16 @@ export function Dialog({
     }
   }, [selectedRowData?.historyDetails, openDialog]);
 
-  const handleRegardingChange = (event) => {
-    setRegarding(event.target.value); // Update the state with user input
-  };
-
   React.useEffect(() => {
     const names = selectedContacts
       .map((contact) => contact?.Full_Name)
       .join(", ");
     setHistoryName(names);
   }, [selectedContacts]);
+
+  const handleRegardingChange = (event) => {
+    setRegarding(event.target.value); // Update the state with user input
+  };
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -368,6 +380,9 @@ export function Dialog({
     selectedParticipants
   ) => {
     try {
+      // 76775000000272001
+      const adminUserId = "76775000000272001";
+      const otherUserId = "76775000000809089";
       const updateConfig = {
         Entity: "History1",
         RecordID: selectedRowData?.historyDetails?.id,
@@ -380,7 +395,6 @@ export function Dialog({
       };
 
       console.log({ updateConfig });
-      return;
 
       const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
 
@@ -571,25 +585,43 @@ export function Dialog({
       return ["Boardroom - Completed", "Boardroom - Not Completed"];
     }
     if (selectedType === "Call Billing") {
-      return [];
+      return ["Call Billing - Completed", "  Call Billing - Not Completed"];
     }
     if (selectedType === "Email Billing") {
-      return [];
+      return ["Email Billing - Completed", "Email Billing - Not Completed"];
     }
     if (selectedType === "Initial Consultation") {
-      return [];
+      return [
+        "Initial Consultation - Completed",
+        "Initial Consultation - Not Completed",
+      ];
     }
     if (selectedType === "Call") {
-      return [];
+      return [
+        "Call Attempted",
+        " Call Completed",
+        " Call Left Message",
+        " Call Received",
+      ];
     }
     if (selectedType === "Mail") {
-      return [];
+      return ["Mail - Completed", "Mail - Not Completed"];
     }
     if (selectedType === "Meeting Billing") {
-      return [];
+      return ["Meeting Billing - Completed", "Meeting Billing - Not Completed"];
     }
     if (selectedType === "Personal Activity") {
-      return [];
+      return [
+        "Personal Activity - Completed",
+        "Personal Activity - Not Completed",
+        "Note",
+        "Mail Received",
+        "Mail Sent",
+        "Email Received",
+        "Courier Sent",
+        "Email Sent",
+        "Payment Received",
+      ];
     }
     if (selectedType === "Room 1") {
       return ["Room 1 - Completed", "Room 1 - Not Completed"];
@@ -611,7 +643,12 @@ export function Dialog({
       ];
     }
     if (selectedType === "Other") {
-      return [];
+      return [
+        "Attachment",
+        "E-mail Attachment",
+        "E-mail Auto Attached",
+        "E-mail Sent",
+      ];
     }
 
     return [
