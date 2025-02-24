@@ -100,7 +100,7 @@ export function Dialog({
   const [selectedOwner, setSelectedOwner] = React.useState(
     loggedInUser || null
   );
-  const [selectedType, setSelectedType] = React.useState();
+  const [selectedType, setSelectedType] = React.useState("Meeting");
   const [loadedAttachmentFromRecord, setLoadedAttachmentFromRecord] =
     React.useState();
   const [regarding, setRegarding] = React.useState(
@@ -378,6 +378,9 @@ export function Dialog({
         },
         Trigger: ["workflow"],
       };
+
+      console.log({ updateConfig });
+      return;
 
       const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
 
