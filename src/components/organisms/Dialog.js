@@ -881,20 +881,21 @@ export function Dialog({
             <Grid
               item
               xs={6}
-              sx={{
-                overflow: "hidden", // Ensure the grid container doesn't allow overflow
-                width: "98%",
-              }}
+              sx={
+                {
+                  //overflow: "hidden", // Ensure the grid container doesn't allow overflow
+                  // width: "98%",
+                }
+              }
             >
-              <Box sx={{ width: "99%", mt: -1 }}>
+              <Box>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <DemoContainer
                     components={["DateTimePicker"]}
-                    sx={
-                      {
-                        // overflow: "hidden", // Prevent overflow in the DemoContainer
-                      }
-                    }
+                    sx={{
+                      // overflow: "hidden", // Prevent overflow in the DemoContainer
+                      pt: 0,
+                    }}
                   >
                     <DateTimePicker
                       id="date_time"
@@ -906,14 +907,16 @@ export function Dialog({
                       }
                       format="DD/MM/YYYY hh:mm A"
                       sx={{
+                        // bgcolor: "green",
                         "& .MuiInputBase-input": {
                           fontSize: "9pt",
                         },
                         "& .MuiInputAdornment-root": {
-                          marginLeft: "-11px", // Move the icon slightly to the left
+                          marginLeft: "-31px", // Move the icon slightly to the left
                         },
                         "& .MuiSvgIcon-root": {
                           fontSize: "20px", // Adjust the icon size
+                          p: 0,
                         },
                         overflow: "hidden", // Prevent overflow in the DateTimePicker
                       }}
@@ -923,7 +926,7 @@ export function Dialog({
                             {
                               name: "offset",
                               options: {
-                                offset: [0, -80], // You can adjust the offset if necessary
+                                offset: [80, -180], // You can adjust the offset if necessary
                               },
                             },
                           ],
