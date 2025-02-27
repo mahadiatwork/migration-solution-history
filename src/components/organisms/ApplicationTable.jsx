@@ -113,6 +113,8 @@ const ApplicationDialog = ({
   }, [currentContact]);
 
   const handleApplicationSelect = async () => {
+    // console.log({ selectedRowData });
+    // return;
 
     if (!selectedApplicationId) {
       setSnackbar({
@@ -136,6 +138,7 @@ const ApplicationDialog = ({
           Regarding: selectedRowData.regarding,
           Duration_Min: selectedRowData.duration,
           Date: selectedRowData.date_time,
+          // Stakeholder: selectedRowData.Stakeholder
         },
         Trigger: ["workflow"],
       });
@@ -192,7 +195,7 @@ const ApplicationDialog = ({
           },
         }}
       >
-         {/* {mahadiContact ? JSON.stringify(mahadiContact) : "No contact selected"} */}
+        {/* {mahadiContact ? JSON.stringify(mahadiContact) : "No contact selected"} */}
         <DialogContent>
           <ApplicationTable
             applications={applications}
