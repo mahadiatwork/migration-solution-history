@@ -138,7 +138,7 @@ const ApplicationDialog = ({
           Regarding: selectedRowData.regarding,
           Duration_Min: selectedRowData.duration,
           Date: selectedRowData.date_time,
-          // Stakeholder: selectedRowData.Stakeholder
+          Stakeholder: selectedRowData.Stakeholder,
         },
         Trigger: ["workflow"],
       });
@@ -148,7 +148,7 @@ const ApplicationDialog = ({
 
         // Create ApplicationxContacts for all associated contacts
         for (const contact of historyContacts) {
-          await ZOHO.CRM.API.insertRecord({
+          const response = await ZOHO.CRM.API.insertRecord({
             Entity: "Application_Hstory",
             APIData: {
               Application_Hstory: { id: newHistoryId },
@@ -157,6 +157,20 @@ const ApplicationDialog = ({
             Trigger: ["workflow"],
           });
         }
+
+        var func_name = "copy_attachment_form_contact_history_to_applicatio";
+        var req_data = {
+          arguments: JSON.stringify({
+            fromModule: "History1",
+            toModule: "Applications_History",
+            fromID: selectedRowData?.historyDetails?.id,
+            ToID: newHistoryId,
+          }),
+        };
+
+        ZOHO.CRM.FUNCTIONS.execute(func_name, req_data).then(function (data) {
+          console.log(data);
+        });
 
         // Delete the current history and associated contacts
         await handleDelete();

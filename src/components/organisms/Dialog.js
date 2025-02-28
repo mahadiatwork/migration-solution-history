@@ -244,6 +244,8 @@ export function Dialog({
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+
+  
     let selectedParticipants = [];
 
     if (formData.Participants) {
@@ -265,7 +267,7 @@ export function Dialog({
       Owner: selectedOwner,
       History_Result: formData.result || "",
       Stakeholder: formData.stakeHolder
-        ? { id: formData.stakeHolder.id }
+        ? formData.stakeHolder
         : null,
       History_Type: formData.type || "",
       Duration: formData.duration ? String(formData.duration) : null,
@@ -273,8 +275,6 @@ export function Dialog({
         ? dayjs(formData.date_time).format("YYYY-MM-DDTHH:mm:ssZ")
         : null,
     };
-
-    console.log("data before updating", finalData);
 
     try {
       if (selectedRowData) {
@@ -458,6 +458,7 @@ export function Dialog({
               APIData: {
                 Contact_History_Info: { id: historyId },
                 Contact_Details: { id: contact.id },
+                Stakeholder: finalData?.Stakeholder
               },
               Trigger: ["workflow"],
             });
@@ -474,6 +475,7 @@ export function Dialog({
           id: selectedRowData.id || null, // Use the ID from the first related record
           ...finalData,
           Participants: selectedParticipants,
+          Stakeholder: finalData?.Stakeholder,
           historyDetails: {
             ...selectedRowData?.historyDetails,
             name: selectedParticipants.map((c) => c.Full_Name).join(", "),
@@ -934,17 +936,6 @@ export function Dialog({
                         textField: {
                           variant: "standard",
                           margin: "dense",
-                          // InputProps: {
-                          //   endAdornment: (
-                          //     <InputAdornment position="end">
-                          //       <IconButton>
-                          //         <CalendarMonthIcon
-                          //           sx={{ fontSize: "20px" }}
-                          //         />
-                          //       </IconButton>
-                          //     </InputAdornment>
-                          //   ),
-                          // },
                         },
                       }}
                     />

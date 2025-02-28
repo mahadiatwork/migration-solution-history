@@ -303,6 +303,7 @@ const App = () => {
       details: updatedRecord.History_Details_Plain,
       ownerName: updatedRecord?.Owner?.full_name,
       date_time: updatedRecord?.Date, // Ensure date is consistent
+      stakeHolder: updatedRecord?.Stakeholder
       // name: updatedRecord.Participants
       //     ? updatedRecord.Participants.map((c) => c.Full_Name).join(", ")
       //     : updatedRecord.name,
