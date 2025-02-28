@@ -125,6 +125,7 @@ const ApplicationDialog = ({
       return;
     }
 
+
     try {
       // Create a new application history in the selected application
       const createApplicationHistory = await ZOHO.CRM.API.insertRecord({
@@ -138,7 +139,7 @@ const ApplicationDialog = ({
           Regarding: selectedRowData.regarding,
           Duration_Min: selectedRowData.duration,
           Date: selectedRowData.date_time,
-          Stakeholder: selectedRowData.Stakeholder,
+          Stakeholder: selectedRowData?.stakeHolder,
         },
         Trigger: ["workflow"],
       });
