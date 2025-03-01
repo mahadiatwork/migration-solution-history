@@ -265,7 +265,7 @@ export function Dialog({
       History_Details_Plain: formData.details,
       Regarding: formData.regarding,
       Owner: selectedOwner,
-      History_Result: formData.result || "",
+      History_Result: formData.result[0] || "",
       Stakeholder: formData.stakeHolder
         ? formData.stakeHolder
         : null,
