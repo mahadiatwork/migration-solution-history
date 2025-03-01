@@ -831,7 +831,7 @@ export function Dialog({
                 variant="standard"
                 sx={{ fontSize: "9pt" }}
               >
-                <InputLabel sx={{ fontSize: "9pt" }}>Result</InputLabel>
+                <InputLabel sx={{ fontSize: "9pt" }}></InputLabel>
                 <Select
                   value={formData.result || ""} // Ensure a fallback value
                   onChange={(e) => {
@@ -851,7 +851,7 @@ export function Dialog({
                     },
                   }}
                 >
-                  {resultOptions.map((result) => (
+                  {getResultOptions(formData.type).map((result) => (
                     <MenuItem
                       key={result}
                       value={result}
