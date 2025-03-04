@@ -122,7 +122,7 @@ export default function ContactField({
     };
 
     fetchParticipantsDetails();
-  }, [selectedRowData, ZOHO]);
+  }, []);
 
   const handleOpen = () => {
     setFilteredContacts([]);

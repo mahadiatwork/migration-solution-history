@@ -265,7 +265,10 @@ export function Dialog({
       History_Details_Plain: formData.details,
       Regarding: formData.regarding,
       Owner: selectedOwner,
-      History_Result: formData.result[0] || "",
+      History_Result: Array.isArray(formData.result) && formData.result.length > 0
+      ? formData.result[0]
+      : formData.result,
+      
       Stakeholder: formData.stakeHolder
         ? formData.stakeHolder
         : null,
