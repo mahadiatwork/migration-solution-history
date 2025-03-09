@@ -1198,6 +1198,7 @@ export function Dialog({
         historyContacts={historyContacts}
         selectedRowData={selectedRowData}
         currentContact={currentContact}
+        selectedOwner={selectedOwner}
       />
       <Snackbar
         open={snackbar.open}
