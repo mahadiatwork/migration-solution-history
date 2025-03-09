@@ -22,7 +22,7 @@ import { DemoContainer } from "@mui/x-date-pickers/internals/demo";
 import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
-import { getResultOptions } from "./helperFunc";
+import { getRegardingOptions, getResultOptions } from "./helperFunc";
 import ContactField from "./ContactFields";
 import RegardingField from "./RegardingField";
 import IconButton from "@mui/material/IconButton"; // For the clickable icon button
@@ -164,7 +164,7 @@ export function Dialog({
         result: selectedRowData?.result || "Meeting Held",
         type: selectedRowData?.type || "Meeting",
         duration: selectedRowData?.duration || "60",
-        regarding: selectedRowData?.regarding || "",
+        regarding: selectedRowData?.regarding || "Hourly Consult $220",
         details: selectedRowData?.details || "",
         stakeHolder: selectedRowData?.stakeHolder || null,
         date_time: selectedRowData?.date_time
@@ -810,6 +810,7 @@ export function Dialog({
                       "result",
                       getResultOptions(e.target.value)[0]
                     );
+                    handleInputChange("regarding",  getRegardingOptions(e.target.value)[0]);
                     setSelectedType(e.target.value);
                   }}
                   label="Type"
