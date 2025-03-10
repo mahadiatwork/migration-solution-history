@@ -1039,6 +1039,7 @@ export function Dialog({
               <RegardingField
                 formData={formData}
                 handleInputChange={handleInputChange}
+                selectedRowData={selectedRowData}
               />
             </Grid>
           </Grid>
