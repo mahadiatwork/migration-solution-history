@@ -15,6 +15,9 @@ import {
   Alert,
   Grid,
   InputAdornment,
+  Modal,
+  Paper,
+  Typography,
 } from "@mui/material";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
@@ -32,6 +35,7 @@ import { zohoApi } from "../../zohoApi";
 import ApplicationTable from "./ApplicationTable";
 import ApplicationDialog from "./ApplicationTable";
 import Stakeholder from "../atoms/Stakeholder";
+import { Close } from "@mui/icons-material";
 
 const VisuallyHiddenInput = styled("input")({
   clip: "rect(0 0 0 0)",
@@ -102,8 +106,8 @@ export function Dialog({
     ownerList?.find(
       (owner) => owner?.full_name === selectedRowData?.ownerName
     ) ||
-      loggedInUser ||
-      null
+    loggedInUser ||
+    null
   );
   const [selectedType, setSelectedType] = React.useState("Meeting");
   const [loadedAttachmentFromRecord, setLoadedAttachmentFromRecord] =
@@ -182,8 +186,8 @@ export function Dialog({
         ownerList?.find(
           (owner) => owner?.full_name === selectedRowData?.ownerName
         ) ||
-          loggedInUser ||
-          null
+        loggedInUser ||
+        null
       );
 
       setHistoryContacts(selectedRowData?.Participants || []);
@@ -245,7 +249,7 @@ export function Dialog({
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-  
+
     let selectedParticipants = [];
 
     if (formData.Participants) {
@@ -266,9 +270,9 @@ export function Dialog({
       Regarding: formData.regarding,
       Owner: selectedOwner,
       History_Result: Array.isArray(formData.result) && formData.result.length > 0
-      ? formData.result[0]
-      : formData.result,
-      
+        ? formData.result[0]
+        : formData.result,
+
       Stakeholder: formData.stakeHolder
         ? formData.stakeHolder
         : null,
@@ -410,6 +414,8 @@ export function Dialog({
           recordId: selectedRowData?.historyDetails?.id,
           attachment_id: loadedAttachmentFromRecord?.[0]?.id,
         });
+
+
 
         // Add new attachment
         const uploadFileResp = await zohoApi.file.uploadAttachment({
@@ -769,6 +775,27 @@ export function Dialog({
     setSelectedApplicationId(null);
   };
 
+
+  const [openConfirmDialog, setOpenConfirmDialog] = React.useState(false);
+
+  const handleAttachmentDelete = async () => {
+    const deleteFileResp = await zohoApi.file.deleteAttachment({
+      module: "History1",
+      recordId: selectedRowData?.historyDetails?.id,
+      attachment_id: loadedAttachmentFromRecord?.[0]?.id,
+    });
+    
+    // Update state to remove attachment
+    setFormData((prev) => ({
+      ...prev,
+      attachment: null,
+    }));
+
+    setOpenConfirmDialog(false); // Close confirmation dialog
+
+  }
+
+
   return (
     <>
       <MUIDialog
@@ -810,7 +837,7 @@ export function Dialog({
                       "result",
                       getResultOptions(e.target.value)[0]
                     );
-                    handleInputChange("regarding",  getRegardingOptions(e.target.value)[0]);
+                    handleInputChange("regarding", getRegardingOptions(e.target.value)[0]);
                     setSelectedType(e.target.value);
                   }}
                   label="Type"
@@ -1047,61 +1074,96 @@ export function Dialog({
           <Box
             sx={{
               display: "flex",
-              flexDirection: "column",
+              alignItems: "center",
               gap: 1,
-              mt: 2,
-              fontSize: "9pt",
+              width: "100%",
             }}
           >
-            <Box
+            <TextField
+              variant="standard"
               sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1,
-                width: "100%",
+                flexGrow: 1,
+                "& .MuiInputBase-input": {
+                  fontSize: "9pt",
+                },
+              }}
+              value={formData?.attachment?.name || ""}
+              placeholder="No file selected"
+              InputProps={{
+                readOnly: true,
+                endAdornment: formData?.attachment?.name ? (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      // onClick={handleAttachmentDelete}
+                      onClick={() => setOpenConfirmDialog(true)}
+                      sx={{ padding: 0.5 }}
+                    >
+                      <Close fontSize="small" />
+                    </IconButton>
+                  </InputAdornment>
+                ) : null,
+              }}
+            />
+
+            <Button
+              variant="outlined"
+              size="small"
+              component="label"
+              sx={{
+                flexShrink: 0,
+                minWidth: "80px",
+                textTransform: "none",
+                fontSize: "9pt",
               }}
             >
-              <TextField
-                variant="standard"
-                sx={{
-                  flexGrow: 1,
-                  "& .MuiInputBase-input": {
-                    fontSize: "9pt",
-                  },
-                }}
-                value={formData?.attachment?.name || ""}
-                placeholder="No file selected"
-                InputProps={{
-                  readOnly: true,
-                }}
-              />
-
-              <Button
-                variant="outlined"
-                size="small"
-                component="label"
-                sx={{
-                  flexShrink: 0,
-                  minWidth: "80px",
-                  textTransform: "none",
-                  fontSize: "9pt",
-                }}
-              >
-                Attachment
-                <VisuallyHiddenInput type="file" onChange={handleSelectFile} />
-                {/* <input
-                  type="file"
-                  hidden
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      handleInputChange("attachment", file);
-                    }
-                  }}
-                /> */}
-              </Button>
-            </Box>
+              Attachment
+              <VisuallyHiddenInput type="file" onChange={handleSelectFile} />
+            </Button>
           </Box>
+          <Modal
+            open={openConfirmDialog}
+            onClose={() => setOpenConfirmDialog(false)}
+          >
+            <Paper sx={{
+              position: "absolute",
+              top: "50%",
+              left: "50%",
+              transform: "translate(-50%, -50%)",
+              padding: 3,
+              width: 300,
+              textAlign: "center",
+              boxShadow: 24,
+            }}>
+              <Typography id="confirm-delete-modal" variant="h6">
+                Confirm Deletion
+              </Typography>
+              <Typography variant="body2" sx={{ marginY: 2 }}>
+                Are you sure you want to delete this attachment? This action cannot be undone.
+              </Typography>
+              <Box sx={{ display: "flex", justifyContent: "space-between", marginTop: 2 }}>
+                <Button onClick={() => setOpenConfirmDialog(false)} color="primary">
+                  Cancel
+                </Button>
+                <Button onClick={handleAttachmentDelete} color="error">
+                  Delete
+                </Button>
+              </Box>
+            </Paper>
+
+            {/* <DialogTitle>Confirm Deletion</DialogTitle>
+            <DialogContent>
+            Are you sure you want to delete this attachment? This action cannot be undone.
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setOpenConfirmDialog(false)} color="primary">
+                Cancel
+              </Button>
+              <Button onClick={handleAttachmentDelete} color="error">
+                Delete
+              </Button>
+            </DialogActions> */}
+          </Modal>
 
           <Box>
             <TextField
