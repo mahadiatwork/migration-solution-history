@@ -301,211 +301,245 @@ export function Dialog({
     }
   };
 
-  const createHistory = async (finalData, selectedParticipants) => {
-    try {
-      const createConfig = {
-        Entity: "History1",
-        APIData: {
-          ...finalData,
-        },
-        Trigger: ["workflow"],
-      };
 
-      // Create the History1 record
-      const createResponse = await ZOHO.CRM.API.insertRecord(createConfig);
-      if (createResponse?.data[0]?.code === "SUCCESS") {
-        const historyId = createResponse.data[0].details.id;
-        if (formData?.attachment) {
-          const fileResp = await zohoApi.file.uploadAttachment({
-            module: "History1",
-            recordId: historyId,
-            data: formData?.attachment,
-          });
-          // console.log({ fileResp });
-        }
+const logResponse = async ({ name, payload, response, result, trigger, meetingType,Widget_Source }) => {
+  try {
+    const timeOccurred = dayjs().tz("Australia/Adelaide").format("YYYY-MM-DDTHH:mm:ssZ");
 
-        let contactRecordIds = [];
+    const logInsertResponse = await ZOHO.CRM.API.insertRecord({
+      Entity: "Log_Module",
+      APIData: {
+        Name: name,
+        Payload: JSON.stringify(payload),
+        Response: JSON.stringify(response),
+        Result: result,
+        Trigger: trigger,
+        Time_Occured: timeOccurred,
+        Meeting_Type: meetingType || "",
+        Widget_Source: Widget_Source
+      },
+    });
 
-        // Create History_X_Contacts records for each contact
-        for (const contact of selectedParticipants) {
-          try {
-            const contactResponse = await ZOHO.CRM.API.insertRecord({
-              Entity: "History_X_Contacts",
-              APIData: {
-                Contact_History_Info: { id: historyId },
-                Contact_Details: { id: contact.id },
-              },
-              Trigger: ["workflow"],
-            });
-
-            // Collect the ID from the insertion response
-            if (contactResponse?.data[0]?.code === "SUCCESS") {
-              contactRecordIds.push(contactResponse.data[0].details.id);
-            } else {
-              console.warn(
-                `Failed to insert History_X_Contacts record for contact ID ${contact.id}`
-              );
-            }
-          } catch (error) {
-            console.error(
-              `Error inserting History_X_Contacts record for contact ID ${contact.id}:`,
-              error
-            );
-          }
-        }
-
-        setSnackbar({
-          open: true,
-          message: "Record created successfully!",
-          severity: "success",
-        });
-
-        // Notify parent about the created record
-        const updatedRecord = {
-          id: contactRecordIds[0] || null, // Set the first inserted History_X_Contacts ID (or null if none succeeded)
-          ...finalData,
-          Participants: selectedParticipants,
-          historyDetails: {
-            name: selectedParticipants.map((c) => c.Full_Name).join(", "),
-            id: historyId, // Add the History1 record ID to historyDetails
-          },
-        };
-
-        if (onRecordAdded) onRecordAdded(updatedRecord);
-      } else {
-        throw new Error("Failed to create History1 record.");
-      }
-    } catch (error) {
-      console.error("Error creating history:", error);
-      throw error;
+    // Log to console if log itself fails
+    const logSuccess = logInsertResponse?.data?.[0]?.code === "SUCCESS";
+    if (!logSuccess) {
+      console.warn("⚠️ Log insert failed:", logInsertResponse);
     }
-  };
-
-  const updateHistory = async (
-    selectedRowData,
-    finalData,
-    selectedParticipants
-  ) => {
-    try {
-      // 76775000000272001
-      const adminUserId = "76775000000272001";
-      const otherUserId = "76775000000809089";
-      const updateConfig = {
-        Entity: "History1",
-        RecordID: selectedRowData?.historyDetails?.id,
-        APIData: {
-          id: selectedRowData?.historyDetails?.id,
-          ...finalData,
-          Owner: { id: finalData?.Owner?.id },
-        },
-        Trigger: ["workflow"],
-      };
-
-      console.log({ updateConfig });
-
-      const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
-
-      if (updateResponse?.data[0]?.code === "SUCCESS") {
-        const historyId = selectedRowData?.historyDetails?.id;
-
-        // Delete attachment
-        const deleteFileResp = await zohoApi.file.deleteAttachment({
-          module: "History1",
-          recordId: selectedRowData?.historyDetails?.id,
-          attachment_id: loadedAttachmentFromRecord?.[0]?.id,
-        });
+  } catch (err) {
+    console.error("🚨 Error inserting into Log_Module:", err);
+  }
+};
 
 
 
-        // Add new attachment
-        const uploadFileResp = await zohoApi.file.uploadAttachment({
-          module: "History1",
-          recordId: historyId,
-          data: formData?.attachment,
-        });
+const createHistory = async (finalData, selectedParticipants) => {
+  try {
+    const createConfig = {
+      Entity: "History1",
+      APIData: {
+        ...finalData,
+      },
+      Trigger: ["workflow"],
+    };
 
-        // Fetch existing History_X_Contacts records
-        const relatedRecordsResponse = await ZOHO.CRM.API.getRelatedRecords({
-          Entity: "History1",
-          RecordID: historyId,
-          RelatedList: "Contacts3",
-        });
+    const createResponse = await ZOHO.CRM.API.insertRecord(createConfig);
 
-        const existingContacts = relatedRecordsResponse?.data || [];
-        const existingContactIds = existingContacts.map(
-          (contact) => contact.Contact_Details?.id
-        );
+    const wasSuccessful = createResponse?.data[0]?.code === "SUCCESS";
 
-        // Find contacts to add and to delete
-        const selectedContactIds = selectedParticipants.map((c) => c.id);
-        const toDeleteContactIds = existingContactIds.filter(
-          (id) => !selectedContactIds.includes(id)
-        );
-        const toAddContacts = selectedParticipants.filter(
-          (contact) => !existingContactIds.includes(contact.id)
-        );
+    await logResponse({
+      name: "Create History1",
+      payload: finalData,
+      response: createResponse,
+      result: wasSuccessful ? "Success" : "Error",
+      trigger: "Record Create",
+      meetingType: finalData?.Type_of_Activity || "",
+      Widget_Source: "Contact History"
+    });
 
-        // Delete records for removed contacts
-        for (const id of toDeleteContactIds) {
-          const recordToDelete = existingContacts.find(
-            (contact) => contact.Contact_Details?.id === id
-          );
+    if (!wasSuccessful) throw new Error("Failed to create History1 record.");
 
-          if (recordToDelete?.id) {
-            await ZOHO.CRM.API.deleteRecord({
-              Entity: "History_X_Contacts",
-              RecordID: recordToDelete.id,
-            });
-          }
-        }
+    const historyId = createResponse.data[0].details.id;
 
-        // Add new records for newly selected contacts
-        for (const contact of toAddContacts) {
-          try {
-            await ZOHO.CRM.API.insertRecord({
-              Entity: "History_X_Contacts",
-              APIData: {
-                Contact_History_Info: { id: historyId },
-                Contact_Details: { id: contact.id },
-                Stakeholder: finalData?.Stakeholder
-              },
-              Trigger: ["workflow"],
-            });
-          } catch (error) {
-            console.error(
-              `Error inserting record for contact ID ${contact.id}:`,
-              error
-            );
-          }
-        }
-
-        // Notify parent about the updated record
-        const updatedRecord = {
-          id: selectedRowData.id || null, // Use the ID from the first related record
-          ...finalData,
-          Participants: selectedParticipants,
-          Stakeholder: finalData?.Stakeholder,
-          historyDetails: {
-            ...selectedRowData?.historyDetails,
-            name: selectedParticipants.map((c) => c.Full_Name).join(", "),
-          },
-        };
-
-        if (onRecordAdded) onRecordAdded(updatedRecord);
-
-        setSnackbar({
-          open: true,
-          message: "Record and contacts updated successfully!",
-          severity: "success",
-        });
-      } else {
-        throw new Error("Failed to update record.");
-      }
-    } catch (error) {
-      console.error("Error updating history:", error);
-      throw error;
+    if (formData?.attachment) {
+      await zohoApi.file.uploadAttachment({
+        module: "History1",
+        recordId: historyId,
+        data: formData?.attachment,
+      });
     }
-  };
+
+    let contactRecordIds = [];
+
+    for (const contact of selectedParticipants) {
+      try {
+        const contactResponse = await ZOHO.CRM.API.insertRecord({
+          Entity: "History_X_Contacts",
+          APIData: {
+            Contact_History_Info: { id: historyId },
+            Contact_Details: { id: contact.id },
+          },
+          Trigger: ["workflow"],
+        });
+
+        if (contactResponse?.data[0]?.code === "SUCCESS") {
+          contactRecordIds.push(contactResponse.data[0].details.id);
+        } else {
+          console.warn(`Failed to insert contact for ID ${contact.id}`);
+        }
+      } catch (error) {
+        console.error(`Error inserting contact ${contact.id}:`, error);
+      }
+    }
+
+    setSnackbar({
+      open: true,
+      message: "Record created successfully!",
+      severity: "success",
+    });
+
+    const updatedRecord = {
+      id: contactRecordIds[0] || null,
+      ...finalData,
+      Participants: selectedParticipants,
+      historyDetails: {
+        name: selectedParticipants.map((c) => c.Full_Name).join(", "),
+        id: historyId,
+      },
+    };
+
+    if (onRecordAdded) onRecordAdded(updatedRecord);
+  } catch (error) {
+    await logResponse({
+      name: "Create History1",
+      payload: finalData,
+      response: { error: error.message },
+      result: "Error",
+      trigger: "Record Create",
+      meetingType: finalData?.Type_of_Activity || "",
+      Widget_Source: "Contact History"
+    });
+    console.error("Error creating history:", error);
+    throw error;
+  }
+};
+
+
+const updateHistory = async (selectedRowData, finalData, selectedParticipants) => {
+  try {
+    const historyId = selectedRowData?.historyDetails?.id;
+
+    const updateConfig = {
+      Entity: "History1",
+      RecordID: historyId,
+      APIData: {
+        id: historyId,
+        ...finalData,
+        Owner: { id: finalData?.Owner?.id },
+      },
+      Trigger: ["workflow"],
+    };
+
+    const updateResponse = await ZOHO.CRM.API.updateRecord(updateConfig);
+
+    const wasSuccessful = updateResponse?.data[0]?.code === "SUCCESS";
+
+    await logResponse({
+      name: `Update History1: ${historyId}`,
+      payload: finalData,
+      response: updateResponse,
+      result: wasSuccessful ? "Success" : "Error",
+      trigger: "Record Update",
+      meetingType: finalData?.Type_of_Activity || "",
+      Widget_Source: "Contact History"
+    });
+
+    if (!wasSuccessful) throw new Error("Failed to update record.");
+
+    await zohoApi.file.deleteAttachment({
+      module: "History1",
+      recordId: historyId,
+      attachment_id: loadedAttachmentFromRecord?.[0]?.id,
+    });
+
+    await zohoApi.file.uploadAttachment({
+      module: "History1",
+      recordId: historyId,
+      data: formData?.attachment,
+    });
+
+    const relatedRecordsResponse = await ZOHO.CRM.API.getRelatedRecords({
+      Entity: "History1",
+      RecordID: historyId,
+      RelatedList: "Contacts3",
+    });
+
+    const existingContacts = relatedRecordsResponse?.data || [];
+    const existingContactIds = existingContacts.map(c => c.Contact_Details?.id);
+    const selectedContactIds = selectedParticipants.map(c => c.id);
+
+    const toDeleteContactIds = existingContactIds.filter(id => !selectedContactIds.includes(id));
+    const toAddContacts = selectedParticipants.filter(c => !existingContactIds.includes(c.id));
+
+    for (const id of toDeleteContactIds) {
+      const recordToDelete = existingContacts.find(c => c.Contact_Details?.id === id);
+      if (recordToDelete?.id) {
+        await ZOHO.CRM.API.deleteRecord({
+          Entity: "History_X_Contacts",
+          RecordID: recordToDelete.id,
+        });
+      }
+    }
+
+    for (const contact of toAddContacts) {
+      try {
+        await ZOHO.CRM.API.insertRecord({
+          Entity: "History_X_Contacts",
+          APIData: {
+            Contact_History_Info: { id: historyId },
+            Contact_Details: { id: contact.id },
+            Stakeholder: finalData?.Stakeholder,
+          },
+          Trigger: ["workflow"],
+        });
+      } catch (error) {
+        console.error(`Error inserting contact ${contact.id}:`, error);
+      }
+    }
+
+    const updatedRecord = {
+      id: selectedRowData.id || null,
+      ...finalData,
+      Participants: selectedParticipants,
+      Stakeholder: finalData?.Stakeholder,
+      historyDetails: {
+        ...selectedRowData?.historyDetails,
+        name: selectedParticipants.map((c) => c.Full_Name).join(", "),
+      },
+    };
+
+    if (onRecordAdded) onRecordAdded(updatedRecord);
+
+    setSnackbar({
+      open: true,
+      message: "Record and contacts updated successfully!",
+      severity: "success",
+    });
+  } catch (error) {
+    await logResponse({
+      name: `Update History1: ${selectedRowData?.historyDetails?.id || "Unknown"}`,
+      payload: finalData,
+      response: { error: error.message },
+      result: "Error",
+      trigger: "Record Update",
+      meetingType: finalData?.Type_of_Activity || "",
+      Widget_Source: "Contact History"
+    });
+
+    console.error("Error updating history:", error);
+    throw error;
+  }
+};
+
 
   const handleDelete = async () => {
     if (!selectedRowData) return; // No record selected
@@ -710,65 +744,127 @@ export function Dialog({
   const [selectedApplicationId, setSelectedApplicationId] =
     React.useState(null);
 
-  const handleApplicationSelect = async () => {
-    if (!selectedApplicationId) {
-      setSnackbar({
-        open: true,
-        message: "Please select an application.",
-        severity: "warning",
-      });
-      return;
-    }
+  
 
-    try {
-      // Delete the current history and associated contacts
-      await handleDelete();
-      // Create a new application history in the selected application
-      const createApplicationHistory = await ZOHO.CRM.API.insertRecord({
-        Entity: "Application History",
-        APIData: {
-          Name: formData.Name,
-          Application: { id: selectedApplicationId },
-          Details: formData.details,
-          Date: formData.date_time,
-        },
-        Trigger: ["workflow"],
-      });
+const handleApplicationSelect = async () => {
+  if (!selectedApplicationId) {
+    setSnackbar({
+      open: true,
+      message: "Please select an application.",
+      severity: "warning",
+    });
+    return;
+  }
 
-      if (createApplicationHistory?.data[0]?.code === "SUCCESS") {
-        const newHistoryId = createApplicationHistory.data[0].details.id;
-
-        // Create ApplicationxContacts for all associated contacts
-        for (const contact of historyContacts) {
-          await ZOHO.CRM.API.insertRecord({
-            Entity: "ApplicationxContacts",
-            APIData: {
-              Application_History: { id: newHistoryId },
-              Contact: { id: contact.id },
-            },
-            Trigger: ["workflow"],
-          });
-        }
-
-        setSnackbar({
-          open: true,
-          message: "History moved successfully!",
-          severity: "success",
-        });
-      } else {
-        throw new Error("Failed to create new application history.");
-      }
-    } catch (error) {
-      console.error("Error moving history:", error);
-      setSnackbar({
-        open: true,
-        message: "Failed to move history.",
-        severity: "error",
-      });
-    } finally {
-      handleApplicationDialogClose();
-    }
+  const payload = {
+    applicationId: selectedApplicationId,
+    formData,
+    contacts: historyContacts.map((c) => c.id),
   };
+
+  try {
+    // Delete the current history and associated contacts
+    await handleDelete();
+
+    const createApplicationHistory = await ZOHO.CRM.API.insertRecord({
+      Entity: "Application History",
+      APIData: {
+        Name: formData.Name,
+        Application: { id: selectedApplicationId },
+        Details: formData.details,
+        Date: formData.date_time,
+      },
+      Trigger: ["workflow"],
+    });
+
+    const wasSuccessful =
+      createApplicationHistory?.data[0]?.code === "SUCCESS";
+
+    await logResponse({
+      name: `Move History to Application ${selectedApplicationId}`,
+      payload,
+      response: createApplicationHistory,
+      result: wasSuccessful ? "Success" : "Error",
+      trigger: "Move History to Application",
+      meetingType: "", // not applicable
+      Widget_Source: "Contact History"
+    });
+
+    if (!wasSuccessful) {
+      throw new Error("Failed to create new application history.");
+    }
+
+    const newHistoryId = createApplicationHistory.data[0].details.id;
+
+    // Log and create each contact relation
+    for (const contact of historyContacts) {
+      try {
+        const contactLinkResponse = await ZOHO.CRM.API.insertRecord({
+          Entity: "ApplicationxContacts",
+          APIData: {
+            Application_History: { id: newHistoryId },
+            Contact: { id: contact.id },
+          },
+          Trigger: ["workflow"],
+        });
+
+        await logResponse({
+          name: `Link Contact to Application History`,
+          payload: {
+            Application_History: newHistoryId,
+            Contact: contact.id,
+          },
+          response: contactLinkResponse,
+          result: contactLinkResponse?.data[0]?.code === "SUCCESS" ? "Success" : "Error",
+          trigger: "Create ApplicationxContacts",
+          meetingType: "",
+          Widget_Source: "Contact History"
+        });
+
+      } catch (error) {
+        await logResponse({
+          name: `Failed Linking Contact ${contact.id}`,
+          payload: {
+            Application_History: newHistoryId,
+            Contact: contact.id,
+          },
+          response: { error: error },
+          result: "Error",
+          trigger: "Create ApplicationxContacts",
+          meetingType: "",
+          Widget_Source: "Contact History"
+        });
+        console.error(`Error linking contact ${contact.id}:`, error);
+      }
+    }
+
+    setSnackbar({
+      open: true,
+      message: "History moved successfully!",
+      severity: "success",
+    });
+  } catch (error) {
+    await logResponse({
+      name: `Move History to Application ${selectedApplicationId}`,
+      payload,
+      response: { error: error },
+      result: "Error",
+      trigger: "Move History to Application",
+      meetingType: "",
+      Widget_Source: "Contact History"
+    });
+
+    console.error("Error moving history:", error);
+    setSnackbar({
+      open: true,
+      message: "Failed to move history.",
+      severity: "error",
+    });
+  } finally {
+    handleApplicationDialogClose();
+  }
+};
+
 
   const handleApplicationDialogClose = () => {
     setOpenApplicationDialog(false);
