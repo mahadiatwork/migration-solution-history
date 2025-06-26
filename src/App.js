@@ -589,6 +589,7 @@ const App = () => {
                     overflow: "auto",
                     wordWrap: "break-word",
                     whiteSpace: "normal",
+                    lineHeight: 1
                   }}
                 >
                   {!!regarding && (
