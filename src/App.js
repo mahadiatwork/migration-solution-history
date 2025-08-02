@@ -78,7 +78,7 @@ const App = () => {
   const [selectedOwner, setSelectedOwner] = React.useState(null);
   const [typeList, setTypeList] = React.useState([]);
   const [selectedType, setSelectedType] = React.useState(null);
-  const [dateRange, setDateRange] = React.useState(null);
+  const [dateRange, setDateRange] = React.useState(dateOptions[0]); // Default
   const [keyword, setKeyword] = React.useState("");
   const [loggedInUser, setLoggedInUser] = React.useState(null);
   const [selectedRowData, setSelectedRowData] = React.useState(null);
@@ -428,6 +428,7 @@ const App = () => {
               <Autocomplete
                 size="small"
                 options={dateOptions}
+                value={dateRange} // <- Add this
                 sx={{
                   "& .MuiInputBase-root": {
                     height: "33px",
