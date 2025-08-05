@@ -147,7 +147,7 @@ const App = () => {
         // });
 
         var config = {
-          "select_query": `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date from History_X_Contacts where Contact_Details = '76775000000578572' limit 200`
+          "select_query": `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date from History_X_Contacts where Contact_Details = '${recordId}' limit 200`
         }
         const { data } = await ZOHO.CRM.API.coql(config);
 
