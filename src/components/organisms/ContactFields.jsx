@@ -59,18 +59,18 @@ export default function ContactField({
     },
   };
 
-  const selectedContact = selectedRowData?.historyDetails?.id
+  const selectedContact = selectedRowData?.history_id
     ? selectedRowData
     : currentContact;
 
   useEffect(() => {
     const fetchParticipantsDetails = async () => {
-      if (selectedContact?.historyDetails?.id && ZOHO) {
+      if (selectedRowData?.history_id && ZOHO) {
         try {
           // Fetch related list data to get contact IDs
           const relatedListData = await ZOHO.CRM.API.getRelatedRecords({
             Entity: "History1",
-            RecordID: selectedContact?.historyDetails?.id,
+            RecordID: selectedContact?.history_id,
             RelatedList: "Contacts3",
             page: 1,
             per_page: 200,

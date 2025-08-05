@@ -12,6 +12,7 @@ export async function getRecordsFromRelatedList({
       RelatedList: RelatedListAPI,
     });
 
+
     if (relatedListResp.statusText === "nocontent") {
       return { data: [], error: null };
     }

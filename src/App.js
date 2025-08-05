@@ -118,14 +118,14 @@ const App = () => {
         prevData.map((item) =>
           item.id === updatedRowData.id
             ? {
-                ...item,
-                ...updatedRowData,
-                name: updatedRowData.Participants
-                  ? updatedRowData.Participants.map((c) => c.Full_Name).join(
-                      ", "
-                    )
-                  : item.name,
-              }
+              ...item,
+              ...updatedRowData,
+              name: updatedRowData.Participants
+                ? updatedRowData.Participants.map((c) => c.Full_Name).join(
+                  ", "
+                )
+                : item.name,
+            }
             : item
         )
       );
@@ -140,11 +140,18 @@ const App = () => {
   React.useEffect(() => {
     const fetchRLData = async () => {
       try {
-        const { data } = await zohoApi.record.getRecordsFromRelatedList({
-          module,
-          recordId,
-          RelatedListAPI: "History3",
-        });
+        // const { data } = await zohoApi.record.getRecordsFromRelatedList({
+        //   module,
+        //   recordId,
+        //   RelatedListAPI: "History3",
+        // });
+
+        var config = {
+          "select_query": `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date from History_X_Contacts where Contact_Details = '76775000000578572' limit 200`
+        }
+        const { data } = await ZOHO.CRM.API.coql(config);
+
+        console.log("mahadi", data)
 
         const usersResponse = await ZOHO.CRM.API.getAllUsers({
           Type: "AllUsers",
@@ -170,20 +177,34 @@ const App = () => {
           setCurrentGlobalContact(currentContact);
         }
 
-        const tempData = data?.map((obj) => ({
-          name: obj?.Name || "No Name",
-          id: obj?.id,
-          date_time: obj?.History_Date_Time,
-          type: obj?.History_Type || "Unknown Type",
-          result: obj?.History_Result || "No Result",
-          duration: obj?.duration_min || "N/A",
-          regarding: obj?.Regarding || "No Regarding",
-          details: obj?.History_Details || "No Details",
-          icon: <DownloadIcon />,
-          ownerName: obj?.Owner?.name || "Unknown Owner",
-          historyDetails: obj?.Contact_History_Info,
-          stakeHolder: obj?.Stakeholder,
-        }));
+
+        console.log({ dataOfMe: data[0]["Contact_History_Info.Regarding"] })
+
+
+
+        const tempData = data?.map((obj) => {
+          const ownerFirst = obj["Owner.first_name"] || "";
+          const ownerLast = obj["Owner.last_name"] || "";
+
+          const ownerName = `${ownerFirst} ${ownerLast}`.trim() || "Unknown Owner";
+
+          return {
+            name: obj["Contact_Details.Full_Name"] || "No Name",
+            id: obj?.id,
+            date_time: obj["Contact_History_Info.Date"] || "No Date",
+            type: obj["Contact_History_Info.History_Type"] || "Unknown Type",
+            result: obj["Contact_History_Info.History_Result"] || "No Result",
+            duration: obj["Contact_History_Info.Duration"] || "N/A",
+            regarding: obj["Contact_History_Info.Regarding"] || "No Regarding",
+            details: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
+            icon: <DownloadIcon />,
+            ownerName: ownerName,
+            historyDetails: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
+            stakeHolder: obj?.Stakeholder || "Unknown",
+            history_id: obj["Contact_History_Info.id"]
+          };
+        });
+
 
         setRelatedListData(tempData || []);
 
@@ -609,7 +630,7 @@ const App = () => {
                       {regarding}
                     </span>
                   )}
-                   <LinkifyText details={details} />
+                  <LinkifyText details={details} />
                 </Box>
               </Paper>
             </Grid>
@@ -753,8 +774,8 @@ const App = () => {
                           <TableCell>
                             {row.date_time
                               ? dayjs(row.date_time).format(
-                                  "DD/MM/YYYY HH:mm A"
-                                )
+                                "DD/MM/YYYY HH:mm A"
+                              )
                               : "No Date"}
                           </TableCell>
                           <TableCell>
