@@ -544,12 +544,14 @@ const updateHistory = async (selectedRowData, finalData, selectedParticipants) =
   const handleDelete = async () => {
     if (!selectedRowData) return; // No record selected
 
+    const deleteId = selectedRowData?.historyDetails?.id;
+
     try {
       // Delete related records first
-      if (selectedRowData?.history_id) {
+      if (deleteId) {
         const relatedRecordsResponse = await ZOHO.CRM.API.getRelatedRecords({
           Entity: "History1",
-          RecordID: selectedRowData?.history_id,
+          RecordID: deleteId,
           RelatedList: "Contacts3",
         });
         const relatedRecords = relatedRecordsResponse?.data || [];
@@ -566,7 +568,7 @@ const updateHistory = async (selectedRowData, finalData, selectedParticipants) =
       // Delete the main record
       const response = await ZOHO.CRM.API.deleteRecord({
         Entity: "History1",
-        RecordID: selectedRowData?.history_id,
+        RecordID: deleteId,
       });
 
       if (response?.data[0]?.code === "SUCCESS") {

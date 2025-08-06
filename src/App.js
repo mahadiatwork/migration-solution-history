@@ -151,11 +151,15 @@ const App = () => {
         }
         const { data } = await ZOHO.CRM.API.coql(config);
 
-        console.log("mahadi", data)
+        const dataArray = Array.isArray(data) ? data : [];
 
+
+    
         const usersResponse = await ZOHO.CRM.API.getAllUsers({
           Type: "AllUsers",
         });
+
+           
         const validUsers = usersResponse?.users?.filter(
           (user) => user?.full_name && user?.id
         );
@@ -178,11 +182,9 @@ const App = () => {
         }
 
 
-        console.log({ dataOfMe: data[0]["Contact_History_Info.Regarding"] })
 
 
-
-        const tempData = data?.map((obj) => {
+        const tempData = dataArray?.map((obj) => {
           const ownerFirst = obj["Owner.first_name"] || "";
           const ownerLast = obj["Owner.last_name"] || "";
 
@@ -208,7 +210,7 @@ const App = () => {
 
         setRelatedListData(tempData || []);
 
-        const types = data
+        const types = dataArray
           ?.map((el) => el.History_Type)
           ?.filter((el) => el !== undefined && el !== null);
 
