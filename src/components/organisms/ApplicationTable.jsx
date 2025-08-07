@@ -92,7 +92,7 @@ const ApplicationDialog = ({
   historyContacts,
   selectedRowData,
   currentContact,
-  selectedOwner
+  selectedOwner,
 }) => {
   const [selectedApplicationId, setSelectedApplicationId] = useState(null);
   const [mahadiContact, setMahadiContact] = useState(null);
@@ -114,9 +114,6 @@ const ApplicationDialog = ({
   }, [currentContact]);
 
   const handleApplicationSelect = async () => {
-    // console.log({ selectedRowData });
-    // return;
-
     if (!selectedApplicationId) {
       setSnackbar({
         open: true,
@@ -125,7 +122,6 @@ const ApplicationDialog = ({
       });
       return;
     }
-
 
     try {
       // Create a new application history in the selected application
@@ -140,8 +136,12 @@ const ApplicationDialog = ({
           Regarding: selectedRowData.regarding,
           Duration_Min: selectedRowData.duration,
           Date: selectedRowData.date_time,
-          Stakeholder: selectedRowData?.stakeHolder,
-          Owner: selectedOwner
+          Stakeholder:
+            typeof selectedRowData?.stakeHolder === "object" &&
+            selectedRowData.stakeHolder?.id
+              ? { id: selectedRowData.stakeHolder.id }
+              : null,
+          Owner: selectedOwner,
         },
         Trigger: ["workflow"],
       });
@@ -162,16 +162,22 @@ const ApplicationDialog = ({
         }
 
         var func_name = "copy_attachment_form_contact_history_to_applicatio";
+
+        const history_id =
+          selectedRowData?.historyDetails?.id || selectedRowData?.history_id;
+
         var req_data = {
           arguments: JSON.stringify({
             fromModule: "History1",
             toModule: "Applications_History",
-            fromID: selectedRowData?.historyDetails?.id,
+            fromID: history_id,
             ToID: newHistoryId,
           }),
         };
 
-        await ZOHO.CRM.FUNCTIONS.execute(func_name, req_data).then(function (data) {
+        await ZOHO.CRM.FUNCTIONS.execute(func_name, req_data).then(function (
+          data
+        ) {
           console.log(data);
         });
 
