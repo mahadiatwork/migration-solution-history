@@ -163,7 +163,7 @@ export function Table({
   keyword
 }) {
   const [order, setOrder] = React.useState("desc");
-  const [orderBy, setOrderBy] = React.useState("name");
+ const [orderBy, setOrderBy] = React.useState("date_time");
   const [selectedRowId, setSelectedRowId] = React.useState(highlightedRecordId); // Sync with highlightedRecordId
 
   // Ensure selectedRowId matches highlightedRecordId on updates
@@ -260,6 +260,7 @@ export function Table({
                           alignItems: "flex-start",
                         }}
                       >
+                        {/* <span>{row.date_time}</span> */}
                         <span>{dayjs(row.date_time).format("DD/MM/YYYY")}</span>
                         <span>{dayjs(row.date_time).format("h:mm A")}</span>
                       </Box>
@@ -327,9 +328,9 @@ export function Table({
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        row.historyDetails?.id &&
+                        row?.history_id &&
                           window.open(
-                            `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${row.historyDetails.id}`,
+                            `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${row.history_id}`,
                             "_blank"
                           );
                       }}
