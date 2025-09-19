@@ -850,6 +850,7 @@ const App = () => {
                 <DatePicker
                   label="Start Date"
                   value={customRange.startDate}
+                  format="DD/MM/YYYY"
                   onChange={(newValue) =>
                     setCustomRange((prev) => ({ ...prev, startDate: newValue }))
                   }
@@ -878,6 +879,7 @@ const App = () => {
                 <DatePicker
                   label="End Date"
                   value={customRange.endDate}
+                  format="DD/MM/YYYY"
                   onChange={(newValue) =>
                     setCustomRange((prev) => ({ ...prev, endDate: newValue }))
                   }

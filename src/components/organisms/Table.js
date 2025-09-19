@@ -284,7 +284,7 @@ export function Table({
                       <Box
                         sx={{
                           display: "-webkit-box",
-                          WebkitLineClamp: 8,
+                          WebkitLineClamp: 2,
                           WebkitBoxOrient: "vertical",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
@@ -297,7 +297,7 @@ export function Table({
                       <Box
                         sx={{
                           display: "-webkit-box",
-                          WebkitLineClamp: 8,
+                          WebkitLineClamp: 2,
                           WebkitBoxOrient: "vertical",
                           overflow: "hidden",
                           textOverflow: "ellipsis",
