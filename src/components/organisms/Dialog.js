@@ -18,6 +18,7 @@ import {
   Modal,
   Paper,
   Typography,
+  CircularProgress,
 } from "@mui/material";
 import DialogActions from "@mui/material/DialogActions";
 import DialogContent from "@mui/material/DialogContent";
@@ -122,6 +123,7 @@ export function Dialog({
     message: "",
     severity: "success",
   });
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const handleSelectFile = async (e) => {
     e.preventDefault();
@@ -137,43 +139,57 @@ export function Dialog({
   };
 
   React.useEffect(() => {
-    let load = true;
-    const getAttachment = async ({ rowData }) => {
-      const { data } = await zohoApi.file.getAttachments({
+    const recordId = selectedRowData?.historyDetails?.id || selectedRowData?.history_id;
+    if (!openDialog || !selectedRowData || !recordId) return;
+
+    const getAttachment = async () => {
+      const { data, error } = await zohoApi.file.getAttachments({
         module: "History1",
-        recordId: rowData?.historyDetails?.id,
+        recordId,
       });
-      setFormData((prev) => ({
-        ...prev,
-        attachment: { name: data?.[0]?.File_Name },
-      }));
-      setLoadedAttachmentFromRecord(data);
+
+      console.log("attachment data fetching", data, recordId);
+
+      if (error) {
+        console.warn("Attachment fetch error:", error);
+        return;
+      }
+      if (data && data.length > 0) {
+        setFormData((prev) => ({
+          ...prev,
+          attachment: { name: data[0]?.File_Name },
+        }));
+        setLoadedAttachmentFromRecord(data);
+      }
     };
-    if (selectedRowData?.id && load) {
-      load = false;
-      getAttachment({ rowData: selectedRowData });
-      // getAttachment({
-      //   selectedRowData: { historyDetails: { id: "76775000001772113" } },
-      // });
-    }
-  }, [selectedRowData]);
+    getAttachment();
+  }, [openDialog, selectedRowData]);
 
   // console.log({ selectedRowData })
 
   // Reinitialize dialog state when `openDialog` or `obj` changes
   React.useEffect(() => {
     if (openDialog) {
-      setFormData({
-        Participants: selectedRowData?.Participants || [],
-        result: selectedRowData?.result || "Meeting Held",
-        type: selectedRowData?.type || "Meeting",
-        duration: selectedRowData?.duration || "60",
-        regarding: selectedRowData?.regarding || "Hourly Consult $220",
-        details: selectedRowData?.details || "",
-        stakeHolder: selectedRowData?.stakeHolder || null,
-        date_time: selectedRowData?.date_time
-          ? dayjs(selectedRowData.date_time)
-          : dayjs(),
+      setIsSubmitting(false);
+      setFormData((prev) => {
+        const base = {
+          Participants: selectedRowData?.Participants || [],
+          result: selectedRowData?.result || "Meeting Held",
+          type: selectedRowData?.type || "Meeting",
+          duration: selectedRowData?.duration || "60",
+          regarding: selectedRowData?.regarding || "Hourly Consult $220",
+          details: selectedRowData?.details || "",
+          stakeHolder: (selectedRowData?.stakeHolder && typeof selectedRowData.stakeHolder === "object" && selectedRowData.stakeHolder?.id != null)
+            ? selectedRowData.stakeHolder
+            : null,
+          date_time: selectedRowData?.date_time
+            ? dayjs(selectedRowData.date_time)
+            : dayjs(),
+        };
+        return {
+          ...base,
+          attachment: selectedRowData ? prev?.attachment : undefined,
+        };
       });
       setSelectedContacts(
         selectedRowData?.Participants || [currentContact] || []
@@ -248,7 +264,7 @@ export function Dialog({
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-
+    setIsSubmitting(true);
 
     let selectedParticipants = [];
 
@@ -303,6 +319,7 @@ export function Dialog({
         severity: "error",
       });
     } finally {
+      setIsSubmitting(false);
       handleCloseDialog();
     }
   };
@@ -523,7 +540,7 @@ export function Dialog({
         id: selectedRowData.id || null,
         ...finalData,
         Participants: selectedParticipants,
-        Stakeholder: selectedRowData?.stakeHolder || null,
+        Stakeholder: formData.stakeHolder || null,
         historyDetails: {
           ...selectedRowData?.historyDetails,
           name: selectedParticipants.map((c) => c.Full_Name).join(", "),
@@ -1307,6 +1324,7 @@ export function Dialog({
                 onClick={handleDelete}
                 variant="outlined"
                 color="error"
+                disabled={isSubmitting}
                 sx={{
                   fontSize: "9pt",
                   marginLeft: "8px",
@@ -1320,6 +1338,7 @@ export function Dialog({
                 onClick={handleMoveToApplication}
                 variant="outlined"
                 color="success"
+                disabled={isSubmitting}
                 sx={{
                   fontSize: "9pt",
                   marginLeft: "8px",
@@ -1352,12 +1371,25 @@ export function Dialog({
             <Button
               onClick={handleCloseDialog}
               variant="outlined"
+              disabled={isSubmitting}
               sx={{ fontSize: "9pt" }}
             >
               Cancel
             </Button>
-            <Button type="submit" variant="contained" sx={{ fontSize: "9pt" }}>
-              {buttonText}
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={isSubmitting}
+              sx={{ fontSize: "9pt" }}
+            >
+              {isSubmitting ? (
+                <>
+                  <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                  Saving...
+                </>
+              ) : (
+                buttonText
+              )}
             </Button>
           </Box>
         </DialogActions>

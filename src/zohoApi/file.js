@@ -37,23 +37,28 @@ async function getAttachments({ module, recordId }) {
       headers: {},
       method: "GET",
     };
+    
 
     const getAttachmentsResp = await ZOHO.CRM.CONNECTION.invoke(
       conn_name,
       req_data
     );
 
-    if (getAttachmentsResp?.details?.statusMessage === "") {
-      return {
-        data: [],
-        error: null,
-      };
+    console.log("getAttachmentsResp 2026", getAttachmentsResp);
+
+    const sm = getAttachmentsResp?.details?.statusMessage;
+    const details = getAttachmentsResp?.details;
+
+    let list = [];
+    if (sm !== "" && sm != null) {
+      const parsed = typeof sm === "string" ? (() => { try { return JSON.parse(sm); } catch { return {}; } })() : sm;
+      list = Array.isArray(parsed?.data) ? parsed.data : (Array.isArray(parsed) ? parsed : []);
+    }
+    if (list.length === 0 && details && typeof details === "object" && Array.isArray(details?.data)) {
+      list = details.data;
     }
 
-    return {
-      data: getAttachmentsResp?.details?.statusMessage?.data,
-      error: null,
-    };
+    return { data: list, error: null };
   } catch (getAttachmentsError) {
     console.log({ getAttachmentsError });
     return {

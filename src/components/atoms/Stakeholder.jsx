@@ -1,21 +1,65 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Autocomplete, TextField } from "@mui/material";
 
 export default function Stakeholder({ formData, handleInputChange, ZOHO }) {
   const [stakeholders, setStakeholders] = useState([]);
   const [selectedStakeholder, setSelectedStakeholder] = useState(null);
   const [inputValue, setInputValue] = useState("");
+  const expectedIdRef = useRef(null);
+  const lastFetchedIdRef = useRef(null);
 
   useEffect(() => {
-    // Reset state when formData changes
-    if (formData?.stakeHolder) {
-      setSelectedStakeholder(formData.stakeHolder);
-      setInputValue(formData.stakeHolder.name || "");
-    } else {
+    if (!formData?.stakeHolder) {
+      expectedIdRef.current = null;
+      lastFetchedIdRef.current = null;
       setSelectedStakeholder(null);
       setInputValue("");
+      return;
     }
-  }, [formData]);
+
+    if (formData.stakeHolder.name) {
+      setSelectedStakeholder(formData.stakeHolder);
+      setInputValue(formData.stakeHolder.name);
+      return;
+    }
+
+    const id = formData.stakeHolder.id;
+    if (!id || !ZOHO) return;
+
+    if (lastFetchedIdRef.current === id) {
+      setSelectedStakeholder(formData.stakeHolder);
+      setInputValue(formData.stakeHolder.name || "");
+      return;
+    }
+
+    lastFetchedIdRef.current = id;
+    expectedIdRef.current = id;
+
+    ZOHO.CRM.API.getRecord({
+      Entity: "Accounts",
+      RecordID: id,
+      approved: "both",
+    })
+      .then((response) => {
+        if (expectedIdRef.current !== id) return;
+        const name = response?.data?.[0]?.Account_Name || "";
+        if (name) {
+          const full = { id, name };
+          handleInputChange("stakeHolder", full);
+          setSelectedStakeholder(full);
+          setInputValue(name);
+        } else {
+          setSelectedStakeholder(formData.stakeHolder);
+          setInputValue("");
+        }
+      })
+      .catch((err) => {
+        if (expectedIdRef.current !== id) return;
+        console.error("Error fetching stakeholder by id:", err);
+        setSelectedStakeholder(formData.stakeHolder);
+        setInputValue("");
+      });
+  }, [formData, ZOHO, handleInputChange]);
 
   const fetchStakeholders = async (query) => {
     if (!ZOHO || !query.trim()) return;

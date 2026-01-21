@@ -137,119 +137,139 @@ const App = () => {
     // setDetails(""); // Clear the details field
   };
 
-  React.useEffect(() => {
-    const fetchRLData = async () => {
-      try {
-        // const { data } = await zohoApi.record.getRecordsFromRelatedList({
-        //   module,
-        //   recordId,
-        //   RelatedListAPI: "History3",
-        // });
+  const fetchRLData = async (options = {}) => {
+    if (!module || !recordId) return;
+    try {
+      // const { data } = await zohoApi.record.getRecordsFromRelatedList({
+      //   module,
+      //   recordId,
+      //   RelatedListAPI: "History3",
+      // });
 
-        var config = {
-          "select_query": `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date from History_X_Contacts where Contact_Details = '${recordId}' limit 200`
-        }
-        const { data } = await ZOHO.CRM.API.coql(config);
+      var config = {
+        "select_query": `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date,Contact_History_Info.Stakeholder  from History_X_Contacts where Contact_Details = '${recordId}' limit 200`
+      }
+      const { data } = await ZOHO.CRM.API.coql(config);
 
-        const dataArray = Array.isArray(data) ? data : [];
-
-
-    
-        const usersResponse = await ZOHO.CRM.API.getAllUsers({
-          Type: "AllUsers",
-        });
-
-           
-        const validUsers = usersResponse?.users?.filter(
-          (user) => user?.full_name && user?.id
-        );
-        setOwnerList(validUsers || []);
-
-        const currentUserResponse = await ZOHO.CRM.CONFIG.getCurrentUser();
-        setLoggedInUser(currentUserResponse?.users?.[0] || null);
-
-        const currentContactResponse = await ZOHO.CRM.API.getRecord({
-          Entity: "Contacts",
-          approved: "both",
-          RecordID: recordId,
-        });
-
-        console.log("currentContactData", currentContactResponse);
-        setCurrentContact(currentContactResponse?.data?.[0] || null);
-
-        if (currentContact) {
-          setCurrentGlobalContact(currentContact);
-        }
+      const dataArray = Array.isArray(data) ? data : [];
 
 
+      console.log("dataArray 2026", dataArray);
 
 
-        const tempData = dataArray?.map((obj) => {
-          const ownerFirst = obj["Owner.first_name"] || "";
-          const ownerLast = obj["Owner.last_name"] || "";
-
-          const ownerName = `${ownerFirst} ${ownerLast}`.trim() || "Unknown Owner";
-
-          return {
-            name: obj["Contact_Details.Full_Name"] || "No Name",
-            id: obj?.id,
-            date_time: obj["Contact_History_Info.Date"] || "No Date",
-            type: obj["Contact_History_Info.History_Type"] || "Unknown Type",
-            result: obj["Contact_History_Info.History_Result"] || "No Result",
-            duration: obj["Contact_History_Info.Duration"] || "N/A",
-            regarding: obj["Contact_History_Info.Regarding"] || "No Regarding",
-            details: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
-            icon: <DownloadIcon />,
-            ownerName: ownerName,
-            historyDetails: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
-            stakeHolder: obj?.Stakeholder || "Unknown",
-            history_id: obj["Contact_History_Info.id"]
-          };
-        });
+      const usersResponse = await ZOHO.CRM.API.getAllUsers({
+        Type: "AllUsers",
+      });
 
 
-        setRelatedListData(tempData || []);
+      const validUsers = usersResponse?.users?.filter(
+        (user) => user?.full_name && user?.id
+      );
+      setOwnerList(validUsers || []);
 
-        const types = dataArray
-          ?.map((el) => el.History_Type)
-          ?.filter((el) => el !== undefined && el !== null);
+      const currentUserResponse = await ZOHO.CRM.CONFIG.getCurrentUser();
+      setLoggedInUser(currentUserResponse?.users?.[0] || null);
 
-        const sortedTypes = [...new Set(types)].sort((a, b) =>
-          a.localeCompare(b)
-        ); // Sort alphabetically
+      const currentContactResponse = await ZOHO.CRM.API.getRecord({
+        Entity: "Contacts",
+        approved: "both",
+        RecordID: recordId,
+      });
 
-        const additionalTypes = [
-          "Meeting",
-          "To-Do",
-          "Call",
-          "Appointment",
-          "Boardroom",
-          "Call Billing",
-          "Email Billing",
-          "Initial Consultation",
-          "Mail",
-          "Meeting Billing",
-          "Personal Activity",
-          "Room 1",
-          "Room 2",
-          "Room 3",
-          "Todo Billing",
-          "Vacation",
-        ]; // Example additional options
+      console.log("currentContactData", currentContactResponse);
+      setCurrentContact(currentContactResponse?.data?.[0] || null);
 
-        const sortedTypesWithAdditional = [
-          ...new Set([...additionalTypes, ...sortedTypes]), // Merge additional options with existing ones
-        ].sort((a, b) => a.localeCompare(b)); // Sort alphabetically
+      if (currentContact) {
+        setCurrentGlobalContact(currentContact);
+      }
 
-        setTypeList(sortedTypesWithAdditional);
 
-        setInitPageContent(null);
-      } catch (error) {
-        console.error("Error fetching data:", error);
+
+
+      const tempData = dataArray?.map((obj) => {
+        const ownerFirst = obj["Owner.first_name"] || "";
+        const ownerLast = obj["Owner.last_name"] || "";
+
+        const ownerName = `${ownerFirst} ${ownerLast}`.trim() || "Unknown Owner";
+
+        return {
+          name: obj["Contact_Details.Full_Name"] || "No Name",
+          id: obj?.id,
+          date_time: obj["Contact_History_Info.Date"] || "No Date",
+          type: obj["Contact_History_Info.History_Type"] || "Unknown Type",
+          result: obj["Contact_History_Info.History_Result"] || "No Result",
+          duration: obj["Contact_History_Info.Duration"] || "N/A",
+          regarding: obj["Contact_History_Info.Regarding"] || "No Regarding",
+          details: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
+          icon: <DownloadIcon />,
+          ownerName: ownerName,
+          historyDetails: {
+            id: obj["Contact_History_Info.id"],
+            text: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
+          },
+          stakeHolder: (() => {
+            const flatId = obj["Contact_History_Info.Stakeholder.id"];
+            const flatName = obj["Contact_History_Info.Stakeholder.Account_Name"];
+            const nested = obj["Contact_History_Info.Stakeholder"];
+            const junction = obj?.Stakeholder;
+
+            const id = flatId ?? (nested && typeof nested === "object" ? nested.id : undefined) ?? (junction && typeof junction === "object" ? junction.id : undefined);
+            const rawName = flatName ?? (nested && typeof nested === "object" ? (nested.Account_Name ?? nested.name) : undefined) ?? (junction && typeof junction === "object" ? (junction.Account_Name ?? junction.name) : undefined);
+
+            return id != null ? { id, name: rawName || "" } : null;
+          })(),
+          history_id: obj["Contact_History_Info.id"]
+        };
+      });
+
+
+      setRelatedListData(tempData || []);
+
+      const types = dataArray
+        ?.map((el) => el.History_Type)
+        ?.filter((el) => el !== undefined && el !== null);
+
+      const sortedTypes = [...new Set(types)].sort((a, b) =>
+        a.localeCompare(b)
+      ); // Sort alphabetically
+
+      const additionalTypes = [
+        "Meeting",
+        "To-Do",
+        "Call",
+        "Appointment",
+        "Boardroom",
+        "Call Billing",
+        "Email Billing",
+        "Initial Consultation",
+        "Mail",
+        "Meeting Billing",
+        "Personal Activity",
+        "Room 1",
+        "Room 2",
+        "Room 3",
+        "Todo Billing",
+        "Vacation",
+      ]; // Example additional options
+
+      const sortedTypesWithAdditional = [
+        ...new Set([...additionalTypes, ...sortedTypes]), // Merge additional options with existing ones
+      ].sort((a, b) => a.localeCompare(b)); // Sort alphabetically
+
+      setTypeList(sortedTypesWithAdditional);
+
+      setInitPageContent(null);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      if (options.isBackground) {
+        enqueueSnackbar("Failed to refresh data", { variant: "error" });
+      } else {
         setInitPageContent("Error loading data.");
       }
-    };
+    }
+  };
 
+  React.useEffect(() => {
     if (module && recordId) {
       fetchRLData();
     }
@@ -307,6 +327,7 @@ const App = () => {
     setSelectedContacts(newRecord.Participants);
     // Debug logs
     console.log("New Record Normalized:", normalizedRecord);
+    fetchRLData({ isBackground: true });
   };
 
   const handleRightSideDataShow = (currentRegarding, currentDetails) => {
@@ -353,6 +374,7 @@ const App = () => {
     setRegarding(updatedRecord.Regarding || "No Regarding");
     setDetails(updatedRecord.History_Details_Plain || "No Details");
     setHighlightedRecordId(updatedRecord.id); // Highlight the updated record
+    fetchRLData({ isBackground: true });
   };
 
   const filteredData = relatedListData

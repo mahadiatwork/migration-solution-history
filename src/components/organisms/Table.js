@@ -41,11 +41,20 @@ const DownloadButton = ({ rowId, rowIcon, isSelected }) => {
       sx={{ fontSize: "12pt" }}
       disableRipple
       onClick={async () => {
+        console.log("DownloadButton clicked, rowId:", rowId);
+
+        if (!rowId) {
+          enqueueSnackbar("No record ID for attachment.", { variant: "error" });
+          return;
+        }
+
         setWaitingForDownload(true);
-        const { data } = await zohoApi.file.getAttachments({
+        const { data, error } = await zohoApi.file.getAttachments({
           module: "History1",
           recordId: rowId,
         });
+
+        console.log("Download - getAttachments response:", { data, error, rowId });
 
         if (data?.length > 0) {
           const downloadResp = await zohoApi.file.downloadAttachmentById({
@@ -163,7 +172,7 @@ export function Table({
   keyword
 }) {
   const [order, setOrder] = React.useState("desc");
- const [orderBy, setOrderBy] = React.useState("date_time");
+  const [orderBy, setOrderBy] = React.useState("date_time");
   const [selectedRowId, setSelectedRowId] = React.useState(highlightedRecordId); // Sync with highlightedRecordId
 
   // Ensure selectedRowId matches highlightedRecordId on updates
@@ -250,7 +259,8 @@ export function Table({
                       },
                     }}
                     onDoubleClick={() => handleClickOpenEditDialog(row)}
-                    onClick={() => handleRowClick(row)}
+                    // onClick={() => handleRowClick(row)}
+                    onClick={() => console.log("row 2026", row)}
                   >
                     <TableCell size="small">
                       <Box
@@ -328,11 +338,13 @@ export function Table({
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        row?.history_id &&
+                        const historyId = row.history_id || row.historyDetails?.id;
+                        if (historyId) {
                           window.open(
-                            `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${row.history_id}`,
+                            `https://crm.zoho.com.au/crm/org7004396182/tab/CustomModule4/${historyId}`,
                             "_blank"
                           );
+                        }
                       }}
                     >
                       {row.historyDetails?.name || row.name || "Unknown Name"}
