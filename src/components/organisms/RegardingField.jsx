@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FormControl, InputLabel, Select, MenuItem, TextField, Box, Typography } from "@mui/material";
+import { FormControl, InputLabel, Select, MenuItem, TextField, Box } from "@mui/material";
 import { getRegardingOptions } from "./helperFunc";
 
 const RegardingField = ({ formData, handleInputChange, selectedRowData }) => {
@@ -24,9 +24,10 @@ const RegardingField = ({ formData, handleInputChange, selectedRowData }) => {
       setManualInput("");
     }
     if (existingValue !== "Other") {
-      setShowManualInput(false); 
+      setShowManualInput(false);
     }
-  }, [formData.type]); // ✅ Removed `selectedValue`
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- existingValue, predefinedOptions intentionally omitted
+  }, [formData.type]);
   
 
   const handleSelectChange = (event) => {

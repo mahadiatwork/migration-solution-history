@@ -15,7 +15,6 @@ import {
   Alert,
 } from "@mui/material";
 
-import { setCurrentGlobalContact, getCurrentContact } from "../../GlobalState";
 
 const ApplicationTable = ({
   applications,
@@ -95,7 +94,6 @@ const ApplicationDialog = ({
   selectedOwner,
 }) => {
   const [selectedApplicationId, setSelectedApplicationId] = useState(null);
-  const [mahadiContact, setMahadiContact] = useState(null);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -105,13 +103,6 @@ const ApplicationDialog = ({
   const handleCloseSnackbar = () => {
     setSnackbar({ open: false, message: "", severity: "success" });
   };
-
-  useEffect(() => {
-    if (currentContact) {
-      setMahadiContact(currentContact);
-      console.log("Current Contact in useEffect:", currentContact);
-    }
-  }, [currentContact]);
 
   const handleApplicationSelect = async () => {
     if (!selectedApplicationId) {
@@ -151,11 +142,11 @@ const ApplicationDialog = ({
 
         // Create ApplicationxContacts for all associated contacts
         for (const contact of historyContacts) {
-          const response = await ZOHO.CRM.API.insertRecord({
+          await ZOHO.CRM.API.insertRecord({
             Entity: "Application_Hstory",
             APIData: {
               Application_Hstory: { id: newHistoryId },
-              Contact: { id: historyContacts[0].id },
+              Contact: { id: contact.id },
             },
             Trigger: ["workflow"],
           });

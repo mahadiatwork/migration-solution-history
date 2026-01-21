@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Button,
@@ -17,21 +17,12 @@ import {
   Typography,
 } from "@mui/material";
 
-const commonStyles = {
-  fontSize: "9pt", // Uniform font size
-  "& .MuiOutlinedInput-input": { fontSize: "9pt" }, // Input text
-  "& .MuiInputBase-input": { fontSize: "9pt" }, // Base input text
-  "& .MuiTypography-root": { fontSize: "9pt" }, // Typography text
-  "& .MuiFormLabel-root": { fontSize: "9pt" }, // Form labels
-};
-
 export default function ContactField({
   handleInputChange,
   ZOHO,
   selectedRowData = {}, // Default to an empty object
   currentContact, // New prop
 }) {
-  const [contacts, setContacts] = useState([]);
   const [selectedParticipants, setSelectedParticipants] = useState([]);
   const [searchType, setSearchType] = useState("First_Name");
   const [searchText, setSearchText] = useState("");
@@ -198,9 +189,10 @@ export default function ContactField({
   };
 
   useEffect(() => {
-    if (selectedRowData.id == null || selectedRowData.id == undefined) {
+    if (selectedRowData.id === null || selectedRowData.id === undefined) {
       setSelectedParticipants([currentContact]);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
   }, []);
 
   return (

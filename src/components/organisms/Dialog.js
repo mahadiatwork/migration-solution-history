@@ -8,7 +8,6 @@ import {
   Dialog as MUIDialog,
   Select,
   MenuItem,
-  Chip,
   FormControl,
   InputLabel,
   Snackbar,
@@ -30,10 +29,8 @@ import { getRegardingOptions, getResultOptions } from "./helperFunc";
 import ContactField from "./ContactFields";
 import RegardingField from "./RegardingField";
 import IconButton from "@mui/material/IconButton"; // For the clickable icon button
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth"; // For the calendar icon
 import { styled } from "@mui/material/styles";
 import { zohoApi } from "../../zohoApi";
-import ApplicationTable from "./ApplicationTable";
 import ApplicationDialog from "./ApplicationTable";
 import Stakeholder from "../atoms/Stakeholder";
 import { Close } from "@mui/icons-material";
@@ -49,14 +46,6 @@ const VisuallyHiddenInput = styled("input")({
   whiteSpace: "nowrap",
   width: 1,
 });
-
-const debounce = (func, delay) => {
-  let timer;
-  return (...args) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => func(...args), delay);
-  };
-};
 
 const durationOptions = Array.from({ length: 24 }, (_, i) => (i + 1) * 10);
 
@@ -101,7 +90,7 @@ export function Dialog({
   openApplicationDialog,
   setOpenApplicationDialog,
 }) {
-  const [historyName, setHistoryName] = React.useState("");
+  const [, setHistoryName] = React.useState("");
   const [historyContacts, setHistoryContacts] = React.useState([]);
   const [selectedOwner, setSelectedOwner] = React.useState(
     ownerList?.find(
@@ -110,12 +99,9 @@ export function Dialog({
     loggedInUser ||
     null
   );
-  const [selectedType, setSelectedType] = React.useState("Meeting");
+  const [, setSelectedType] = React.useState("Meeting");
   const [loadedAttachmentFromRecord, setLoadedAttachmentFromRecord] =
     React.useState();
-  const [regarding, setRegarding] = React.useState(
-    selectedRowData?.regarding || ""
-  );
   const [formData, setFormData] = React.useState(selectedRowData || {}); // Form data state
   // console.log({ formData });
   const [snackbar, setSnackbar] = React.useState({
@@ -211,6 +197,7 @@ export function Dialog({
       // Reset formData to avoid stale data
       setFormData({});
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- ownerList, setSelectedContacts intentionally omitted
   }, [openDialog, selectedRowData, loggedInUser, currentContact]);
 
   React.useEffect(() => {
@@ -245,6 +232,7 @@ export function Dialog({
     if (openDialog) {
       fetchHistoryData();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- ZOHO.CRM.API, setSelectedContacts intentionally omitted
   }, [selectedRowData?.history_id, openDialog]);
 
   React.useEffect(() => {
@@ -253,10 +241,6 @@ export function Dialog({
       .join(", ");
     setHistoryName(names);
   }, [selectedContacts]);
-
-  const handleRegardingChange = (event) => {
-    setRegarding(event.target.value); // Update the state with user input
-  };
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -647,133 +631,7 @@ export function Dialog({
     "Other",
   ];
 
-  const resultOptions = React.useMemo(() => {
-    if (selectedType === "Meeting") {
-      return ["Meeting Held", "Meeting Not Held"];
-    }
-    if (selectedType === "To-Do") {
-      return ["To-do Done", "To-do Not Done"];
-    }
-    if (selectedType === "Appointment") {
-      return ["Appointment Completed", "Appointment Not Completed"];
-    }
-    if (selectedType === "Boardroom") {
-      return ["Boardroom - Completed", "Boardroom - Not Completed"];
-    }
-    if (selectedType === "Call Billing") {
-      return ["Call Billing - Completed", "  Call Billing - Not Completed"];
-    }
-    if (selectedType === "Email Billing") {
-      return ["Email Billing - Completed", "Email Billing - Not Completed"];
-    }
-    if (selectedType === "Initial Consultation") {
-      return [
-        "Initial Consultation - Completed",
-        "Initial Consultation - Not Completed",
-      ];
-    }
-    if (selectedType === "Call") {
-      return [
-        "Call Attempted",
-        " Call Completed",
-        " Call Left Message",
-        " Call Received",
-      ];
-    }
-    if (selectedType === "Mail") {
-      return ["Mail - Completed", "Mail - Not Completed"];
-    }
-    if (selectedType === "Meeting Billing") {
-      return ["Meeting Billing - Completed", "Meeting Billing - Not Completed"];
-    }
-    if (selectedType === "Personal Activity") {
-      return [
-        "Personal Activity - Completed",
-        "Personal Activity - Not Completed",
-        "Note",
-        "Mail Received",
-        "Mail Sent",
-        "Email Received",
-        "Courier Sent",
-        "Email Sent",
-        "Payment Received",
-      ];
-    }
-    if (selectedType === "Room 1") {
-      return ["Room 1 - Completed", "Room 1 - Not Completed"];
-    }
-    if (selectedType === "Room 2") {
-      return ["Room 2 - Completed", "Room 2 - Not Completed"];
-    }
-    if (selectedType === "Room 3") {
-      return ["Room 3 - Completed", "Room 3 - Not Completed"];
-    }
-    if (selectedType === "To Do Billing") {
-      return ["To Do Billing - Completed", "To Do Billing - Not Completed"];
-    }
-    if (selectedType === "Vacation") {
-      return [
-        "Vacation - Completed",
-        "Vacation - Not Completed",
-        "Vacation Cancelled",
-      ];
-    }
-    if (selectedType === "Other") {
-      return [
-        "Attachment",
-        "E-mail Attachment",
-        "E-mail Auto Attached",
-        "E-mail Sent",
-      ];
-    }
-
-    return [
-      "Call Attempted",
-      "Call Completed",
-      "Call Left Message",
-      "Call Received",
-      "Meeting Held",
-      "Meeting Not Held",
-      "To-do Done",
-      "To-do Not Done",
-      "Appointment Completed",
-      "Appointment Not Completed",
-      "Boardroom - Completed",
-      "Boardroom - Not Completed",
-      "Call Billing - Completed",
-      "Initial Consultation - Completed",
-      "Initial Consultation - Not Completed",
-      "Mail - Completed",
-      "Mail - Not Completed",
-      "Meeting Billing - Completed",
-      "Meeting Billing - Not Completed",
-      "Personal Activity - Completed",
-      "Personal Activity - Not Completed",
-      "Note",
-      "Mail Received",
-      "Mail Sent",
-      "Email Received",
-      "Courier Sent",
-      "Email Sent",
-      "Payment Received",
-      "Room 1 - Completed",
-      "Room 1 - Not Completed",
-      "Room 2 - Completed",
-      "Room 2 - Not Completed",
-      "Room 3 - Completed",
-      "Room 3 - Not Completed",
-      "To Do Billing - Completed",
-      "To Do Billing - Not Completed",
-      "Vacation - Completed",
-      "Vacation - Not Completed",
-      "Vacation Cancelled",
-      "Attachment",
-      "E-mail Attachment",
-    ];
-  }, [selectedType]);
-
-  const [selectedApplicationId, setSelectedApplicationId] =
-    React.useState(null);
+  const [, setSelectedApplicationId] = React.useState(null);
 
 
 
@@ -906,7 +764,7 @@ export function Dialog({
   const [openConfirmDialog, setOpenConfirmDialog] = React.useState(false);
 
   const handleAttachmentDelete = async () => {
-    const deleteFileResp = await zohoApi.file.deleteAttachment({
+    await zohoApi.file.deleteAttachment({
       module: "History1",
       recordId: selectedRowData?.history_id,
       attachment_id: loadedAttachmentFromRecord?.[0]?.id,

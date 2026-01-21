@@ -186,17 +186,6 @@ export function Table({
     setOrderBy(property);
   };
 
-  const handleRowClick = (row) => {
-    if (row.id === selectedRowId) {
-      // Deselect row if already selected
-      setSelectedRowId(null);
-    } else {
-      // Select the clicked row
-      setSelectedRowId(row.id);
-      handleRightSideDataShow(row.regarding, row.details);
-    }
-  };
-
   const visibleRows = React.useMemo(
     () => [...(rows || [])].sort(getComparator(order, orderBy)),
     [order, rows, orderBy]

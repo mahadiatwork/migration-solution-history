@@ -13,7 +13,6 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 
 import { useZohoInit } from "./hook/useZohoInit";
-import { zohoApi } from "./zohoApi";
 import { Table } from "./components/organisms/Table";
 import { Dialog } from "./components/organisms/Dialog";
 import {
@@ -23,7 +22,7 @@ import {
   TableHead,
   TableRow,
 } from "@mui/material";
-import { setCurrentGlobalContact, getCurrentContact } from "./GlobalState";
+import { setCurrentGlobalContact } from "./GlobalState";
 import { DialogTitle, DialogContent, DialogActions } from "@mui/material";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
@@ -71,7 +70,7 @@ const App = () => {
     <CircularProgress />
   );
   const [relatedListData, setRelatedListData] = React.useState([]);
-  const [selectedRecordId, setSelectedRecordId] = React.useState(null);
+  const [, setSelectedRecordId] = React.useState(null);
   const [openEditDialog, setOpenEditDialog] = React.useState(false);
   const [openCreateDialog, setOpenCreateDialog] = React.useState(false);
   const [ownerList, setOwnerList] = React.useState([]);
@@ -83,7 +82,6 @@ const App = () => {
   const [loggedInUser, setLoggedInUser] = React.useState(null);
   const [selectedRowData, setSelectedRowData] = React.useState(null);
   const [currentContact, setCurrentContact] = React.useState(null);
-  const [zohoLoaded, setZohoLoaded] = React.useState(false);
   const [regarding, setRegarding] = React.useState("");
   const [details, setDetails] = React.useState("");
   const [selectedContacts, setSelectedContacts] = React.useState([]);
@@ -273,6 +271,7 @@ const App = () => {
     if (module && recordId) {
       fetchRLData();
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchRLData is stable, avoid refetch loop
   }, [module, recordId]);
 
   const [highlightedRecordId, setHighlightedRecordId] = React.useState(null);
