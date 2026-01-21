@@ -119,6 +119,7 @@ export default function ContactField({
     };
 
     fetchParticipantsDetails();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- ZOHO, selectedContact; fetch on mount only
   }, []);
 
   const handleOpen = () => {
