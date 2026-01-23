@@ -195,6 +195,17 @@ export function Table({
     console.log("Table rows updated:", rows); // Debugging rows
   }, [rows]);
 
+  const handleRowClick = (row) => {
+    if (row.id === selectedRowId) {
+      // Deselect row if already selected
+      setSelectedRowId(null);
+    } else {
+      // Select the clicked row
+      setSelectedRowId(row.id);
+      handleRightSideDataShow(row.regarding, row.details);
+    }
+  };
+
   return (
     <Paper sx={{ height: "25.5rem", overflowY: "auto" }}>
       <TableContainer>
@@ -248,8 +259,8 @@ export function Table({
                       },
                     }}
                     onDoubleClick={() => handleClickOpenEditDialog(row)}
-                    // onClick={() => handleRowClick(row)}
-                    onClick={() => console.log("row 2026", row)}
+                    onClick={() => handleRowClick(row)}
+                  // onClick={() => console.log("row 2026", row)}
                   >
                     <TableCell size="small">
                       <Box
