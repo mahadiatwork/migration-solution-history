@@ -161,10 +161,28 @@ const App = () => {
 
   const [isCustomRangeDialogOpen, setIsCustomRangeDialogOpen] =
     React.useState(false);
+  const [isCustomRangeApplying, setIsCustomRangeApplying] = React.useState(false);
+  const [showDebugPanel, setShowDebugPanel] = React.useState(true);
+  const [debugInfo, setDebugInfo] = React.useState({
+    lastDefaultFetch: null,
+    lastCustomFetch: null,
+    updatedAt: null,
+  });
   const [customRange, setCustomRange] = React.useState({
     startDate: null,
     endDate: null,
   });
+
+  const stringifyForUi = React.useCallback((value, maxLen = 15000) => {
+    let text = "";
+    try {
+      text = JSON.stringify(value, null, 2);
+    } catch (e) {
+      text = String(value);
+    }
+    if (text.length <= maxLen) return text;
+    return `${text.slice(0, maxLen)}\n... (truncated ${text.length - maxLen} chars)`;
+  }, []);
 
   const handleClickOpenCreateDialog = () => {
     setOpenCreateDialog(true);
@@ -209,71 +227,264 @@ const App = () => {
   };
 
   // ============================================================================
-  // COQL v8 Fetch Helper (up to 2000 records in one call)
+  // STEP 5: Custom Date Range Fetching (Search API)
   // ============================================================================
-  /**
-   * Fetch History_X_Contacts via COQL v8 API (up to 2000 records in one call)
-   * Uses CONNECTION.invoke POST to {dataCenter}/crm/v8/coql
-   * @param {string} contactId - Contact record ID (from widget context)
-   * @param {number} [limit=2000] - Max records (v8 allows up to 2000)
-   * @param {number} [offset=0] - Pagination offset
-   * @returns {Promise<Array>} - Array of junction records
-   */
-  const fetchHistoryViaCoqlV8 = async (contactId, limit = 2000, offset = 0) => {
-    const selectQuery = `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date,Contact_History_Info.Stakeholder from History_X_Contacts where Contact_Details = '${contactId}' LIMIT ${offset}, ${limit}`;
-
-    const req_data = {
-      url: `${dataCenterMap.AU}/crm/v8/coql`,
-      method: "POST",
-      param_type: 2, // Send parameters in request body (payload)
-      parameters: { select_query: selectQuery },
+  // Fetch History records using Search API with custom date range
+  // Uses Zoho Search API with pagination and junction record filtering
+  const fetchHistoryFromZoho = async (beginDate, closeDate, contactId) => {
+    const debug = {
+      kind: "customRange",
+      startedAt: new Date().toISOString(),
+      module,
+      recordId: contactId,
+      beginDate: beginDate?.toISOString?.() || String(beginDate),
+      closeDate: closeDate?.toISOString?.() || String(closeDate),
+      formattedBegin: null,
+      formattedClose: null,
+      criteriaUsed: null,
+      searchRequests: [],
+      searchPages: [],
+      junctionRequests: [],
+      counts: {},
+      finishedAt: null,
+      totalMs: null,
     };
 
-    const response = await ZOHO.CRM.CONNECTION.invoke(conn_name, req_data);
+    const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+    // Format the dates using the helper
+    const formattedBegin = formatDateForZoho(beginDate, 0, 0, 0);
+    const formattedClose = formatDateForZoho(closeDate, 23, 59, 59);
+    debug.formattedBegin = formattedBegin;
+    debug.formattedClose = formattedClose;
 
-    // Handle response format (may vary: data vs details.statusMessage.data)
-    let data = [];
-    if (response?.data) {
-      data = Array.isArray(response.data) ? response.data : [];
-    } else if (response?.details?.statusMessage?.data) {
-      data = Array.isArray(response.details.statusMessage.data)
-        ? response.details.statusMessage.data
-        : [];
+    if (!formattedBegin || !formattedClose) {
+      throw new Error("Invalid date range provided");
     }
 
-    return data;
+    let allHistoryRecords = [];
+    let currentPage = 1;
+    let hasMoreRecords = true;
+    const recordsPerPage = 100;
+
+    // --- STEP 1: Fetch History Records by Date ---
+    // Try Date field first, fallback to Created_Time
+    let searchCriteria = `((Date:greater_equal:${encodeURIComponent(formattedBegin)})and(Date:less_equal:${encodeURIComponent(formattedClose)}))`;
+    debug.criteriaUsed = searchCriteria;
+
+    while (hasMoreRecords && currentPage < 11) {
+      const req_data = {
+        url: `${dataCenterMap.AU}/crm/v3/History1/search?criteria=${searchCriteria}&per_page=${recordsPerPage}&page=${currentPage}`,
+        method: "GET",
+        param_type: 1,
+      };
+      debug.searchRequests.push({ page: currentPage, url: req_data.url });
+
+      try {
+        const data = await ZOHO.CRM.CONNECTION.invoke(conn_name, req_data);
+        let pageResults = [];
+        let moreRecords = false;
+
+        if (data?.details?.statusMessage?.data) {
+          pageResults = data.details.statusMessage.data;
+          moreRecords = data.details.statusMessage.info?.more_records || false;
+        } else if (data?.data) {
+          pageResults = Array.isArray(data.data) ? data.data : [];
+          moreRecords = data.info?.more_records || false;
+        }
+
+        allHistoryRecords = [...allHistoryRecords, ...pageResults];
+        hasMoreRecords = moreRecords;
+        debug.searchPages.push({
+          page: currentPage,
+          results: pageResults.length,
+          more_records: !!moreRecords,
+        });
+        currentPage++;
+      } catch (error) {
+        if (currentPage === 1 && error.message?.includes("Date")) {
+          console.warn("Date field not found, trying Created_Time field");
+          searchCriteria = `((Created_Time:greater_equal:${encodeURIComponent(formattedBegin)})and(Created_Time:less_equal:${encodeURIComponent(formattedClose)}))`;
+          debug.criteriaUsed = searchCriteria;
+          currentPage = 1;
+          continue;
+        }
+        console.error("Pagination error:", error);
+        hasMoreRecords = false;
+      }
+    }
+    debug.counts.historySearchTotal = allHistoryRecords.length;
+
+    // --- STEP 2: Fetch ALL Linked Junction Records (The Fix) ---
+    if (contactId && allHistoryRecords.length > 0) {
+      let allJunctionRecords = [];
+      let jPage = 1;
+      let jHasMore = true;
+
+      // Loop to get ALL pages of related records, not just the first 200
+      while (jHasMore) {
+        try {
+          debug.junctionRequests.push({
+            page: jPage,
+            Entity: "Contacts",
+            RecordID: contactId,
+            RelatedList: "History3",
+            per_page: 200,
+          });
+          const junctionResponse = await ZOHO.CRM.API.getRelatedRecords({
+            Entity: "Contacts",
+            RecordID: contactId,
+            RelatedList: "History3", // Verify this API name is correct
+            page: jPage,
+            per_page: 200,
+          });
+
+          const pageData = junctionResponse?.data || [];
+          allJunctionRecords = [...allJunctionRecords, ...pageData];
+          debug.counts.junctionTotal = allJunctionRecords.length;
+
+          // Check if there are more records
+          if (pageData.length < 200 || !junctionResponse?.info?.more_records) {
+            jHasMore = false;
+          } else {
+            jPage++;
+          }
+        } catch (err) {
+          console.error("Error fetching related list page " + jPage, err);
+          jHasMore = false;
+        }
+      }
+
+      // Create a Set of valid History IDs linked to this contact
+      const contactHistoryIds = new Set(
+        allJunctionRecords.map(j => j.Contact_History_Info?.id).filter(Boolean)
+      );
+
+      // Filter fetched history to only those linked to this contact
+      allHistoryRecords = allHistoryRecords.filter(h => contactHistoryIds.has(h.id));
+      debug.counts.historyAfterJunctionFilter = allHistoryRecords.length;
+
+      const historyMap = new Map(allHistoryRecords.map(h => [h.id, h]));
+
+      // Map the final data structure
+      const mapped = allJunctionRecords
+        .filter(j => historyMap.has(j.Contact_History_Info?.id))
+        .map(junction => {
+          const history = historyMap.get(junction.Contact_History_Info.id);
+          const historyDate = history.Date || history.Created_Time || "No Date";
+
+          return {
+            id: junction.id,
+            "Contact_Details.Full_Name": junction.Contact_Details?.name || "No Name",
+            "Contact_History_Info.id": history.id,
+            "Contact_History_Info.Date": historyDate,
+            "Contact_History_Info.History_Type": history.History_Type || "Unknown Type",
+            "Contact_History_Info.History_Result": history.History_Result || "No Result",
+            "Contact_History_Info.Duration": history.Duration || "N/A",
+            "Contact_History_Info.Regarding": history.Regarding || "No Regarding",
+            "Contact_History_Info.History_Details_Plain": history.History_Details_Plain || history.History_Details || "No Details",
+            "Contact_History_Info.Stakeholder": history.Stakeholder || null,
+            "Owner.first_name": history.Owner?.first_name || "",
+            "Owner.last_name": history.Owner?.last_name || "",
+            History_Type: history.History_Type,
+          };
+        });
+      debug.counts.mappedCount = mapped.length;
+      const t1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      debug.finishedAt = new Date().toISOString();
+      debug.totalMs = Math.round((t1 - t0) * 100) / 100;
+      setDebugInfo((prev) => ({
+        ...prev,
+        lastCustomFetch: debug,
+        updatedAt: new Date().toISOString(),
+      }));
+      return mapped;
+    }
+
+    {
+      const t1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      debug.finishedAt = new Date().toISOString();
+      debug.totalMs = Math.round((t1 - t0) * 100) / 100;
+      setDebugInfo((prev) => ({
+        ...prev,
+        lastCustomFetch: debug,
+        updatedAt: new Date().toISOString(),
+      }));
+    }
+    return [];
   };
 
   // ============================================================================
-  // STEP 4: Default Data Fetching (COQL v8)
+  // STEP 4: Default Data Fetching (COQL)
   // ============================================================================
-  // Default fetch uses COQL v8 to get up to 2000 related list records from History_X_Contacts
+  // Default fetch uses COQL to get related list records from History_X_Contacts
   const fetchRLData = async (options = {}) => {
     if (!module || !recordId) return;
+    const debug = {
+      kind: "default",
+      startedAt: new Date().toISOString(),
+      module,
+      recordId,
+      stepsMs: {},
+      coql: null,
+      users: null,
+      currentUser: null,
+      contact: null,
+      counts: {},
+      finishedAt: null,
+      totalMs: null,
+    };
+    const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
     try {
-      let dataArray = [];
-      try {
-        dataArray = await fetchHistoryViaCoqlV8(recordId, 2000, 0);
-      } catch (coqlError) {
-        console.warn("COQL v8 (2000) failed, falling back to 200:", coqlError);
-        // Fallback: try with 200 if 2000 fails (e.g. LIMIT_EXCEEDED, scope issues)
-        dataArray = await fetchHistoryViaCoqlV8(recordId, 200, 0);
+      // const { data } = await zohoApi.record.getRecordsFromRelatedList({
+      //   module,
+      //   recordId,
+      //   RelatedListAPI: "History3",
+      // });
+
+      var config = {
+        "select_query": `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date,Contact_History_Info.Stakeholder  from History_X_Contacts where Contact_Details = '${recordId}' limit 200`
       }
+      debug.coql = { select_query: config.select_query };
+      const tCoql0 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      const { data } = await ZOHO.CRM.API.coql(config);
+      const tCoql1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      debug.stepsMs.coql = Math.round((tCoql1 - tCoql0) * 100) / 100;
 
-      dataArray = Array.isArray(dataArray) ? dataArray : [];
+      const dataArray = Array.isArray(data) ? data : [];
+      debug.counts.coqlRows = dataArray.length;
+      debug.coql.sample = dataArray[0] || null;
 
+
+      console.log("dataArray 2026", dataArray);
+
+
+      const tUsers0 = typeof performance !== "undefined" ? performance.now() : Date.now();
       const usersResponse = await ZOHO.CRM.API.getAllUsers({
         Type: "AllUsers",
       });
+      const tUsers1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      debug.stepsMs.getAllUsers = Math.round((tUsers1 - tUsers0) * 100) / 100;
+
 
       const validUsers = usersResponse?.users?.filter(
         (user) => user?.full_name && user?.id
       );
       setOwnerList(validUsers || []);
+      debug.users = {
+        total: usersResponse?.users?.length ?? null,
+        valid: validUsers?.length ?? null,
+        sample: validUsers?.[0] || null,
+      };
 
+      const tMe0 = typeof performance !== "undefined" ? performance.now() : Date.now();
       const currentUserResponse = await ZOHO.CRM.CONFIG.getCurrentUser();
+      const tMe1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      debug.stepsMs.getCurrentUser = Math.round((tMe1 - tMe0) * 100) / 100;
       const currentUser = currentUserResponse?.users?.[0] || null;
       setLoggedInUser(currentUser);
+      debug.currentUser = currentUser
+        ? { id: currentUser.id, full_name: currentUser.full_name }
+        : null;
 
       // Initialize filterOwner with logged-in user by default
       if (currentUser?.full_name) {
@@ -281,16 +492,25 @@ const App = () => {
         setSelectedOwner(currentUser);
       }
 
+      const tContact0 = typeof performance !== "undefined" ? performance.now() : Date.now();
       const currentContactResponse = await ZOHO.CRM.API.getRecord({
         Entity: "Contacts",
         approved: "both",
         RecordID: recordId,
       });
+      const tContact1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      debug.stepsMs.getContact = Math.round((tContact1 - tContact0) * 100) / 100;
 
-      const contactData = currentContactResponse?.data?.[0] || null;
-      setCurrentContact(contactData);
-      if (contactData) {
-        setCurrentGlobalContact(contactData);
+      console.log("currentContactData", currentContactResponse);
+      setCurrentContact(currentContactResponse?.data?.[0] || null);
+      debug.contact = {
+        RecordID: recordId,
+        found: !!currentContactResponse?.data?.[0],
+        sample: currentContactResponse?.data?.[0] || null,
+      };
+
+      if (currentContact) {
+        setCurrentGlobalContact(currentContact);
       }
 
 
@@ -337,6 +557,7 @@ const App = () => {
       const allCachedRecords = getAllRecordsFromCache();
       setRelatedListData(allCachedRecords);
       setCacheVersion(prev => prev + 1); // Force re-render
+      debug.counts.cacheSize = allCachedRecords.length;
 
       const types = dataArray
         ?.map((el) => el.History_Type)
@@ -372,6 +593,14 @@ const App = () => {
       setTypeList(sortedTypesWithAdditional);
 
       setInitPageContent(null);
+      const t1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      debug.finishedAt = new Date().toISOString();
+      debug.totalMs = Math.round((t1 - t0) * 100) / 100;
+      setDebugInfo((prev) => ({
+        ...prev,
+        lastDefaultFetch: debug,
+        updatedAt: new Date().toISOString(),
+      }));
     } catch (error) {
       console.error("Error fetching data:", error);
       if (options.isBackground) {
@@ -379,6 +608,15 @@ const App = () => {
       } else {
         setInitPageContent("Error loading data.");
       }
+      const t1 = typeof performance !== "undefined" ? performance.now() : Date.now();
+      debug.finishedAt = new Date().toISOString();
+      debug.totalMs = Math.round((t1 - t0) * 100) / 100;
+      debug.error = { message: error?.message || String(error) };
+      setDebugInfo((prev) => ({
+        ...prev,
+        lastDefaultFetch: debug,
+        updatedAt: new Date().toISOString(),
+      }));
     }
   };
 
@@ -910,6 +1148,18 @@ const App = () => {
                     <Button
                       size="small"
                       variant="outlined"
+                      onClick={() => setShowDebugPanel((v) => !v)}
+                      sx={{
+                        fontSize: "9pt",
+                        padding: "2px 8px",
+                        minHeight: "24px",
+                      }}
+                    >
+                      {showDebugPanel ? "Hide Debug" : "Show Debug"}
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="outlined"
                       onClick={handleClearFilters}
                       sx={{
                         fontSize: "9pt",
@@ -966,6 +1216,46 @@ const App = () => {
                 </Box>
               </Paper>
             </Grid>
+            {showDebugPanel && (
+              <Grid item xs={12}>
+                <Paper sx={{ p: 1.5, mt: 1, fontSize: "9pt" }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
+                    <Box>
+                      <strong>Debug</strong>{" "}
+                      <span style={{ color: "#666" }}>
+                        (updated: {debugInfo.updatedAt || "—"})
+                      </span>
+                    </Box>
+                    <Box sx={{ color: "#666" }}>
+                      cache: {getAllRecordsFromCache().length} • relatedListData: {relatedListData.length} • filtered: {filteredData.length}
+                    </Box>
+                  </Box>
+                  <Box sx={{ mt: 1 }}>
+                    <strong>Active filters</strong>
+                    <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+{stringifyForUi({
+  dateRange,
+  filterOwner: filterOwner.map((o) => ({ id: o?.id, full_name: o?.full_name })),
+  filterType,
+  keyword,
+})}
+                    </pre>
+                  </Box>
+                  <Box sx={{ mt: 1 }}>
+                    <strong>Last default fetch (COQL)</strong>
+                    <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+{stringifyForUi(debugInfo.lastDefaultFetch)}
+                    </pre>
+                  </Box>
+                  <Box sx={{ mt: 1 }}>
+                    <strong>Last custom fetch (Search API)</strong>
+                    <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+{stringifyForUi(debugInfo.lastCustomFetch)}
+                    </pre>
+                  </Box>
+                </Paper>
+              </Grid>
+            )}
           </Grid>
         ) : (
           <Grid container spacing={2}>
@@ -1147,6 +1437,46 @@ const App = () => {
                 </Table>
               </TableContainer>
             </Box>
+            {showDebugPanel && (
+              <Box mt={1} width="100%">
+                <Paper sx={{ p: 1.5, fontSize: "9pt" }}>
+                  <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
+                    <Box>
+                      <strong>Debug</strong>{" "}
+                      <span style={{ color: "#666" }}>
+                        (updated: {debugInfo.updatedAt || "—"})
+                      </span>
+                    </Box>
+                    <Box sx={{ color: "#666" }}>
+                      cache: {getAllRecordsFromCache().length} • relatedListData: {relatedListData.length} • filtered: {filteredData.length}
+                    </Box>
+                  </Box>
+                  <Box sx={{ mt: 1 }}>
+                    <strong>Active filters</strong>
+                    <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+{stringifyForUi({
+  dateRange,
+  filterOwner: filterOwner.map((o) => ({ id: o?.id, full_name: o?.full_name })),
+  filterType,
+  keyword,
+})}
+                    </pre>
+                  </Box>
+                  <Box sx={{ mt: 1 }}>
+                    <strong>Last default fetch (COQL)</strong>
+                    <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+{stringifyForUi(debugInfo.lastDefaultFetch)}
+                    </pre>
+                  </Box>
+                  <Box sx={{ mt: 1 }}>
+                    <strong>Last custom fetch (Search API)</strong>
+                    <pre style={{ margin: 0, whiteSpace: "pre-wrap" }}>
+{stringifyForUi(debugInfo.lastCustomFetch)}
+                    </pre>
+                  </Box>
+                </Paper>
+              </Box>
+            )}
           </Grid>
         )}
       </Box>
@@ -1264,19 +1594,24 @@ const App = () => {
               onClick={() => setIsCustomRangeDialogOpen(false)}
               color="secondary"
               size="small"
+              disabled={isCustomRangeApplying}
             >
               Cancel
             </Button>
             <Button
-              onClick={() => {
+              onClick={async () => {
                 // ============================================================================
-                // STEP 6: Custom Date Range Handler (client-side filtering only)
+                // STEP 6: Custom Date Range Handler
                 // ============================================================================
+                if (isCustomRangeApplying) return;
+                setIsCustomRangeApplying(true);
+
                 // Validate dates are selected
                 if (!customRange.startDate || !customRange.endDate) {
                   enqueueSnackbar("Please select both start and end dates.", {
                     variant: "warning",
                   });
+                  setIsCustomRangeApplying(false);
                   return;
                 }
 
@@ -1285,32 +1620,145 @@ const App = () => {
                   enqueueSnackbar("End date must be after start date.", {
                     variant: "warning",
                   });
+                  setIsCustomRangeApplying(false);
                   return;
                 }
 
-                // Client-side filtering only - no API call
-                // We already have up to 2000 records in cache from initial COQL v8 fetch
-                const formattedStart = dayjs(customRange.startDate).format("DD/MM/YYYY");
-                const formattedEnd = dayjs(customRange.endDate).format("DD/MM/YYYY");
+                try {
+                  // Normalize the dayjs objects from the picker into Date objects
+                  // DatePicker returns dayjs objects, convert to Date with proper time
+                  const startDayjs = dayjs(customRange.startDate);
+                  const endDayjs = dayjs(customRange.endDate);
 
-                const newCustomRangeObject = {
-                  startDate: customRange.startDate,
-                  endDate: customRange.endDate,
-                  label: `${formattedStart} - ${formattedEnd}`,
-                };
+                  // Create Date objects at start and end of day
+                  const beginDate = startDayjs.startOf("day").toDate();
+                  const closeDate = endDayjs.endOf("day").toDate();
 
-                setDateRange(newCustomRangeObject);
-                setIsCustomRangeDialogOpen(false);
+                  // Fetch data using Search API pattern
+                  setInitPageContent(<CircularProgress />);
+                  const searchResults = await fetchHistoryFromZoho(beginDate, closeDate, recordId);
 
-                // Snackbar will show filtered count after next render (filteredData updates)
-                enqueueSnackbar("Date range filter applied (client-side).", {
-                  variant: "success",
-                });
+                  // Process the results using the same mapping logic as fetchRLData
+                  if (searchResults && searchResults.length > 0) {
+                    // Debug: inspect what we got back from Zoho
+                    console.log("[Custom Range] Raw searchResults:", {
+                      count: searchResults.length,
+                      first: searchResults[0],
+                      all: searchResults,
+                    });
+
+                    const tempData = searchResults.map((obj) => {
+                      const ownerFirst = obj["Owner.first_name"] || "";
+                      const ownerLast = obj["Owner.last_name"] || "";
+                      const ownerName = `${ownerFirst} ${ownerLast}`.trim() || "Unknown Owner";
+
+                      return {
+                        name: obj["Contact_Details.Full_Name"] || "No Name",
+                        id: obj?.id,
+                        date_time: obj["Contact_History_Info.Date"] || "No Date",
+                        type: obj["Contact_History_Info.History_Type"] || "Unknown Type",
+                        result: obj["Contact_History_Info.History_Result"] || "No Result",
+                        duration: obj["Contact_History_Info.Duration"] || "N/A",
+                        regarding: obj["Contact_History_Info.Regarding"] || "No Regarding",
+                        details: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
+                        icon: <DownloadIcon />,
+                        ownerName: ownerName,
+                        historyDetails: {
+                          id: obj["Contact_History_Info.id"],
+                          text: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
+                        },
+                        stakeHolder: (() => {
+                          const stakeholder = obj["Contact_History_Info.Stakeholder"];
+                          if (stakeholder && typeof stakeholder === "object" && stakeholder.id) {
+                            return {
+                              id: stakeholder.id,
+                              name: stakeholder.Account_Name || stakeholder.name || "",
+                            };
+                          }
+                          return null;
+                        })(),
+                        history_id: obj["Contact_History_Info.id"]
+                      };
+                    });
+
+                    // Debug: inspect mapped records used by the UI/table
+                    console.log("[Custom Range] Mapped tempData (table rows):", {
+                      count: tempData.length,
+                      first: tempData[0],
+                      all: tempData,
+                    });
+
+                    // Merge new records into global cache instead of replacing
+                    mergeRecordsIntoCache(tempData || []);
+
+                    // Update state from cache to trigger re-render
+                    const allCachedRecords = getAllRecordsFromCache();
+                    console.log("[Custom Range] Cache after merge:", {
+                      count: allCachedRecords.length,
+                      first: allCachedRecords[0],
+                    });
+                    setRelatedListData(allCachedRecords);
+                    setCacheVersion(prev => prev + 1);
+                    setInitPageContent(null);
+
+                    // WHEN SETTING STATE:
+                    const formattedStart = dayjs(customRange.startDate).format("DD/MM/YYYY");
+                    const formattedEnd = dayjs(customRange.endDate).format("DD/MM/YYYY");
+
+                    // Construct the object exactly how the Autocomplete expects it
+                    const newCustomRangeObject = {
+                      startDate: customRange.startDate,
+                      endDate: customRange.endDate,
+                      label: `${formattedStart} - ${formattedEnd}`, // This prevents [object Object]
+                      custom: true // Helper flag for your filter logic
+                    };
+
+                    setDateRange(newCustomRangeObject);
+
+                    enqueueSnackbar(`Found ${tempData.length} records for the selected date range.`, {
+                      variant: "success",
+                    });
+                  } else {
+                    // No new records found, but keep existing cache
+                    setInitPageContent(null);
+                    enqueueSnackbar("No new records found for the selected date range.", {
+                      variant: "info",
+                    });
+
+                    // Still set the dateRange for display
+                    const formattedStart = dayjs(customRange.startDate).format("DD/MM/YYYY");
+                    const formattedEnd = dayjs(customRange.endDate).format("DD/MM/YYYY");
+
+                    setDateRange({
+                      startDate: customRange.startDate,
+                      endDate: customRange.endDate,
+                      label: `${formattedStart} - ${formattedEnd}`,
+                    });
+                  }
+
+                  setIsCustomRangeDialogOpen(false);
+                } catch (error) {
+                  console.error("Error fetching custom date range:", error);
+                  setInitPageContent("Error loading data.");
+                  enqueueSnackbar("Failed to fetch records for the selected date range.", {
+                    variant: "error",
+                  });
+                } finally {
+                  setIsCustomRangeApplying(false);
+                }
               }}
               color="primary"
               size="small"
+              disabled={isCustomRangeApplying}
             >
-              Apply
+              {isCustomRangeApplying ? (
+                <>
+                  <CircularProgress size={16} color="inherit" sx={{ mr: 1 }} />
+                  Apply
+                </>
+              ) : (
+                "Apply"
+              )}
             </Button>
           </DialogActions>
         </MUIDialog>

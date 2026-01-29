@@ -38,25 +38,15 @@ dayjs.extend(timezone);
 
 const ZOHO = window.ZOHO;
 
-// ============================================================================
-// STEP 3: Date Formatting Utility
-// ============================================================================
 // Date formatter for Zoho API (handles timezone offsets correctly)
-// Formats dates in ISO 8601 format with timezone offset for Zoho API
-// Output example: 2020-12-09T17:25:24-07:00 (uses the current PC/browser timezone offset)
-// If hours/minutes/seconds are NOT provided, it uses the Date object's local time.
-const formatDateForZoho = (date, hours, minutes, seconds) => {
+const formatDateForZoho = (date, hours = 0, minutes = 0, seconds = 0) => {
   if (!date || isNaN(date.getTime())) return null;
   const pad = (num) => String(num).padStart(2, "0");
-
-  const h = hours ?? date.getHours();
-  const m = minutes ?? date.getMinutes();
-  const s = seconds ?? date.getSeconds();
 
   const year = date.getFullYear();
   const month = pad(date.getMonth() + 1);
   const day = pad(date.getDate());
-  const formattedTime = `${pad(h)}:${pad(m)}:${pad(s)}`;
+  const formattedTime = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
 
   // Handles Timezone Offset correctly (e.g., +05:30)
   const timezoneOffset = -date.getTimezoneOffset();
@@ -93,15 +83,12 @@ const dateOptions = [
   { label: "Custom Range", customRange: true },
 ];
 
-// ============================================================================
-// STEP 1: Global Cache System
-// ============================================================================
-// Map-based global cache that persists across filter changes and component re-renders
+// Global cache to store all fetched history records
 // Key: record ID (junction ID), Value: record data
+// This persists across filter changes and component re-renders
 const globalHistoryCache = new Map();
 
 // Helper function to merge new records into the global cache
-// Records are merged (not replaced) when new data is fetched
 const mergeRecordsIntoCache = (newRecords) => {
   if (!Array.isArray(newRecords)) return;
 
@@ -122,14 +109,10 @@ const getAllRecordsFromCache = () => {
 };
 
 // Helper function to clear cache (useful for reset or when contact changes)
-// Cache is cleared when contact changes to avoid mixing data from different contacts
 const clearHistoryCache = () => {
   globalHistoryCache.clear();
 };
 
-// ============================================================================
-// STEP 2: Component State Management
-// ============================================================================
 const App = () => {
   const { module, recordId } = useZohoInit();
   const { enqueueSnackbar } = useSnackbar();
@@ -139,8 +122,6 @@ const App = () => {
   // relatedListData now reads from cache, but we keep state for reactivity
   const [relatedListData, setRelatedListData] = React.useState([]);
   const [cacheVersion, setCacheVersion] = React.useState(0); // Force re-render when cache updates
-  
-  // Filter states
   const [, setSelectedRecordId] = React.useState(null);
   const [openEditDialog, setOpenEditDialog] = React.useState(false);
   const [openCreateDialog, setOpenCreateDialog] = React.useState(false);
@@ -208,63 +189,154 @@ const App = () => {
     // setDetails(""); // Clear the details field
   };
 
-  // ============================================================================
-  // COQL v8 Fetch Helper (up to 2000 records in one call)
-  // ============================================================================
-  /**
-   * Fetch History_X_Contacts via COQL v8 API (up to 2000 records in one call)
-   * Uses CONNECTION.invoke POST to {dataCenter}/crm/v8/coql
-   * @param {string} contactId - Contact record ID (from widget context)
-   * @param {number} [limit=2000] - Max records (v8 allows up to 2000)
-   * @param {number} [offset=0] - Pagination offset
-   * @returns {Promise<Array>} - Array of junction records
-   */
-  const fetchHistoryViaCoqlV8 = async (contactId, limit = 2000, offset = 0) => {
-    const selectQuery = `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date,Contact_History_Info.Stakeholder from History_X_Contacts where Contact_Details = '${contactId}' LIMIT ${offset}, ${limit}`;
+  // Fetch History records using Search API with custom date range
+  const fetchHistoryFromZoho = async (beginDate, closeDate, contactId) => {
+    // Format the dates using the helper
+    const formattedBegin = formatDateForZoho(beginDate, 0, 0, 0);
+    const formattedClose = formatDateForZoho(closeDate, 23, 59, 59);
 
-    const req_data = {
-      url: `${dataCenterMap.AU}/crm/v8/coql`,
-      method: "POST",
-      param_type: 2, // Send parameters in request body (payload)
-      parameters: { select_query: selectQuery },
-    };
-
-    const response = await ZOHO.CRM.CONNECTION.invoke(conn_name, req_data);
-
-    // Handle response format (may vary: data vs details.statusMessage.data)
-    let data = [];
-    if (response?.data) {
-      data = Array.isArray(response.data) ? response.data : [];
-    } else if (response?.details?.statusMessage?.data) {
-      data = Array.isArray(response.details.statusMessage.data)
-        ? response.details.statusMessage.data
-        : [];
+    if (!formattedBegin || !formattedClose) {
+      throw new Error("Invalid date range provided");
     }
 
-    return data;
+    let allHistoryRecords = [];
+    let currentPage = 1;
+    let hasMoreRecords = true;
+    const recordsPerPage = 100;
+
+    // --- STEP 1: Fetch History Records by Date ---
+    // Try Date field first, fallback to Created_Time
+    let searchCriteria = `((Date:greater_equal:${encodeURIComponent(formattedBegin)})and(Date:less_equal:${encodeURIComponent(formattedClose)}))`;
+
+    while (hasMoreRecords && currentPage < 11) {
+      const req_data = {
+        url: `${dataCenterMap.AU}/crm/v3/History1/search?criteria=${searchCriteria}&per_page=${recordsPerPage}&page=${currentPage}`,
+        method: "GET",
+        param_type: 1,
+      };
+
+      try {
+        const data = await ZOHO.CRM.CONNECTION.invoke(conn_name, req_data);
+        let pageResults = [];
+        let moreRecords = false;
+
+        if (data?.details?.statusMessage?.data) {
+          pageResults = data.details.statusMessage.data;
+          moreRecords = data.details.statusMessage.info?.more_records || false;
+        } else if (data?.data) {
+          pageResults = Array.isArray(data.data) ? data.data : [];
+          moreRecords = data.info?.more_records || false;
+        }
+
+        allHistoryRecords = [...allHistoryRecords, ...pageResults];
+        hasMoreRecords = moreRecords;
+        currentPage++;
+      } catch (error) {
+        if (currentPage === 1 && error.message?.includes("Date")) {
+          console.warn("Date field not found, trying Created_Time field");
+          searchCriteria = `((Created_Time:greater_equal:${encodeURIComponent(formattedBegin)})and(Created_Time:less_equal:${encodeURIComponent(formattedClose)}))`;
+          currentPage = 1;
+          continue;
+        }
+        console.error("Pagination error:", error);
+        hasMoreRecords = false;
+      }
+    }
+
+    // --- STEP 2: Fetch ALL Linked Junction Records (The Fix) ---
+    if (contactId && allHistoryRecords.length > 0) {
+      let allJunctionRecords = [];
+      let jPage = 1;
+      let jHasMore = true;
+
+      // Loop to get ALL pages of related records, not just the first 200
+      while (jHasMore) {
+        try {
+          const junctionResponse = await ZOHO.CRM.API.getRelatedRecords({
+            Entity: "Contacts",
+            RecordID: contactId,
+            RelatedList: "History3", // Verify this API name is correct
+            page: jPage,
+            per_page: 200,
+          });
+
+          const pageData = junctionResponse?.data || [];
+          allJunctionRecords = [...allJunctionRecords, ...pageData];
+
+          // Check if there are more records
+          if (pageData.length < 200 || !junctionResponse?.info?.more_records) {
+            jHasMore = false;
+          } else {
+            jPage++;
+          }
+        } catch (err) {
+          console.error("Error fetching related list page " + jPage, err);
+          jHasMore = false;
+        }
+      }
+
+      // Create a Set of valid History IDs linked to this contact
+      const contactHistoryIds = new Set(
+        allJunctionRecords.map(j => j.Contact_History_Info?.id).filter(Boolean)
+      );
+
+      // Filter fetched history to only those linked to this contact
+      allHistoryRecords = allHistoryRecords.filter(h => contactHistoryIds.has(h.id));
+
+      const historyMap = new Map(allHistoryRecords.map(h => [h.id, h]));
+
+      // Map the final data structure
+      return allJunctionRecords
+        .filter(j => historyMap.has(j.Contact_History_Info?.id))
+        .map(junction => {
+          const history = historyMap.get(junction.Contact_History_Info.id);
+          const historyDate = history.Date || history.Created_Time || "No Date";
+
+          return {
+            id: junction.id,
+            "Contact_Details.Full_Name": junction.Contact_Details?.name || "No Name",
+            "Contact_History_Info.id": history.id,
+            "Contact_History_Info.Date": historyDate,
+            "Contact_History_Info.History_Type": history.History_Type || "Unknown Type",
+            "Contact_History_Info.History_Result": history.History_Result || "No Result",
+            "Contact_History_Info.Duration": history.Duration || "N/A",
+            "Contact_History_Info.Regarding": history.Regarding || "No Regarding",
+            "Contact_History_Info.History_Details_Plain": history.History_Details_Plain || history.History_Details || "No Details",
+            "Contact_History_Info.Stakeholder": history.Stakeholder || null,
+            "Owner.first_name": history.Owner?.first_name || "",
+            "Owner.last_name": history.Owner?.last_name || "",
+            History_Type: history.History_Type,
+          };
+        });
+    }
+
+    return [];
   };
 
-  // ============================================================================
-  // STEP 4: Default Data Fetching (COQL v8)
-  // ============================================================================
-  // Default fetch uses COQL v8 to get up to 2000 related list records from History_X_Contacts
   const fetchRLData = async (options = {}) => {
     if (!module || !recordId) return;
     try {
-      let dataArray = [];
-      try {
-        dataArray = await fetchHistoryViaCoqlV8(recordId, 2000, 0);
-      } catch (coqlError) {
-        console.warn("COQL v8 (2000) failed, falling back to 200:", coqlError);
-        // Fallback: try with 200 if 2000 fails (e.g. LIMIT_EXCEEDED, scope issues)
-        dataArray = await fetchHistoryViaCoqlV8(recordId, 200, 0);
-      }
+      // const { data } = await zohoApi.record.getRecordsFromRelatedList({
+      //   module,
+      //   recordId,
+      //   RelatedListAPI: "History3",
+      // });
 
-      dataArray = Array.isArray(dataArray) ? dataArray : [];
+      var config = {
+        "select_query": `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date,Contact_History_Info.Stakeholder  from History_X_Contacts where Contact_Details = '${recordId}' limit 200`
+      }
+      const { data } = await ZOHO.CRM.API.coql(config);
+
+      const dataArray = Array.isArray(data) ? data : [];
+
+
+      console.log("dataArray 2026", dataArray);
+
 
       const usersResponse = await ZOHO.CRM.API.getAllUsers({
         Type: "AllUsers",
       });
+
 
       const validUsers = usersResponse?.users?.filter(
         (user) => user?.full_name && user?.id
@@ -287,10 +359,11 @@ const App = () => {
         RecordID: recordId,
       });
 
-      const contactData = currentContactResponse?.data?.[0] || null;
-      setCurrentContact(contactData);
-      if (contactData) {
-        setCurrentGlobalContact(contactData);
+      console.log("currentContactData", currentContactResponse);
+      setCurrentContact(currentContactResponse?.data?.[0] || null);
+
+      if (currentContact) {
+        setCurrentGlobalContact(currentContact);
       }
 
 
@@ -382,9 +455,6 @@ const App = () => {
     }
   };
 
-  // ============================================================================
-  // Initialization Effect: Fetch data when contact changes
-  // ============================================================================
   React.useEffect(() => {
     if (module && recordId) {
       // Clear cache when contact changes to avoid mixing data from different contacts
@@ -396,9 +466,7 @@ const App = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchRLData is stable, avoid refetch loop
   }, [module, recordId]);
 
-  // ============================================================================
-  // Cache Synchronization Effect: Sync state with cache when cacheVersion changes
-  // ============================================================================
+  // Sync relatedListData with cache whenever cacheVersion changes
   React.useEffect(() => {
     const allCachedRecords = getAllRecordsFromCache();
     setRelatedListData(allCachedRecords);
@@ -406,9 +474,6 @@ const App = () => {
 
   const [highlightedRecordId, setHighlightedRecordId] = React.useState(null);
 
-  // ============================================================================
-  // STEP 8: Record Updates and Additions
-  // ============================================================================
   const handleRecordAdded = (newRecord) => {
     // Normalize the new record to match the existing structure
     let participantsArray = [];
@@ -470,7 +535,6 @@ const App = () => {
     setDetails(currentDetails || "No Details");
   };
 
-  // Update existing record in cache
   const handleRecordUpdate = (updatedRecord) => {
     console.log("Updated before by maddie:", updatedRecord);
 
@@ -516,10 +580,7 @@ const App = () => {
     fetchRLData({ isBackground: true });
   };
 
-  // ============================================================================
-  // STEP 7: Reactive Filtering Logic
-  // ============================================================================
-  // Filtering happens client-side using useMemo that reads from the global cache
+  // Reactive filtering with useMemo for performance
   // Always filter from the global cache to ensure we have all data
   const filteredData = React.useMemo(() => {
     // Get all records from cache (includes all previously fetched data)
@@ -581,9 +642,6 @@ const App = () => {
     });
   }, [cacheVersion, filterOwner, filterType, dateRange, keyword]); // Use cacheVersion to react to cache updates
 
-  // ============================================================================
-  // STEP 11: Active Filter Summary
-  // ============================================================================
   // Get active filter names for summary display
   const activeFilterNames = React.useMemo(() => {
     const activeFilters = [];
@@ -613,11 +671,8 @@ const App = () => {
     return activeFilters;
   }, [dateRange, filterType, filterOwner, ownerList.length, keyword]);
 
-  // ============================================================================
-  // STEP 9: Clear Filters Function
-  // ============================================================================
+  // Clear all filters function
   // Note: This clears filters but keeps the cache intact
-  // Cache remains intact - filteredData will show all cached records when filters are cleared
   const handleClearFilters = React.useCallback(() => {
     setFilterType([]);
     // Reset owner filter to logged-in user only (default state)
@@ -906,20 +961,18 @@ const App = () => {
                   )}
                 </Box>
                 {(activeFilterNames.length > 0 || keyword.trim()) && (
-                  <Box sx={{ display: "flex", gap: 1, alignItems: "center" }}>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={handleClearFilters}
-                      sx={{
-                        fontSize: "9pt",
-                        padding: "2px 8px",
-                        minHeight: "24px",
-                      }}
-                    >
-                      Clear Filters
-                    </Button>
-                  </Box>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={handleClearFilters}
+                    sx={{
+                      fontSize: "9pt",
+                      padding: "2px 8px",
+                      minHeight: "24px",
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
                 )}
               </Box>
             </Grid>
@@ -1268,10 +1321,7 @@ const App = () => {
               Cancel
             </Button>
             <Button
-              onClick={() => {
-                // ============================================================================
-                // STEP 6: Custom Date Range Handler (client-side filtering only)
-                // ============================================================================
+              onClick={async () => {
                 // Validate dates are selected
                 if (!customRange.startDate || !customRange.endDate) {
                   enqueueSnackbar("Please select both start and end dates.", {
@@ -1288,24 +1338,126 @@ const App = () => {
                   return;
                 }
 
-                // Client-side filtering only - no API call
-                // We already have up to 2000 records in cache from initial COQL v8 fetch
-                const formattedStart = dayjs(customRange.startDate).format("DD/MM/YYYY");
-                const formattedEnd = dayjs(customRange.endDate).format("DD/MM/YYYY");
+                try {
+                  // Normalize the dayjs objects from the picker into Date objects
+                  // DatePicker returns dayjs objects, convert to Date with proper time
+                  const startDayjs = dayjs(customRange.startDate);
+                  const endDayjs = dayjs(customRange.endDate);
 
-                const newCustomRangeObject = {
-                  startDate: customRange.startDate,
-                  endDate: customRange.endDate,
-                  label: `${formattedStart} - ${formattedEnd}`,
-                };
+                  // Create Date objects at start and end of day
+                  const beginDate = startDayjs.startOf("day").toDate();
+                  const closeDate = endDayjs.endOf("day").toDate();
 
-                setDateRange(newCustomRangeObject);
-                setIsCustomRangeDialogOpen(false);
+                  // Fetch data using Search API pattern
+                  setInitPageContent(<CircularProgress />);
+                  const searchResults = await fetchHistoryFromZoho(beginDate, closeDate, recordId);
 
-                // Snackbar will show filtered count after next render (filteredData updates)
-                enqueueSnackbar("Date range filter applied (client-side).", {
-                  variant: "success",
-                });
+                  // Process the results using the same mapping logic as fetchRLData
+                  if (searchResults && searchResults.length > 0) {
+                    // Debug: inspect what we got back from Zoho
+                    console.log("[Custom Range] Raw searchResults:", {
+                      count: searchResults.length,
+                      first: searchResults[0],
+                      all: searchResults,
+                    });
+
+                    const tempData = searchResults.map((obj) => {
+                      const ownerFirst = obj["Owner.first_name"] || "";
+                      const ownerLast = obj["Owner.last_name"] || "";
+                      const ownerName = `${ownerFirst} ${ownerLast}`.trim() || "Unknown Owner";
+
+                      return {
+                        name: obj["Contact_Details.Full_Name"] || "No Name",
+                        id: obj?.id,
+                        date_time: obj["Contact_History_Info.Date"] || "No Date",
+                        type: obj["Contact_History_Info.History_Type"] || "Unknown Type",
+                        result: obj["Contact_History_Info.History_Result"] || "No Result",
+                        duration: obj["Contact_History_Info.Duration"] || "N/A",
+                        regarding: obj["Contact_History_Info.Regarding"] || "No Regarding",
+                        details: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
+                        icon: <DownloadIcon />,
+                        ownerName: ownerName,
+                        historyDetails: {
+                          id: obj["Contact_History_Info.id"],
+                          text: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
+                        },
+                        stakeHolder: (() => {
+                          const stakeholder = obj["Contact_History_Info.Stakeholder"];
+                          if (stakeholder && typeof stakeholder === "object" && stakeholder.id) {
+                            return {
+                              id: stakeholder.id,
+                              name: stakeholder.Account_Name || stakeholder.name || "",
+                            };
+                          }
+                          return null;
+                        })(),
+                        history_id: obj["Contact_History_Info.id"]
+                      };
+                    });
+
+                    // Debug: inspect mapped records used by the UI/table
+                    console.log("[Custom Range] Mapped tempData (table rows):", {
+                      count: tempData.length,
+                      first: tempData[0],
+                      all: tempData,
+                    });
+
+                    // Merge new records into global cache instead of replacing
+                    mergeRecordsIntoCache(tempData || []);
+
+                    // Update state from cache to trigger re-render
+                    const allCachedRecords = getAllRecordsFromCache();
+                    console.log("[Custom Range] Cache after merge:", {
+                      count: allCachedRecords.length,
+                      first: allCachedRecords[0],
+                    });
+                    setRelatedListData(allCachedRecords);
+                    setCacheVersion(prev => prev + 1);
+                    setInitPageContent(null);
+
+                    // WHEN SETTING STATE:
+                    const formattedStart = dayjs(customRange.startDate).format("DD/MM/YYYY");
+                    const formattedEnd = dayjs(customRange.endDate).format("DD/MM/YYYY");
+
+                    // Construct the object exactly how the Autocomplete expects it
+                    const newCustomRangeObject = {
+                      startDate: customRange.startDate,
+                      endDate: customRange.endDate,
+                      label: `${formattedStart} - ${formattedEnd}`, // This prevents [object Object]
+                      custom: true // Helper flag for your filter logic
+                    };
+
+                    setDateRange(newCustomRangeObject);
+
+                    enqueueSnackbar(`Found ${tempData.length} records for the selected date range.`, {
+                      variant: "success",
+                    });
+                  } else {
+                    // No new records found, but keep existing cache
+                    setInitPageContent(null);
+                    enqueueSnackbar("No new records found for the selected date range.", {
+                      variant: "info",
+                    });
+
+                    // Still set the dateRange for display
+                    const formattedStart = dayjs(customRange.startDate).format("DD/MM/YYYY");
+                    const formattedEnd = dayjs(customRange.endDate).format("DD/MM/YYYY");
+
+                    setDateRange({
+                      startDate: customRange.startDate,
+                      endDate: customRange.endDate,
+                      label: `${formattedStart} - ${formattedEnd}`,
+                    });
+                  }
+
+                  setIsCustomRangeDialogOpen(false);
+                } catch (error) {
+                  console.error("Error fetching custom date range:", error);
+                  setInitPageContent("Error loading data.");
+                  enqueueSnackbar("Failed to fetch records for the selected date range.", {
+                    variant: "error",
+                  });
+                }
               }}
               color="primary"
               size="small"
