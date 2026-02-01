@@ -3,8 +3,8 @@ import { FormControl, InputLabel, Select, MenuItem, TextField, Box } from "@mui/
 import { getRegardingOptions } from "./helperFunc";
 
 const RegardingField = ({ formData, handleInputChange, selectedRowData }) => {
-  const existingValue = selectedRowData?.regarding || formData.regarding;
-  const predefinedOptions = getRegardingOptions(formData.type, existingValue);
+  const existingValue = selectedRowData?.regarding || formData?.regarding || "";
+  const predefinedOptions = getRegardingOptions(formData?.type, existingValue) || ["General"];
 
   const [selectedValue, setSelectedValue] = useState("");
   const [manualInput, setManualInput] = useState("");
@@ -66,7 +66,7 @@ const RegardingField = ({ formData, handleInputChange, selectedRowData }) => {
           onChange={handleSelectChange}
           sx={{ "& .MuiInputBase-root": { padding: "0 !important" }, fontSize: "9pt" }}
         >
-          {predefinedOptions.map((option) => (
+          {(Array.isArray(predefinedOptions) ? predefinedOptions : []).map((option) => (
             <MenuItem key={option} value={option} sx={{ fontSize: "9pt" }}>
               {option}
             </MenuItem>

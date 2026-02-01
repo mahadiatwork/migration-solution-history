@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import dayjs from "dayjs";
+import { APPLICATIONS_HISTORY_STAKEHOLDER_FIELD } from "../../config/config";
 import {
   Table,
   TableBody,
@@ -13,6 +15,8 @@ import {
   DialogActions,
   Snackbar,
   Alert,
+  CircularProgress,
+  Box,
 } from "@mui/material";
 
 
@@ -53,7 +57,7 @@ const ApplicationTable = ({
           </TableRow>
         </TableHead>
         <TableBody>
-          {applications.map((app) => (
+          {(Array.isArray(applications) ? applications : []).map((app) => (
             <TableRow key={app.id}>
               <TableCell>
                 <Radio
@@ -94,6 +98,7 @@ const ApplicationDialog = ({
   selectedOwner,
 }) => {
   const [selectedApplicationId, setSelectedApplicationId] = useState(null);
+  const [isMoving, setIsMoving] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: "",
@@ -114,39 +119,73 @@ const ApplicationDialog = ({
       return;
     }
 
+    const contacts = Array.isArray(historyContacts) ? historyContacts : [];
+    if (contacts.length === 0) {
+      setSnackbar({
+        open: true,
+        message: "No contacts associated with this history. Please add at least one contact.",
+        severity: "error",
+      });
+      return;
+    }
+
+    if (!selectedRowData) {
+      setSnackbar({
+        open: true,
+        message: "History record data is missing. Please close and try again.",
+        severity: "error",
+      });
+      return;
+    }
+
+    setIsMoving(true);
     try {
-      // Create a new application history in the selected application
+      const firstContactName = contacts[0]?.Full_Name || contacts[0]?.full_name || "Unknown";
+      // Use formData first (current form values), then selectedRowData (original row)
+      const stakeHolder = formData?.stakeHolder ?? selectedRowData?.stakeHolder;
+      const stakeholderId =
+        stakeHolder && typeof stakeHolder === "object"
+          ? stakeHolder.id ?? stakeHolder.Id ?? stakeHolder.ID
+          : null;
+      const stakeholderForApi =
+        stakeholderId != null
+          ? { id: String(stakeholderId) }
+          : null;
+
+      const apiData = {
+        Name: firstContactName,
+        Application: { id: selectedApplicationId },
+        History_Details: formData?.details ?? selectedRowData?.details ?? "",
+        History_Result: formData?.result ?? selectedRowData?.result ?? "",
+        History_Type: formData?.type ?? selectedRowData?.type ?? "",
+        Regarding: formData?.regarding ?? selectedRowData?.regarding ?? "",
+        Duration_Min: formData?.duration ?? selectedRowData?.duration ?? null,
+        Date: (() => {
+          const dt = formData?.date_time ?? selectedRowData?.date_time;
+          return dt ? dayjs(dt).format("YYYY-MM-DDTHH:mm:ssZ") : null;
+        })(),
+        [APPLICATIONS_HISTORY_STAKEHOLDER_FIELD]: stakeholderForApi,
+        Owner: selectedOwner,
+      };
+
       const createApplicationHistory = await ZOHO.CRM.API.insertRecord({
         Entity: "Applications_History",
-        APIData: {
-          Name: historyContacts[0].Full_Name,
-          Application: { id: selectedApplicationId },
-          History_Details: selectedRowData.details,
-          History_Result: selectedRowData.result,
-          History_Type: selectedRowData.type,
-          Regarding: selectedRowData.regarding,
-          Duration_Min: selectedRowData.duration,
-          Date: selectedRowData.date_time,
-          Stakeholder:
-            typeof selectedRowData?.stakeHolder === "object" &&
-            selectedRowData.stakeHolder?.id
-              ? { id: selectedRowData.stakeHolder.id }
-              : null,
-          Owner: selectedOwner,
-        },
+        APIData: apiData,
         Trigger: ["workflow"],
       });
 
       if (createApplicationHistory?.data[0]?.code === "SUCCESS") {
         const newHistoryId = createApplicationHistory.data[0].details.id;
 
-        // Create ApplicationxContacts for all associated contacts
-        for (const contact of historyContacts) {
+        // Create junction records linking Application History to Contacts
+        for (const contact of contacts) {
+          const contactId = contact?.id;
+          if (!contactId) continue;
           await ZOHO.CRM.API.insertRecord({
             Entity: "Application_Hstory",
             APIData: {
               Application_Hstory: { id: newHistoryId },
-              Contact: { id: contact.id },
+              Contact: { id: contactId },
             },
             Trigger: ["workflow"],
           });
@@ -187,10 +226,11 @@ const ApplicationDialog = ({
       console.error("Error moving history:", error);
       setSnackbar({
         open: true,
-        message: "Failed to move history.",
+        message: error?.message || "Failed to move history. Please try again.",
         severity: "error",
       });
     } finally {
+      setIsMoving(false);
       handleApplicationDialogClose();
     }
   };
@@ -209,8 +249,25 @@ const ApplicationDialog = ({
           },
         }}
       >
-        {/* {mahadiContact ? JSON.stringify(mahadiContact) : "No contact selected"} */}
-        <DialogContent>
+        <DialogContent sx={{ position: "relative" }}>
+          {isMoving && (
+            <Box
+              sx={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                backgroundColor: "rgba(255, 255, 255, 0.8)",
+                zIndex: 1,
+              }}
+            >
+              <CircularProgress size={48} />
+            </Box>
+          )}
           <ApplicationTable
             applications={applications}
             selectedApplicationId={selectedApplicationId}
@@ -219,15 +276,20 @@ const ApplicationDialog = ({
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleApplicationDialogClose} color="secondary">
+          <Button
+            onClick={handleApplicationDialogClose}
+            color="secondary"
+            disabled={isMoving}
+          >
             Cancel
           </Button>
           <Button
             onClick={() => handleApplicationSelect(currentContact)}
             color="primary"
-            disabled={!selectedApplicationId} // Disable if no application is selected
+            disabled={!selectedApplicationId || isMoving}
+            startIcon={isMoving ? <CircularProgress size={16} color="inherit" /> : null}
           >
-            Move
+            {isMoving ? "Moving..." : "Move"}
           </Button>
         </DialogActions>
       </MUIDialog>

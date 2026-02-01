@@ -177,12 +177,16 @@ export function Dialog({
           attachment: selectedRowData ? prev?.attachment : undefined,
         };
       });
-      setSelectedContacts(
-        selectedRowData?.Participants || [currentContact] || []
-      );
-      setHistoryName(
-        selectedRowData?.Participants?.map((p) => p.Full_Name).join(", ") || ""
-      );
+      const participants = Array.isArray(selectedRowData?.Participants)
+        ? selectedRowData.Participants.filter((p) => p && (p.id || p.Full_Name))
+        : currentContact
+          ? [currentContact]
+          : [];
+      setSelectedContacts(participants);
+      const names = Array.isArray(selectedRowData?.Participants)
+        ? selectedRowData.Participants.map((p) => p?.Full_Name || "").filter(Boolean).join(", ")
+        : "";
+      setHistoryName(names);
       // setSelectedOwner(loggedInUser || null);
       setSelectedOwner(
         ownerList?.find(
@@ -192,7 +196,11 @@ export function Dialog({
         null
       );
 
-      setHistoryContacts(selectedRowData?.Participants || []);
+      setHistoryContacts(
+        Array.isArray(selectedRowData?.Participants)
+          ? selectedRowData.Participants.filter((p) => p && (p.id || p.Full_Name))
+          : []
+      );
     } else {
       // Reset formData to avoid stale data
       setFormData({});
@@ -212,10 +220,17 @@ export function Dialog({
             per_page: 200,
           });
 
-          const contactDetailsArray = data.data.map((record) => ({
-            Full_Name: record.Contact_Details.name,
-            id: record.Contact_Details.id,
-          }));
+          const dataArray = Array.isArray(data?.data) ? data.data : [];
+          const contactDetailsArray = dataArray
+            .map((record) => {
+              const contact = record?.Contact_Details;
+              if (!contact || !contact.id) return null;
+              return {
+                Full_Name: contact.name || contact.Full_Name || "",
+                id: contact.id,
+              };
+            })
+            .filter(Boolean);
 
           setHistoryContacts(contactDetailsArray);
           setSelectedContacts(contactDetailsArray);
@@ -236,8 +251,10 @@ export function Dialog({
   }, [selectedRowData?.history_id, openDialog]);
 
   React.useEffect(() => {
-    const names = selectedContacts
-      .map((contact) => contact?.Full_Name)
+    const contacts = Array.isArray(selectedContacts) ? selectedContacts : [];
+    const names = contacts
+      .map((contact) => contact?.Full_Name || contact?.full_name || "")
+      .filter(Boolean)
       .join(", ");
     setHistoryName(names);
   }, [selectedContacts]);
@@ -248,21 +265,58 @@ export function Dialog({
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    setIsSubmitting(true);
 
-    let selectedParticipants = [];
-
-    if (formData.Participants) {
-      selectedParticipants = formData.Participants;
+    // Validation: prevent submission with missing required data
+    if (!selectedOwner) {
+      setSnackbar({
+        open: true,
+        message: "Please select a Record Owner before saving.",
+        severity: "error",
+      });
+      return;
     }
 
-    if (selectedParticipants.length === 0) {
+    let selectedParticipants = Array.isArray(formData?.Participants)
+      ? formData.Participants.filter((c) => c && (c.id || c.Full_Name))
+      : [];
+
+    if (selectedParticipants.length === 0 && currentContact) {
       selectedParticipants = [currentContact];
     }
 
+    if (selectedParticipants.length === 0) {
+      setSnackbar({
+        open: true,
+        message: "Please add at least one contact (participant) before saving.",
+        severity: "error",
+      });
+      return;
+    }
+
+    if (!formData?.type?.trim()) {
+      setSnackbar({
+        open: true,
+        message: "Please select a Type before saving.",
+        severity: "error",
+      });
+      return;
+    }
+
+    if (!formData?.result?.trim()) {
+      setSnackbar({
+        open: true,
+        message: "Please select a Result before saving.",
+        severity: "error",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
     // Generate history name based on selected contacts
     const updatedHistoryName = selectedParticipants
-      .map((c) => c.Full_Name)
+      .map((c) => c?.Full_Name || c?.full_name || "")
+      .filter(Boolean)
       .join(", ");
     const finalData = {
       Name: updatedHistoryName,
@@ -295,16 +349,16 @@ export function Dialog({
       } else {
         await createHistory(finalData, selectedParticipants);
       }
+      handleCloseDialog();
     } catch (error) {
       console.error("Error saving records:", error);
       setSnackbar({
         open: true,
-        message: error.message || "An error occurred.",
+        message: error?.message || "An error occurred. Please try again.",
         severity: "error",
       });
     } finally {
       setIsSubmitting(false);
-      handleCloseDialog();
     }
   };
 
@@ -962,9 +1016,9 @@ export function Dialog({
 
             <Grid item xs={6}>
               <Autocomplete
-                options={durationOptions}
-                getOptionLabel={(option) => option.toString()}
-                value={formData?.duration || null} // Provide a fallback value
+                options={durationOptions || []}
+                getOptionLabel={(option) => (option != null ? String(option) : "")}
+                value={formData?.duration ?? null}
                 onChange={(event, newValue) =>
                   handleInputChange("duration", newValue)
                 }
@@ -1007,9 +1061,9 @@ export function Dialog({
           <Grid container spacing={1}>
             <Grid item xs={6}>
               <Autocomplete
-                options={ownerList}
-                getOptionLabel={(option) => option.full_name || ""}
-                value={selectedOwner}
+                options={ownerList || []}
+                getOptionLabel={(option) => option?.full_name || ""}
+                value={selectedOwner ?? null}
                 onChange={(event, newValue) => {
                   setSelectedOwner(newValue);
                   // handleInputChange("ownerName", newValue)

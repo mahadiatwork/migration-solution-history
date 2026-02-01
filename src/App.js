@@ -245,22 +245,67 @@ const App = () => {
   };
 
   // ============================================================================
-  // STEP 4: Default Data Fetching (COQL v8)
+  // STEP 4: Default Data Fetching (COQL v8 – up to 2000 records per plan)
   // ============================================================================
-  // Default fetch uses COQL v8 to get up to 2000 related list records from History_X_Contacts
   const fetchRLData = async (options = {}) => {
     if (!module || !recordId) return;
+    // Migration Solutions History = Contact History; COQL v8 fetches History_X_Contacts for Contact only
+    const isContactsModule = /^Contacts/i.test(module);
+    if (!isContactsModule) {
+      setInitPageContent("This widget is designed for Contact records. Please open a Contact record.");
+      return;
+    }
     try {
       let dataArray = [];
       try {
         dataArray = await fetchHistoryViaCoqlV8(recordId, 2000, 0);
       } catch (coqlError) {
         console.warn("COQL v8 (2000) failed, falling back to 200:", coqlError);
-        // Fallback: try with 200 if 2000 fails (e.g. LIMIT_EXCEEDED, scope issues)
         dataArray = await fetchHistoryViaCoqlV8(recordId, 200, 0);
       }
-
       dataArray = Array.isArray(dataArray) ? dataArray : [];
+
+      const tempData = dataArray?.map((obj) => {
+        const ownerFirst = obj["Owner.first_name"] || "";
+        const ownerLast = obj["Owner.last_name"] || "";
+
+        const ownerName = `${ownerFirst} ${ownerLast}`.trim() || "Unknown Owner";
+
+        return {
+          name: obj["Contact_Details.Full_Name"] || "No Name",
+          id: obj?.id,
+          date_time: obj["Contact_History_Info.Date"] || "No Date",
+          type: obj["Contact_History_Info.History_Type"] || "Unknown Type",
+          result: obj["Contact_History_Info.History_Result"] || "No Result",
+          duration: obj["Contact_History_Info.Duration"] || "N/A",
+          regarding: obj["Contact_History_Info.Regarding"] || "No Regarding",
+          details: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
+          icon: <DownloadIcon />,
+          ownerName: ownerName,
+          historyDetails: {
+            id: obj["Contact_History_Info.id"],
+            text: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
+          },
+          stakeHolder: (() => {
+            const flatId = obj["Contact_History_Info.Stakeholder.id"];
+            const flatName = obj["Contact_History_Info.Stakeholder.Account_Name"];
+            const nested = obj["Contact_History_Info.Stakeholder"];
+            const junction = obj?.Stakeholder;
+
+            const id =
+              flatId ??
+              (nested && typeof nested === "object" ? (nested.id ?? nested.Id ?? nested.ID) : undefined) ??
+              (junction && typeof junction === "object" ? (junction.id ?? junction.Id ?? junction.ID) : undefined);
+            const rawName =
+              flatName ??
+              (nested && typeof nested === "object" ? (nested.Account_Name ?? nested.name ?? nested.AccountName) : undefined) ??
+              (junction && typeof junction === "object" ? (junction.Account_Name ?? junction.name ?? junction.AccountName) : undefined);
+
+            return id != null ? { id, name: rawName || "" } : null;
+          })(),
+          history_id: obj["Contact_History_Info.id"]
+        };
+      });
 
       const usersResponse = await ZOHO.CRM.API.getAllUsers({
         Type: "AllUsers",
@@ -293,43 +338,6 @@ const App = () => {
         setCurrentGlobalContact(contactData);
       }
 
-
-      const tempData = dataArray?.map((obj) => {
-        const ownerFirst = obj["Owner.first_name"] || "";
-        const ownerLast = obj["Owner.last_name"] || "";
-
-        const ownerName = `${ownerFirst} ${ownerLast}`.trim() || "Unknown Owner";
-
-        return {
-          name: obj["Contact_Details.Full_Name"] || "No Name",
-          id: obj?.id,
-          date_time: obj["Contact_History_Info.Date"] || "No Date",
-          type: obj["Contact_History_Info.History_Type"] || "Unknown Type",
-          result: obj["Contact_History_Info.History_Result"] || "No Result",
-          duration: obj["Contact_History_Info.Duration"] || "N/A",
-          regarding: obj["Contact_History_Info.Regarding"] || "No Regarding",
-          details: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
-          icon: <DownloadIcon />,
-          ownerName: ownerName,
-          historyDetails: {
-            id: obj["Contact_History_Info.id"],
-            text: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
-          },
-          stakeHolder: (() => {
-            const flatId = obj["Contact_History_Info.Stakeholder.id"];
-            const flatName = obj["Contact_History_Info.Stakeholder.Account_Name"];
-            const nested = obj["Contact_History_Info.Stakeholder"];
-            const junction = obj?.Stakeholder;
-
-            const id = flatId ?? (nested && typeof nested === "object" ? nested.id : undefined) ?? (junction && typeof junction === "object" ? junction.id : undefined);
-            const rawName = flatName ?? (nested && typeof nested === "object" ? (nested.Account_Name ?? nested.name) : undefined) ?? (junction && typeof junction === "object" ? (junction.Account_Name ?? junction.name) : undefined);
-
-            return id != null ? { id, name: rawName || "" } : null;
-          })(),
-          history_id: obj["Contact_History_Info.id"]
-        };
-      });
-
       // Merge new records into global cache instead of replacing
       mergeRecordsIntoCache(tempData || []);
 
@@ -339,7 +347,7 @@ const App = () => {
       setCacheVersion(prev => prev + 1); // Force re-render
 
       const types = dataArray
-        ?.map((el) => el.History_Type)
+        ?.map((el) => el["Contact_History_Info.History_Type"])
         ?.filter((el) => el !== undefined && el !== null);
 
       const sortedTypes = [...new Set(types)].sort((a, b) =>
@@ -525,14 +533,17 @@ const App = () => {
     // Get all records from cache (includes all previously fetched data)
     const allRecords = getAllRecordsFromCache();
 
-    if (!allRecords || allRecords.length === 0) {
+    const records = Array.isArray(allRecords) ? allRecords : [];
+    if (records.length === 0) {
       return [];
     }
 
-    return allRecords.filter((el) => {
+    return records.filter((el) => {
       // 1. Owner Filter (multi-select)
-      const ownerMatch = filterOwner.length === 0 ||
-        filterOwner.some((owner) => {
+      const owners = Array.isArray(filterOwner) ? filterOwner : [];
+      const types = Array.isArray(filterType) ? filterType : [];
+      const ownerMatch = owners.length === 0 ||
+        owners.some((owner) => {
           const ownerName = (owner?.full_name || owner || "").trim().toLowerCase();
           const recordOwner = (el?.ownerName || "").trim().toLowerCase();
           // Support exact and flexible matching
@@ -542,7 +553,7 @@ const App = () => {
         });
 
       // 2. Type Filter (multi-select)
-      const typeMatch = filterType.length === 0 || filterType.includes(el?.type);
+      const typeMatch = types.length === 0 || types.includes(el?.type);
 
       // 3. Date Filter
       let dateMatch = true;
@@ -641,28 +652,34 @@ const App = () => {
     React.useState(false);
 
   const handleMoveToApplication = async () => {
+    if (!currentContact?.id) {
+      enqueueSnackbar("Contact information is not available. Please refresh the page and try again.", {
+        variant: "error",
+      });
+      return;
+    }
     try {
-      // Fetch related applications for the current contact
       const response = await ZOHO.CRM.API.getRelatedRecords({
         Entity: "Contacts",
-        RecordID: currentContact?.id,
+        RecordID: currentContact.id,
         RelatedList: "Applications",
         page: 1,
         per_page: 200,
       });
-      if (response?.data) {
-        setApplications(response.data || []);
-        setOpenApplicationDialog(true); // Open the application selection dialog
+      if (response?.data && response.data.length > 0) {
+        setApplications(response.data);
+        setOpenApplicationDialog(true);
       } else {
-        throw new Error("No related applications found.");
+        enqueueSnackbar("No related applications found for this contact.", {
+          variant: "info",
+        });
       }
     } catch (error) {
       console.error("Error fetching related applications:", error);
-      // setSnackbar({
-      //   open: true,
-      //   message: "Failed to fetch related applications.",
-      //   severity: "error",
-      // });
+      enqueueSnackbar(
+        error?.message || "Failed to fetch applications. Please try again.",
+        { variant: "error" }
+      );
     }
   };
 
@@ -694,8 +711,8 @@ const App = () => {
             >
               <Autocomplete
                 size="small"
-                options={dateOptions}
-                value={dateRange}
+                options={dateOptions || []}
+                value={dateRange ?? dateOptions?.[0]}
                 getOptionLabel={(option) => {
                   // Handle custom range object with startDate/endDate
                   if (option?.startDate && option?.endDate) {
@@ -753,8 +770,8 @@ const App = () => {
               <Autocomplete
                 size="small"
                 multiple
-                options={typeList}
-                value={filterType}
+                options={typeList || []}
+                value={filterType ?? []}
                 onChange={(e, newValue) => {
                   setFilterType(newValue);
                   // Update backward-compatible single select
@@ -822,7 +839,7 @@ const App = () => {
                 multiple
                 options={ownerList || []}
                 getOptionLabel={(option) => option?.full_name || "Unknown User"}
-                value={filterOwner}
+                value={filterOwner ?? []}
                 onChange={(e, newValue) => {
                   setFilterOwner(newValue);
                   // Update backward-compatible single select
@@ -978,29 +995,24 @@ const App = () => {
                 gap: "1rem",
                 "& > *": { flexGrow: 1, flexBasis: "0px" },
               }}
-            >
+              >
               <Autocomplete
                 size="small"
-                options={dateOptions}
-                value={dateRange}
-                // 1. Ensure it renders the custom label correctly
+                options={dateOptions || []}
+                value={dateRange ?? dateOptions?.[0]}
                 getOptionLabel={(option) => {
-                  // If it's our custom object with a label property, use it
-                  if (option?.label) return option.label;
-                  return "Unknown";
+                  if (option?.startDate && option?.endDate) {
+                    return `${dayjs(option.startDate).format("DD/MM/YYYY")} - ${dayjs(option.endDate).format("DD/MM/YYYY")}`;
+                  }
+                  return option?.label || "";
                 }}
-                // 2. Help React understand when the custom object matches the selected value
                 isOptionEqualToValue={(option, value) => {
-                  // If exact object match
-                  if (option === value) return true;
-                  // If both are custom ranges with same dates
                   if (option?.startDate && value?.startDate) {
                     return (
-                      dayjs(option.startDate).isSame(dayjs(value.startDate), 'day') &&
-                      dayjs(option.endDate).isSame(dayjs(value.endDate), 'day')
+                      dayjs(option.startDate).isSame(dayjs(value.startDate), "day") &&
+                      dayjs(option.endDate).isSame(dayjs(value.endDate), "day")
                     );
                   }
-                  // Standard label match
                   return option?.label === value?.label;
                 }}
                 sx={{
@@ -1015,25 +1027,42 @@ const App = () => {
                     InputLabelProps={{ style: { fontSize: "9pt" } }}
                   />
                 )}
-              // ... existing onChange logic ...
+                onChange={(e, value) => {
+                  if (value?.customRange) {
+                    setIsCustomRangeDialogOpen(true);
+                  } else {
+                    setDateRange(value);
+                  }
+                }}
               />
               <Autocomplete
                 size="small"
-                options={typeList}
+                multiple
+                options={typeList || []}
+                value={filterType ?? []}
+                getOptionLabel={(option) => (option && String(option)) || ""}
                 sx={{
                   width: "8rem",
                   "& .MuiInputBase-root": {
                     height: "33px",
-                    fontSize: "9pt", // Adjust font size for selected value
+                    fontSize: "9pt",
                   },
                   "& .MuiInputLabel-root": {
-                    fontSize: "9pt", // Adjust label font size
+                    fontSize: "9pt",
                   },
                 }}
                 renderInput={(params) => (
                   <TextField {...params} label="Types" size="small" />
                 )}
-                onChange={(e, value) => setSelectedType(value)}
+                renderTags={(value) =>
+                  value.length > 0 ? (
+                    <span style={{ fontSize: "9pt" }}>{value.length} selected</span>
+                  ) : null
+                }
+                onChange={(e, newValue) => {
+                  setFilterType(newValue);
+                  setSelectedType(newValue.length === 1 ? newValue[0] : null);
+                }}
               />
               <TextField
                 size="small"
@@ -1053,9 +1082,10 @@ const App = () => {
               />
               <Autocomplete
                 size="small"
+                multiple
                 options={ownerList || []}
                 getOptionLabel={(option) => option?.full_name || "Unknown User"}
-                value={selectedOwner || null}
+                value={filterOwner ?? []}
                 isOptionEqualToValue={(option, value) =>
                   option?.id === value?.id
                 }
@@ -1065,13 +1095,21 @@ const App = () => {
                     height: "33px",
                   },
                   "& .MuiInputLabel-root": {
-                    fontSize: "9pt", // Adjust label font size
+                    fontSize: "9pt",
                   },
                 }}
                 renderInput={(params) => (
                   <TextField {...params} label="Users" size="small" />
                 )}
-                onChange={(e, value) => setSelectedOwner(value)}
+                renderTags={(value) =>
+                  value.length > 0 ? (
+                    <span style={{ fontSize: "9pt" }}>{value.length} selected</span>
+                  ) : null
+                }
+                onChange={(e, newValue) => {
+                  setFilterOwner(newValue);
+                  setSelectedOwner(newValue.length === 1 ? newValue[0] : null);
+                }}
               />
             </Grid>
             <Grid
@@ -1110,8 +1148,8 @@ const App = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {relatedListData.length > 0 ? (
-                      relatedListData.map((row) => (
+                    {(Array.isArray(relatedListData) ? relatedListData : []).length > 0 ? (
+                      (Array.isArray(relatedListData) ? relatedListData : []).map((row) => (
                         <TableRow
                           key={row.id}
                           sx={{
@@ -1166,6 +1204,7 @@ const App = () => {
         applications={applications}
         openApplicationDialog={openApplicationDialog}
         setOpenApplicationDialog={setOpenApplicationDialog}
+        currentContact={currentContact}
       />
       <Dialog
         openDialog={openCreateDialog}

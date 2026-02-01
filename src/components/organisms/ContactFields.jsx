@@ -74,12 +74,15 @@ export default function ContactField({
           });
 
           // Fetch full contact details for each contact ID
+          const dataArray = Array.isArray(relatedListData?.data) ? relatedListData.data : [];
           const participants = await Promise.all(
-            relatedListData.data.map(async (record) => {
+            dataArray.map(async (record) => {
               try {
+                const contactId = record?.Contact_Details?.id;
+                if (!contactId) return null;
                 const contactDetails = await ZOHO.CRM.API.getRecord({
                   Entity: "Contacts",
-                  RecordID: record.Contact_Details.id,
+                  RecordID: contactId,
                 });
 
                 if (contactDetails.data && contactDetails.data.length > 0) {
@@ -99,8 +102,9 @@ export default function ContactField({
                   return null; // Return null for invalid records
                 }
               } catch (error) {
+                const recordId = record?.Contact_Details?.id ?? "unknown";
                 console.error(
-                  `Error fetching contact details for ID ${record.Contact_Details.id}:`,
+                  `Error fetching contact details for ID ${recordId}:`,
                   error
                 );
                 return null; // Return null for failed fetches

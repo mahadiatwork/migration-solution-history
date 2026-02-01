@@ -101,8 +101,8 @@ export default function Stakeholder({ formData, handleInputChange, ZOHO }) {
 
   return (
     <Autocomplete
-      options={stakeholders}
-      getOptionLabel={(option) => option.name || ""}
+      options={stakeholders || []}
+      getOptionLabel={(option) => option?.name || ""}
       value={selectedStakeholder}
       onChange={handleChange}
       inputValue={inputValue}

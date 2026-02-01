@@ -69,8 +69,9 @@ export const getRegardingOptions = (type, existingValue) => {
   let predefinedOptions = options[type] || ["General"];
 
   // Only add existingValue if it's not empty and not already in the options
-  if (existingValue && existingValue.trim() !== "" && !predefinedOptions.includes(existingValue)) {
-    predefinedOptions = [existingValue, ...predefinedOptions];
+  const safeValue = typeof existingValue === "string" ? existingValue : "";
+  if (safeValue.trim() !== "" && !predefinedOptions.includes(safeValue)) {
+    predefinedOptions = [safeValue, ...predefinedOptions];
   }
 
   return predefinedOptions;
