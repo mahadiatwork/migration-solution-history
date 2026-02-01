@@ -38,35 +38,6 @@ dayjs.extend(timezone);
 
 const ZOHO = window.ZOHO;
 
-// ============================================================================
-// STEP 3: Date Formatting Utility
-// ============================================================================
-// Date formatter for Zoho API (handles timezone offsets correctly)
-// Formats dates in ISO 8601 format with timezone offset for Zoho API
-// Output example: 2020-12-09T17:25:24-07:00 (uses the current PC/browser timezone offset)
-// If hours/minutes/seconds are NOT provided, it uses the Date object's local time.
-const formatDateForZoho = (date, hours, minutes, seconds) => {
-  if (!date || isNaN(date.getTime())) return null;
-  const pad = (num) => String(num).padStart(2, "0");
-
-  const h = hours ?? date.getHours();
-  const m = minutes ?? date.getMinutes();
-  const s = seconds ?? date.getSeconds();
-
-  const year = date.getFullYear();
-  const month = pad(date.getMonth() + 1);
-  const day = pad(date.getDate());
-  const formattedTime = `${pad(h)}:${pad(m)}:${pad(s)}`;
-
-  // Handles Timezone Offset correctly (e.g., +05:30)
-  const timezoneOffset = -date.getTimezoneOffset();
-  const offsetSign = timezoneOffset >= 0 ? "+" : "-";
-  const offsetHours = pad(Math.floor(Math.abs(timezoneOffset) / 60));
-  const offsetMinutes = pad(Math.abs(timezoneOffset) % 60);
-
-  return `${year}-${month}-${day}T${formattedTime}${offsetSign}${offsetHours}:${offsetMinutes}`;
-};
-
 const parentContainerStyle = {
   borderTop: "1px solid #BABABA",
   minHeight: "calc(100vh - 1px)",
@@ -145,10 +116,10 @@ const App = () => {
   const [openEditDialog, setOpenEditDialog] = React.useState(false);
   const [openCreateDialog, setOpenCreateDialog] = React.useState(false);
   const [ownerList, setOwnerList] = React.useState([]);
-  const [selectedOwner, setSelectedOwner] = React.useState(null); // Keep for backward compatibility
+  const [, setSelectedOwner] = React.useState(null);
   const [filterOwner, setFilterOwner] = React.useState([]); // Multi-select owner filter
   const [typeList, setTypeList] = React.useState([]);
-  const [selectedType, setSelectedType] = React.useState(null); // Keep for backward compatibility
+  const [, setSelectedType] = React.useState(null);
   const [filterType, setFilterType] = React.useState([]); // Multi-select type filter
   const [dateRange, setDateRange] = React.useState(dateOptions[0]); // Default
   const [keyword, setKeyword] = React.useState("");
@@ -590,7 +561,8 @@ const App = () => {
       // Combine all filters with AND logic
       return ownerMatch && typeMatch && dateMatch && keywordMatch;
     });
-  }, [cacheVersion, filterOwner, filterType, dateRange, keyword]); // Use cacheVersion to react to cache updates
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- cacheVersion forces re-compute when global cache is updated
+  }, [cacheVersion, filterOwner, filterType, dateRange, keyword]);
 
   // ============================================================================
   // STEP 11: Active Filter Summary
