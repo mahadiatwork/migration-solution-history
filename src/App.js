@@ -291,12 +291,6 @@ const App = () => {
       const currentUser = currentUserResponse?.users?.[0] || null;
       setLoggedInUser(currentUser);
 
-      // Initialize filterOwner with logged-in user by default
-      if (currentUser?.full_name) {
-        setFilterOwner([currentUser]);
-        setSelectedOwner(currentUser);
-      }
-
       const currentContactResponse = await ZOHO.CRM.API.getRecord({
         Entity: "Contacts",
         approved: "both",
@@ -603,21 +597,16 @@ const App = () => {
   // Cache remains intact - filteredData will show all cached records when filters are cleared
   const handleClearFilters = React.useCallback(() => {
     setFilterType([]);
-    // Reset owner filter to logged-in user only (default state)
-    if (loggedInUser?.full_name) {
-      setFilterOwner([loggedInUser]);
-      setSelectedOwner(loggedInUser);
-    } else {
-      setFilterOwner([]);
-      setSelectedOwner(null);
-    }
+    // Reset owner filter to show all users (no default filter)
+    setFilterOwner([]);
+    setSelectedOwner(null);
     setDateRange(dateOptions[0]); // Reset to Default
     setKeyword("");
     setCustomRange({ startDate: null, endDate: null });
     // Also reset backward-compatible single selects
     setSelectedType(null);
     // Cache remains intact - filteredData will show all cached records when filters are cleared
-  }, [loggedInUser]);
+  }, []);
 
   const [applications, setApplications] = React.useState([]);
   const [openApplicationDialog, setOpenApplicationDialog] =

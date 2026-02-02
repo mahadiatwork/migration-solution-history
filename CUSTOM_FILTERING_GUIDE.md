@@ -153,10 +153,10 @@ const priorityMatch = filterPriority.length === 0 || filterPriority.includes(row
 
 Users can filter by "Scheduled For" (event owner):
 
-- **Default**: Shows only events for the logged-in user
+- **Default**: Shows events for all users (no default filter applied)
 - **Select All**: Shows events for all users
-- **Deselect All**: Resets to logged-in user only
-- **Multiple Selection**: Select specific users
+- **Deselect All**: Resets to show all users
+- **Multiple Selection**: Select specific users to filter
 
 ### Filtering Logic
 
@@ -542,3 +542,11 @@ The custom filtering system provides:
 ✅ **User-Friendly**: Clear filter summary and easy reset functionality  
 
 The system ensures that users can efficiently filter large datasets with multiple criteria while maintaining fast, responsive UI updates.
+
+
+Maddie, I thought you said this issue I have outlined below is fixed? Its not working for me and I have done several tests - you told you fixed it.
+
+Go to this contact called Emily Palmer  - there is an email history that dates back to 10/02/2020
+the contact url is 
+The history entry that cannot be filtered is 
+video details https://workdrive.zohoexternal.com/external/c02d427f9a0990f93180a2e33ae7fc2ffc8acb82f8c8cbeed22943de745ec05e
