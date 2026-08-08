@@ -107,6 +107,7 @@ const App = () => {
   const [initPageContent, setInitPageContent] = React.useState(
     <CircularProgress />
   );
+  const [loadedCount, setLoadedCount] = React.useState(0); // Records fetched so far during initial load
   // relatedListData now reads from cache, but we keep state for reactivity
   const [relatedListData, setRelatedListData] = React.useState([]);
   const [cacheVersion, setCacheVersion] = React.useState(0); // Force re-render when cache updates
@@ -181,20 +182,22 @@ const App = () => {
   };
 
   // ============================================================================
-  // COQL v8 Fetch Helper (up to 2000 records in one call)
+  // COQL v8 Fetch Helpers (2000 records per page, paginated for full history)
   // ============================================================================
   const COQL_HISTORY_SELECT = `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date,Contact_History_Info.Stakeholder from History_X_Contacts`;
   const COQL_HISTORY_ORDER = "order by Contact_History_Info.Date desc, id desc";
+  const COQL_PAGE_SIZE = 2000; // Zoho COQL v8 hard cap per request
+  const COQL_MAX_RECORDS = 100000; // Zoho COQL pagination ceiling
 
   /**
-   * Fetch History_X_Contacts via COQL v8 API (up to 2000 records in one call).
-   * Results are sorted newest-first so contacts with >2000 history rows still
-   * return the most recent entries (including email-plugin logs).
+   * Fetch one page of History_X_Contacts via COQL v8 API.
+   * Results are sorted newest-first so the most recent entries (including
+   * email-plugin logs) always arrive in the first page.
    * Uses CONNECTION.invoke POST to {dataCenter}/crm/v8/coql
    * @param {string} contactId - Contact record ID (from widget context)
-   * @param {number} [limit=2000] - Max records (v8 allows up to 2000)
+   * @param {number} [limit=2000] - Page size (v8 allows up to 2000)
    * @param {number} [offset=0] - Pagination offset
-   * @returns {Promise<Array>} - Array of junction records
+   * @returns {Promise<{data: Array, moreRecords: boolean}>}
    */
   const fetchHistoryViaCoqlV8 = async (contactId, limit = 2000, offset = 0) => {
     const selectQuery = `${COQL_HISTORY_SELECT} where Contact_Details = '${contactId}' ${COQL_HISTORY_ORDER} LIMIT ${offset}, ${limit}`;
@@ -208,31 +211,63 @@ const App = () => {
 
     const response = await ZOHO.CRM.CONNECTION.invoke(conn_name, req_data);
 
-    // Handle response format (may vary: data vs details.statusMessage.data)
+    // Handle response format (CONNECTION.invoke may wrap data at top level or under details.statusMessage)
     let data = [];
-    if (response?.data) {
-      data = Array.isArray(response.data) ? response.data : [];
-    } else if (response?.details?.statusMessage?.data) {
-      data = Array.isArray(response.details.statusMessage.data)
-        ? response.details.statusMessage.data
-        : [];
+    let moreRecords = false;
+
+    if (Array.isArray(response?.data)) {
+      data = response.data;
+      moreRecords = response?.info?.more_records === true;
+    } else if (response?.details?.statusMessage) {
+      const statusMessage = response.details.statusMessage;
+      data = Array.isArray(statusMessage.data) ? statusMessage.data : [];
+      moreRecords = statusMessage?.info?.more_records === true;
     }
 
-    const moreRecords =
-      response?.info?.more_records ??
-      response?.details?.statusMessage?.info?.more_records ??
-      false;
-    if (moreRecords && offset === 0) {
-      console.info(
-        `Contact ${contactId} has more than ${limit} history records; showing the ${limit} most recent.`
+    return { data, moreRecords };
+  };
+
+  /**
+   * Fetch every History_X_Contacts row for a contact by paging through COQL v8.
+   * COQL allows a maximum of 2000 records per call and 100,000 via pagination,
+   * so contacts with large histories need multiple sequential requests.
+   * @param {string} contactId - Contact record ID
+   * @param {(loadedCount: number) => void} [onProgress] - Called after each page
+   * @returns {Promise<Array>} - Deduplicated junction records, newest first
+   */
+  const fetchAllHistoryViaCoqlV8 = async (contactId, onProgress) => {
+    const pageSize = COQL_PAGE_SIZE;
+    const seenIds = new Set();
+    const allRecords = [];
+    let offset = 0;
+
+    while (offset < COQL_MAX_RECORDS) {
+      const { data, moreRecords } = await fetchHistoryViaCoqlV8(
+        contactId,
+        pageSize,
+        offset
       );
+
+      data.forEach((row) => {
+        const key = row?.id;
+        // Offsets can shift if records are created mid-fetch; dedupe defensively
+        if (key && !seenIds.has(key)) {
+          seenIds.add(key);
+          allRecords.push(row);
+        }
+      });
+
+      if (onProgress) onProgress(allRecords.length);
+
+      if (!moreRecords || data.length < pageSize) break;
+      offset += pageSize;
     }
 
-    return data;
+    return allRecords;
   };
 
   // ============================================================================
-  // STEP 4: Default Data Fetching (COQL v8 – up to 2000 records per plan)
+  // STEP 4: Default Data Fetching (COQL v8 – paginated, full history)
   // ============================================================================
   const fetchRLData = async (options = {}) => {
     if (!module || !recordId) return;
@@ -243,14 +278,23 @@ const App = () => {
       return;
     }
     try {
+      const onProgress = options.isBackground
+        ? undefined
+        : (loaded) => setLoadedCount(loaded);
+
       let dataArray = [];
       try {
-        dataArray = await fetchHistoryViaCoqlV8(recordId, 2000, 0);
+        dataArray = await fetchAllHistoryViaCoqlV8(recordId, onProgress);
       } catch (coqlError) {
-        console.warn("COQL v8 (2000) failed, falling back to 200:", coqlError);
-        dataArray = await fetchHistoryViaCoqlV8(recordId, 200, 0);
+        console.warn("COQL v8 paginated fetch failed, falling back to 200:", coqlError);
+        const fallback = await fetchHistoryViaCoqlV8(recordId, 200, 0);
+        dataArray = fallback.data;
       }
       dataArray = Array.isArray(dataArray) ? dataArray : [];
+
+      console.info(
+        `Contact ${recordId}: loaded ${dataArray.length} history record(s) via COQL v8 pagination`
+      );
 
       const tempData = dataArray?.map((obj) => {
         const ownerFirst = obj["Owner.first_name"] || "";
@@ -384,6 +428,7 @@ const App = () => {
       clearHistoryCache();
       setCacheVersion(0);
       setRelatedListData([]); // Clear UI state
+      setLoadedCount(0);
       fetchRLData();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchRLData is stable, avoid refetch loop
@@ -674,9 +719,17 @@ const App = () => {
               top: "50%",
               left: "50%",
               transform: "translate(-50%, -50%)",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "8px",
+              fontSize: "9pt",
             }}
           >
             {initPageContent}
+            {loadedCount > 0 && (
+              <span>{`Loaded ${loadedCount} records...`}</span>
+            )}
           </span>
         ) : (relatedListData?.length > 0 || getAllRecordsFromCache().length > 0) ? (
           <Grid container spacing={2}>
@@ -892,7 +945,10 @@ const App = () => {
               >
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <span>
-                    <strong>Total Records:</strong> {filteredData?.length || 0}
+                    <strong>Total Records:</strong>{" "}
+                    {activeFilterNames.length > 0 || keyword.trim()
+                      ? `${filteredData?.length || 0} of ${getAllRecordsFromCache().length}`
+                      : filteredData?.length || 0}
                   </span>
                   {activeFilterNames.length > 0 && (
                     <>
@@ -1309,7 +1365,7 @@ const App = () => {
                 }
 
                 // Client-side filtering only - no API call
-                // Cache holds up to 2000 most-recent records from initial COQL v8 fetch
+                // Cache holds the contact's full history from the paginated COQL v8 fetch
                 const formattedStart = dayjs(customRange.startDate).format("DD/MM/YYYY");
                 const formattedEnd = dayjs(customRange.endDate).format("DD/MM/YYYY");
 
