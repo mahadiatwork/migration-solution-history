@@ -34,6 +34,7 @@ import { zohoApi } from "../../zohoApi";
 import ApplicationDialog from "./ApplicationTable";
 import Stakeholder from "../atoms/Stakeholder";
 import { Close } from "@mui/icons-material";
+import { resolveMatterSnapshotForContact } from "../../services/matterSnapshot";
 
 const VisuallyHiddenInput = styled("input")({
   clip: "rect(0 0 0 0)",
@@ -318,11 +319,24 @@ export function Dialog({
       .map((c) => c?.Full_Name || c?.full_name || "")
       .filter(Boolean)
       .join(", ");
+
+    const dateTimeFormatted = formData.date_time
+      ? dayjs(formData.date_time).format("YYYY-MM-DDTHH:mm:ssZ")
+      : null;
+
+    const primaryContactId =
+      currentContact?.id || selectedParticipants[0]?.id || null;
+
+    const matterSnapshot =
+      !selectedRowData && primaryContactId
+        ? await resolveMatterSnapshotForContact(primaryContactId)
+        : {};
+
     const finalData = {
       Name: updatedHistoryName,
       History_Details_Plain: formData.details,
       Regarding: formData.regarding,
-      Owner: selectedOwner,
+      Owner: selectedOwner?.id ? { id: selectedOwner.id } : selectedOwner,
       History_Result: Array.isArray(formData.result) && formData.result.length > 0
         ? formData.result[0]
         : formData.result,
@@ -332,9 +346,8 @@ export function Dialog({
         : null,
       History_Type: formData.type || "",
       Duration: formData.duration ? String(formData.duration) : null,
-      Date: formData.date_time
-        ? dayjs(formData.date_time).format("YYYY-MM-DDTHH:mm:ssZ")
-        : null,
+      Date: dateTimeFormatted,
+      ...matterSnapshot,
     };
 
 

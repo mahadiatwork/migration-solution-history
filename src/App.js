@@ -115,7 +115,8 @@ const App = () => {
   const [, setSelectedRecordId] = React.useState(null);
   const [openEditDialog, setOpenEditDialog] = React.useState(false);
   const [openCreateDialog, setOpenCreateDialog] = React.useState(false);
-  const [ownerList, setOwnerList] = React.useState([]);
+  const [ownerList, setOwnerList] = React.useState([]); // All users (for filtering)
+  const [activeOwnerList, setActiveOwnerList] = React.useState([]); // Active users only (for create/edit)
   const [, setSelectedOwner] = React.useState(null);
   const [filterOwner, setFilterOwner] = React.useState([]); // Multi-select owner filter
   const [typeList, setTypeList] = React.useState([]);
@@ -182,8 +183,13 @@ const App = () => {
   // ============================================================================
   // COQL v8 Fetch Helper (up to 2000 records in one call)
   // ============================================================================
+  const COQL_HISTORY_SELECT = `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date,Contact_History_Info.Stakeholder from History_X_Contacts`;
+  const COQL_HISTORY_ORDER = "order by Contact_History_Info.Date desc, id desc";
+
   /**
-   * Fetch History_X_Contacts via COQL v8 API (up to 2000 records in one call)
+   * Fetch History_X_Contacts via COQL v8 API (up to 2000 records in one call).
+   * Results are sorted newest-first so contacts with >2000 history rows still
+   * return the most recent entries (including email-plugin logs).
    * Uses CONNECTION.invoke POST to {dataCenter}/crm/v8/coql
    * @param {string} contactId - Contact record ID (from widget context)
    * @param {number} [limit=2000] - Max records (v8 allows up to 2000)
@@ -191,7 +197,7 @@ const App = () => {
    * @returns {Promise<Array>} - Array of junction records
    */
   const fetchHistoryViaCoqlV8 = async (contactId, limit = 2000, offset = 0) => {
-    const selectQuery = `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date,Contact_History_Info.Stakeholder from History_X_Contacts where Contact_Details = '${contactId}' LIMIT ${offset}, ${limit}`;
+    const selectQuery = `${COQL_HISTORY_SELECT} where Contact_Details = '${contactId}' ${COQL_HISTORY_ORDER} LIMIT ${offset}, ${limit}`;
 
     const req_data = {
       url: `${dataCenterMap.AU}/crm/v8/coql`,
@@ -210,6 +216,16 @@ const App = () => {
       data = Array.isArray(response.details.statusMessage.data)
         ? response.details.statusMessage.data
         : [];
+    }
+
+    const moreRecords =
+      response?.info?.more_records ??
+      response?.details?.statusMessage?.info?.more_records ??
+      false;
+    if (moreRecords && offset === 0) {
+      console.info(
+        `Contact ${contactId} has more than ${limit} history records; showing the ${limit} most recent.`
+      );
     }
 
     return data;
@@ -283,9 +299,13 @@ const App = () => {
       });
 
       const validUsers = usersResponse?.users?.filter(
-        (user) => user?.full_name && user?.id && (user?.status || "").toLowerCase() === "active"
+        (user) => user?.full_name && user?.id
+      ) || [];
+      setOwnerList(validUsers);
+      const activeUsers = validUsers.filter(
+        (user) => (user?.status || "").toLowerCase() === "active"
       );
-      setOwnerList(validUsers || []);
+      setActiveOwnerList(activeUsers);
 
       const currentUserResponse = await ZOHO.CRM.CONFIG.getCurrentUser();
       const currentUser = currentUserResponse?.users?.[0] || null;
@@ -1153,7 +1173,7 @@ const App = () => {
         openDialog={openEditDialog}
         handleCloseDialog={handleCloseEditDialog}
         title="Edit History"
-        ownerList={ownerList}
+        ownerList={activeOwnerList}
         loggedInUser={loggedInUser}
         ZOHO={ZOHO}
         selectedRowData={selectedRowData}
@@ -1171,7 +1191,7 @@ const App = () => {
         openDialog={openCreateDialog}
         handleCloseDialog={handleCloseCreateDialog}
         title="Create"
-        ownerList={ownerList}
+        ownerList={activeOwnerList}
         loggedInUser={loggedInUser}
         ZOHO={ZOHO}
         onRecordAdded={handleRecordAdded} // Pass the callback
@@ -1289,7 +1309,7 @@ const App = () => {
                 }
 
                 // Client-side filtering only - no API call
-                // We already have up to 2000 records in cache from initial COQL v8 fetch
+                // Cache holds up to 2000 most-recent records from initial COQL v8 fetch
                 const formattedStart = dayjs(customRange.startDate).format("DD/MM/YYYY");
                 const formattedEnd = dayjs(customRange.endDate).format("DD/MM/YYYY");
 

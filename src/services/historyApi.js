@@ -5,6 +5,7 @@
 import dayjs from "dayjs";
 import timezone from "dayjs/plugin/timezone";
 import { zohoApi } from "../../zohoApi";
+import { resolveMatterSnapshotForContact } from "./matterSnapshot";
 
 dayjs.extend(timezone);
 
@@ -61,9 +62,14 @@ export const createHistory = async ({
     onError,
 }) => {
     try {
+        const primaryContactId = selectedParticipants?.[0]?.id || null;
+        const matterSnapshot = primaryContactId
+            ? await resolveMatterSnapshotForContact(primaryContactId)
+            : {};
+
         const createConfig = {
             Entity: "History1",
-            APIData: { ...finalData },
+            APIData: { ...finalData, ...matterSnapshot },
             Trigger: ["workflow"],
         };
 
