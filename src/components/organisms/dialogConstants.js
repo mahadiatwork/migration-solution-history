@@ -1,6 +1,14 @@
 /**
- * Dialog Constants
- * Static data used by the History Dialog component
+ * Dialog Constants — FALLBACK DEFAULTS
+ *
+ * These are the hard-coded default values for picklist dropdowns.
+ * They are used as a fallback when the Zoho CRM Widget_Picklist_Config
+ * custom module is not available or has no records.
+ *
+ * Admin users can override these values by creating entries in the
+ * Widget_Picklist_Config module in Zoho CRM (Setup > Modules > Widget_Picklist_Config).
+ * The picklistConfigService.js will fetch from that module first,
+ * and only fall back to these defaults if the module is unavailable.
  */
 
 // Duration options in minutes (10, 20, 30, ... 240)

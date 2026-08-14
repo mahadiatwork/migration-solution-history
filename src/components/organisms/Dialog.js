@@ -26,6 +26,11 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
 import { getRegardingOptions, getResultOptions } from "./helperFunc";
+import {
+  getTypeOptionsFromConfig,
+  getDurationOptionsFromConfig,
+  getResultMappingFromConfig,
+} from "../../services/picklistConfigService";
 import ContactField from "./ContactFields";
 import RegardingField from "./RegardingField";
 import IconButton from "@mui/material/IconButton"; // For the clickable icon button
@@ -48,9 +53,10 @@ const VisuallyHiddenInput = styled("input")({
   width: 1,
 });
 
-const durationOptions = Array.from({ length: 24 }, (_, i) => (i + 1) * 10);
+// Hard-coded fallback defaults — used when picklistConfig is not available
+const fallbackDurationOptions = Array.from({ length: 24 }, (_, i) => (i + 1) * 10);
 
-const resultMapping = {
+const fallbackResultMapping = {
   Meeting: "Meeting Held",
   "To-Do": "To-do Done",
   Appointment: "Appointment Completed",
@@ -67,12 +73,8 @@ const resultMapping = {
   "Room 3": "Room 3 - Completed",
   "To Do Billing": "To Do Billing - Completed",
   Vacation: "Vacation - Completed",
-  Other: "Attachment", // Just added it.
+  Other: "Attachment",
 };
-
-const typeMapping = Object.fromEntries(
-  Object.entries(resultMapping).map(([type, result]) => [result, type])
-);
 
 export function Dialog({
   openDialog,
@@ -90,7 +92,26 @@ export function Dialog({
   applications,
   openApplicationDialog,
   setOpenApplicationDialog,
+  picklistConfig = null, // Admin-configurable picklist config from App.js
 }) {
+  // Derive picklist options from admin config (or fallback to hard-coded defaults)
+  const durationOptions = picklistConfig
+    ? getDurationOptionsFromConfig(picklistConfig)
+    : fallbackDurationOptions;
+  const resultMapping = picklistConfig
+    ? getResultMappingFromConfig(picklistConfig)
+    : fallbackResultMapping;
+  const typeMapping = Object.fromEntries(
+    Object.entries(resultMapping).map(([type, result]) => [result, type])
+  );
+  const typeOptions = picklistConfig
+    ? getTypeOptionsFromConfig(picklistConfig)
+    : [
+        "Meeting", "To-Do", "Appointment", "Boardroom", "Call Billing",
+        "Email Billing", "Initial Consultation", "Call", "Mail",
+        "Meeting Billing", "Personal Activity", "Room 1", "Room 2",
+        "Room 3", "To Do Billing", "Vacation", "Other",
+      ];
   const [, setHistoryName] = React.useState("");
   const [historyContacts, setHistoryContacts] = React.useState([]);
   const [selectedOwner, setSelectedOwner] = React.useState(
@@ -678,25 +699,8 @@ export function Dialog({
     setSnackbar({ open: false, message: "", severity: "success" });
   };
 
-  const typeOptions = [
-    "Meeting",
-    "To-Do",
-    "Appointment",
-    "Boardroom",
-    "Call Billing",
-    "Email Billing",
-    "Initial Consultation",
-    "Call",
-    "Mail",
-    "Meeting Billing",
-    "Personal Activity",
-    "Room 1",
-    "Room 2",
-    "Room 3",
-    "To Do Billing",
-    "Vacation",
-    "Other",
-  ];
+  // typeOptions is now derived from picklistConfig at the top of the component
+  // (or falls back to the hard-coded list if picklistConfig is null)
 
   const [, setSelectedApplicationId] = React.useState(null);
 
@@ -887,9 +891,9 @@ export function Dialog({
                     handleInputChange("type", e.target.value);
                     handleInputChange(
                       "result",
-                      getResultOptions(e.target.value)[0]
+                      getResultOptions(e.target.value, picklistConfig)[0]
                     );
-                    handleInputChange("regarding", getRegardingOptions(e.target.value)[0]);
+                    handleInputChange("regarding", getRegardingOptions(e.target.value, undefined, picklistConfig)[0]);
                     setSelectedType(e.target.value);
                   }}
                   label="Type"
@@ -934,7 +938,7 @@ export function Dialog({
                     },
                   }}
                 >
-                  {getResultOptions(formData.type).map((result) => (
+                  {getResultOptions(formData.type, picklistConfig).map((result) => (
                     <MenuItem
                       key={result}
                       value={result}
@@ -1119,6 +1123,7 @@ export function Dialog({
                 formData={formData}
                 handleInputChange={handleInputChange}
                 selectedRowData={selectedRowData}
+                picklistConfig={picklistConfig}
               />
             </Grid>
           </Grid>

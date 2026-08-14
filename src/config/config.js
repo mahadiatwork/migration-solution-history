@@ -45,6 +45,32 @@ export const MATTER_SOURCE_FIELDS = {
   createdTime: "Created_Time",
 };
 
+// ============================================================================
+// Admin-Configurable Picklist Config Module
+// ============================================================================
+// Zoho CRM custom module that stores picklist entries for the widget.
+// Admin users can add/edit/remove entries without code changes.
+// If this module doesn't exist or has no records, the widget falls back
+// to the hard-coded defaults in dialogConstants.js / helperFunc.js.
+export const PICKLIST_CONFIG_MODULE = "Widget_Picklist_Config";
+
+// Field API names on the Widget_Picklist_Config module
+export const PICKLIST_CONFIG_FIELDS = {
+  name: "Name",              // The picklist entry value (e.g. "Meeting", "Call Completed")
+  category: "Category",      // Which picklist: "Type", "Result", "Regarding", "Duration"
+  parentType: "Parent_Type",  // For Result/Regarding: which Type this belongs to (e.g. "Meeting")
+  sortOrder: "Sort_Order",    // Display order (lower = first)
+  active: "Active",           // Whether this entry is active/visible (boolean)
+};
+
+// Categories used in the Widget_Picklist_Config module
+export const PICKLIST_CATEGORIES = {
+  TYPE: "Type",
+  RESULT: "Result",
+  REGARDING: "Regarding",
+  DURATION: "Duration",
+};
+
 export const access_token_api_url =
   "https://api.easy-pluginz.com.au/admin/v2/data/zoho/crm/downloadattachment";
 

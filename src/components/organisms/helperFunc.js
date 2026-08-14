@@ -1,6 +1,36 @@
 
+/**
+ * Helper Functions for Dialog Picklists
+ *
+ * These functions return picklist options for Result and Regarding dropdowns.
+ * They support two modes:
+ *   1. Config-driven: When an admin config object is passed, options come from
+ *      the Widget_Picklist_Config Zoho CRM module.
+ *   2. Hard-coded fallback: When no config is passed (or config has no entries
+ *      for the given type), the original ACT-migrated hard-coded values are used.
+ */
 
-export const getResultOptions = (type) => {
+/**
+ * Get result options for a given history type.
+ * @param {string} type - The selected history type (e.g. "Meeting")
+ * @param {Object|null} [config] - Admin picklist config from picklistConfigService
+ * @returns {string[]} Array of result option values
+ */
+export const getResultOptions = (type, config) => {
+  // If admin config is available and has results for this type, use them
+  if (config?.results) {
+    const typeResults = config.results[type];
+    if (typeResults && typeResults.length > 0) {
+      return typeResults;
+    }
+    // Check for default results (entries with no specific parent type)
+    const defaultResults = config.results["_default"];
+    if (defaultResults && defaultResults.length > 0) {
+      return defaultResults;
+    }
+  }
+
+  // Fall back to hard-coded ACT-migrated values
   switch (type) {
     case "Meeting":
       return ["Meeting Held", "Meeting Not Held"]; // Wrap in an array
@@ -39,7 +69,39 @@ export const getResultOptions = (type) => {
   }
 };
 
-export const getRegardingOptions = (type, existingValue) => {
+/**
+ * Get regarding options for a given history type.
+ * @param {string} type - The selected history type (e.g. "Call")
+ * @param {string} [existingValue] - Existing regarding value (for edit mode)
+ * @param {Object|null} [config] - Admin picklist config from picklistConfigService
+ * @returns {string[]} Array of regarding option values
+ */
+export const getRegardingOptions = (type, existingValue, config) => {
+  // If admin config is available and has regarding options for this type, use them
+  if (config?.regarding) {
+    const typeRegarding = config.regarding[type];
+    if (typeRegarding && typeRegarding.length > 0) {
+      let options = [...typeRegarding];
+      // Ensure existing value is included if not already present
+      const safeValue = typeof existingValue === "string" ? existingValue : "";
+      if (safeValue.trim() !== "" && !options.includes(safeValue)) {
+        options = [safeValue, ...options];
+      }
+      return options;
+    }
+    // Check for default regarding (entries with no specific parent type)
+    const defaultRegarding = config.regarding["_default"];
+    if (defaultRegarding && defaultRegarding.length > 0) {
+      let options = [...defaultRegarding];
+      const safeValue = typeof existingValue === "string" ? existingValue : "";
+      if (safeValue.trim() !== "" && !options.includes(safeValue)) {
+        options = [safeValue, ...options];
+      }
+      return options;
+    }
+  }
+
+  // Fall back to hard-coded ACT-migrated values
   const options = {
     Call: [
       "2nd Followup", "3rd Followup", "4th Followup", "5th Followup",

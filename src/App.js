@@ -17,6 +17,10 @@ import { Table } from "./components/organisms/Table";
 import { Dialog } from "./components/organisms/Dialog";
 import { conn_name, dataCenterMap } from "./config/config";
 import {
+  fetchPicklistConfig,
+  getTypeOptionsFromConfig,
+} from "./services/picklistConfigService";
+import {
   TableBody,
   TableCell,
   TableContainer,
@@ -98,6 +102,61 @@ const clearHistoryCache = () => {
   globalHistoryCache.clear();
 };
 
+/**
+ * Normalise COQL v8 response from ZOHO.CRM.CONNECTION.invoke.
+ * The wrapper may put data/info at the top level, inside details.statusMessage,
+ * or statusMessage may be a JSON string — same pattern as zohoApi/file.js.
+ */
+const parseCoqlV8Response = (response) => {
+  const rawStatusMessage = response?.details?.statusMessage;
+  let parsedStatusMessage = rawStatusMessage;
+  if (typeof rawStatusMessage === "string" && rawStatusMessage.trim()) {
+    try {
+      parsedStatusMessage = JSON.parse(rawStatusMessage);
+    } catch {
+      parsedStatusMessage = null;
+    }
+  }
+
+  // Prefer nested COQL payload (CONNECTION.invoke typical shape)
+  const candidates = [
+    parsedStatusMessage,
+    response?.details,
+    response,
+  ].filter((c) => c && typeof c === "object");
+
+  let data = [];
+  let moreRecords = false;
+  let errorCode = null;
+  let errorMessage = null;
+
+  for (const candidate of candidates) {
+    if (!data.length && Array.isArray(candidate.data)) {
+      data = candidate.data;
+    }
+    if (
+      candidate.info &&
+      typeof candidate.info === "object" &&
+      candidate.info.more_records != null
+    ) {
+      moreRecords =
+        candidate.info.more_records === true ||
+        candidate.info.more_records === "true";
+    }
+    if (candidate.status === "error" || candidate.code === "INVALID_QUERY" || candidate.code === "LIMIT_EXCEEDED") {
+      errorCode = candidate.code || "ERROR";
+      errorMessage = candidate.message || null;
+    }
+  }
+
+  // Top-level SUCCESS wrappers sometimes put records only under details.statusMessage
+  if (!data.length && Array.isArray(response?.data)) {
+    data = response.data;
+  }
+
+  return { data, moreRecords, errorCode, errorMessage, raw: response };
+};
+
 // ============================================================================
 // STEP 2: Component State Management
 // ============================================================================
@@ -111,6 +170,7 @@ const App = () => {
   // relatedListData now reads from cache, but we keep state for reactivity
   const [relatedListData, setRelatedListData] = React.useState([]);
   const [cacheVersion, setCacheVersion] = React.useState(0); // Force re-render when cache updates
+  const [picklistConfig, setPicklistConfig] = React.useState(null); // Admin-configurable picklist config
   
   // Filter states
   const [, setSelectedRecordId] = React.useState(null);
@@ -184,83 +244,165 @@ const App = () => {
   // ============================================================================
   // COQL v8 Fetch Helpers (2000 records per page, paginated for full history)
   // ============================================================================
+  // Visible in UI so we can confirm the paginated build is what CRM is serving
+  const HISTORY_FETCH_BUILD = "paginated-v3";
   const COQL_HISTORY_SELECT = `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date,Contact_History_Info.Stakeholder from History_X_Contacts`;
   const COQL_HISTORY_ORDER = "order by Contact_History_Info.Date desc, id desc";
   const COQL_PAGE_SIZE = 2000; // Zoho COQL v8 hard cap per request
   const COQL_MAX_RECORDS = 100000; // Zoho COQL pagination ceiling
 
   /**
-   * Fetch one page of History_X_Contacts via COQL v8 API.
-   * Results are sorted newest-first so the most recent entries (including
-   * email-plugin logs) always arrive in the first page.
-   * Uses CONNECTION.invoke POST to {dataCenter}/crm/v8/coql
-   * @param {string} contactId - Contact record ID (from widget context)
-   * @param {number} [limit=2000] - Page size (v8 allows up to 2000)
-   * @param {number} [offset=0] - Pagination offset
-   * @returns {Promise<{data: Array, moreRecords: boolean}>}
+   * Escape a value for safe inclusion in a COQL string literal.
    */
-  const fetchHistoryViaCoqlV8 = async (contactId, limit = 2000, offset = 0) => {
-    const selectQuery = `${COQL_HISTORY_SELECT} where Contact_Details = '${contactId}' ${COQL_HISTORY_ORDER} LIMIT ${offset}, ${limit}`;
+  const escapeCoqlString = (value) =>
+    String(value ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+
+  /**
+   * Fetch one page of History_X_Contacts via COQL v8.
+   * Uses keyset (cursor) pagination when cursor is provided — more reliable than
+   * LIMIT offset with joined ORDER BY fields under CONNECTION.invoke.
+   *
+   * @param {string} contactId
+   * @param {number} [limit=2000]
+   * @param {{ date?: string, id?: string } | null} [cursor] - last row from previous page
+   */
+  const fetchHistoryViaCoqlV8 = async (
+    contactId,
+    limit = 2000,
+    cursor = null
+  ) => {
+    let whereClause = `Contact_Details = '${escapeCoqlString(contactId)}'`;
+
+    // Keyset pagination: rows older than the last Date/id we already have
+    if (cursor?.date && cursor?.id) {
+      const dateVal = escapeCoqlString(cursor.date);
+      const idVal = escapeCoqlString(cursor.id);
+      whereClause += ` and ((Contact_History_Info.Date < '${dateVal}') or (Contact_History_Info.Date = '${dateVal}' and id < '${idVal}'))`;
+    }
+
+    const selectQuery = `${COQL_HISTORY_SELECT} where ${whereClause} ${COQL_HISTORY_ORDER} LIMIT 0, ${limit}`;
 
     const req_data = {
       url: `${dataCenterMap.AU}/crm/v8/coql`,
       method: "POST",
-      param_type: 2, // Send parameters in request body (payload)
+      param_type: 2,
       parameters: { select_query: selectQuery },
     };
 
     const response = await ZOHO.CRM.CONNECTION.invoke(conn_name, req_data);
+    const parsed = parseCoqlV8Response(response);
 
-    // Handle response format (CONNECTION.invoke may wrap data at top level or under details.statusMessage)
-    let data = [];
-    let moreRecords = false;
-
-    if (Array.isArray(response?.data)) {
-      data = response.data;
-      moreRecords = response?.info?.more_records === true;
-    } else if (response?.details?.statusMessage) {
-      const statusMessage = response.details.statusMessage;
-      data = Array.isArray(statusMessage.data) ? statusMessage.data : [];
-      moreRecords = statusMessage?.info?.more_records === true;
+    if (parsed.errorCode) {
+      console.warn("COQL page error", {
+        cursor,
+        limit,
+        errorCode: parsed.errorCode,
+        errorMessage: parsed.errorMessage,
+        response,
+      });
     }
 
-    return { data, moreRecords };
+    return parsed;
   };
 
   /**
-   * Fetch every History_X_Contacts row for a contact by paging through COQL v8.
-   * COQL allows a maximum of 2000 records per call and 100,000 via pagination,
-   * so contacts with large histories need multiple sequential requests.
-   * @param {string} contactId - Contact record ID
-   * @param {(loadedCount: number) => void} [onProgress] - Called after each page
-   * @returns {Promise<Array>} - Deduplicated junction records, newest first
+   * Fallback page fetch using classic LIMIT offset (no date cursor).
+   * Used only if keyset pagination errors.
+   */
+  const fetchHistoryViaCoqlV8Offset = async (
+    contactId,
+    limit = 2000,
+    offset = 0
+  ) => {
+    const selectQuery = `${COQL_HISTORY_SELECT} where Contact_Details = '${escapeCoqlString(contactId)}' ${COQL_HISTORY_ORDER} LIMIT ${offset}, ${limit}`;
+    const req_data = {
+      url: `${dataCenterMap.AU}/crm/v8/coql`,
+      method: "POST",
+      param_type: 2,
+      parameters: { select_query: selectQuery },
+    };
+    const response = await ZOHO.CRM.CONNECTION.invoke(conn_name, req_data);
+    return parseCoqlV8Response(response);
+  };
+
+  /**
+   * Fetch every History_X_Contacts row for a contact.
+   * Primary strategy: keyset pagination on (Date desc, id desc).
+   * Fallback: LIMIT offset if keyset query fails.
+   * Stops when a page returns fewer than pageSize rows.
    */
   const fetchAllHistoryViaCoqlV8 = async (contactId, onProgress) => {
     const pageSize = COQL_PAGE_SIZE;
     const seenIds = new Set();
     const allRecords = [];
+    let cursor = null;
+    let useKeyset = true;
     let offset = 0;
+    let pageIndex = 0;
 
-    while (offset < COQL_MAX_RECORDS) {
-      const { data, moreRecords } = await fetchHistoryViaCoqlV8(
-        contactId,
-        pageSize,
-        offset
-      );
+    while (allRecords.length < COQL_MAX_RECORDS) {
+      let page;
+      if (useKeyset) {
+        page = await fetchHistoryViaCoqlV8(contactId, pageSize, cursor);
+        if (page.errorCode && page.data.length === 0 && pageIndex > 0) {
+          console.warn(
+            `[${HISTORY_FETCH_BUILD}] keyset page failed; falling back to offset pagination`
+          );
+          useKeyset = false;
+          offset = allRecords.length;
+          page = await fetchHistoryViaCoqlV8Offset(contactId, pageSize, offset);
+        }
+      } else {
+        page = await fetchHistoryViaCoqlV8Offset(contactId, pageSize, offset);
+      }
 
-      data.forEach((row) => {
+      if (page.errorCode && page.data.length === 0) {
+        throw new Error(
+          `COQL failed on page ${pageIndex}: ${page.errorCode} ${page.errorMessage || ""}`
+        );
+      }
+
+      let addedThisPage = 0;
+      page.data.forEach((row) => {
         const key = row?.id;
-        // Offsets can shift if records are created mid-fetch; dedupe defensively
         if (key && !seenIds.has(key)) {
           seenIds.add(key);
           allRecords.push(row);
+          addedThisPage += 1;
         }
       });
 
       if (onProgress) onProgress(allRecords.length);
 
-      if (!moreRecords || data.length < pageSize) break;
-      offset += pageSize;
+      console.info(
+        `[${HISTORY_FETCH_BUILD}] page ${pageIndex}: raw=${page.data.length}, added=${addedThisPage}, more_records=${page.moreRecords}, total=${allRecords.length}, mode=${useKeyset ? "keyset" : "offset"}`
+      );
+
+      if (page.data.length < pageSize) break;
+      if (addedThisPage === 0) {
+        console.warn(
+          `[${HISTORY_FETCH_BUILD}] page ${pageIndex}: no new rows; stopping`
+        );
+        break;
+      }
+
+      // Advance cursor from the last row of this raw page (oldest on this page)
+      const lastRow = page.data[page.data.length - 1];
+      cursor = {
+        date: lastRow?.["Contact_History_Info.Date"] || lastRow?.Date || null,
+        id: lastRow?.id || null,
+      };
+      if (!cursor.date || !cursor.id) {
+        console.warn(
+          `[${HISTORY_FETCH_BUILD}] missing cursor fields on last row; switching to offset`
+        );
+        useKeyset = false;
+        offset = allRecords.length;
+      } else {
+        offset = allRecords.length;
+      }
+
+      pageIndex += 1;
     }
 
     return allRecords;
@@ -287,7 +429,7 @@ const App = () => {
         dataArray = await fetchAllHistoryViaCoqlV8(recordId, onProgress);
       } catch (coqlError) {
         console.warn("COQL v8 paginated fetch failed, falling back to 200:", coqlError);
-        const fallback = await fetchHistoryViaCoqlV8(recordId, 200, 0);
+        const fallback = await fetchHistoryViaCoqlV8(recordId, 200, null);
         dataArray = fallback.data;
       }
       dataArray = Array.isArray(dataArray) ? dataArray : [];
@@ -383,27 +525,27 @@ const App = () => {
         a.localeCompare(b)
       ); // Sort alphabetically
 
-      const additionalTypes = [
-        "Meeting",
-        "To-Do",
-        "Call",
-        "Appointment",
-        "Boardroom",
-        "Call Billing",
-        "Email Billing",
-        "Initial Consultation",
-        "Mail",
-        "Meeting Billing",
-        "Personal Activity",
-        "Room 1",
-        "Room 2",
-        "Room 3",
-        "Todo Billing",
-        "Vacation",
-      ]; // Example additional options
+      // ============================================================================
+      // Admin-Configurable Picklist: Fetch type options from Zoho CRM config module
+      // Falls back to hard-coded defaults if the module doesn't exist
+      // ============================================================================
+      let configTypeOptions;
+      try {
+        const config = await fetchPicklistConfig();
+        setPicklistConfig(config);
+        configTypeOptions = getTypeOptionsFromConfig(config);
+      } catch (configError) {
+        console.warn("Failed to fetch picklist config, using defaults:", configError);
+        configTypeOptions = [
+          "Meeting", "To-Do", "Call", "Appointment", "Boardroom",
+          "Call Billing", "Email Billing", "Initial Consultation",
+          "Mail", "Meeting Billing", "Personal Activity",
+          "Room 1", "Room 2", "Room 3", "Todo Billing", "Vacation",
+        ];
+      }
 
       const sortedTypesWithAdditional = [
-        ...new Set([...additionalTypes, ...sortedTypes]), // Merge additional options with existing ones
+        ...new Set([...configTypeOptions, ...sortedTypes]), // Merge admin/config types with existing data types
       ].sort((a, b) => a.localeCompare(b)); // Sort alphabetically
 
       setTypeList(sortedTypesWithAdditional);
@@ -949,6 +1091,9 @@ const App = () => {
                     {activeFilterNames.length > 0 || keyword.trim()
                       ? `${filteredData?.length || 0} of ${getAllRecordsFromCache().length}`
                       : filteredData?.length || 0}
+                    <span style={{ marginLeft: 8, color: "#888", fontSize: "8pt" }}>
+                      ({HISTORY_FETCH_BUILD})
+                    </span>
                   </span>
                   {activeFilterNames.length > 0 && (
                     <>
@@ -1242,6 +1387,7 @@ const App = () => {
         openApplicationDialog={openApplicationDialog}
         setOpenApplicationDialog={setOpenApplicationDialog}
         currentContact={currentContact}
+        picklistConfig={picklistConfig}
       />
       <Dialog
         openDialog={openCreateDialog}
@@ -1255,6 +1401,7 @@ const App = () => {
         selectedContacts={selectedContacts}
         setSelectedContacts={setSelectedContacts}
         buttonText="Save"
+        picklistConfig={picklistConfig}
       />
       {isCustomRangeDialogOpen && (
         <MUIDialog
