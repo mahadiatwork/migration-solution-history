@@ -1091,9 +1091,10 @@ const App = () => {
                     {activeFilterNames.length > 0 || keyword.trim()
                       ? `${filteredData?.length || 0} of ${getAllRecordsFromCache().length}`
                       : filteredData?.length || 0}
-                    <span style={{ marginLeft: 8, color: "#888", fontSize: "8pt" }}>
-                      ({HISTORY_FETCH_BUILD})
-                    </span>
+                    {" "}
+                    <strong style={{ color: "#c62828" }}>
+                      [{HISTORY_FETCH_BUILD}]
+                    </strong>
                   </span>
                   {activeFilterNames.length > 0 && (
                     <>
