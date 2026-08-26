@@ -5,7 +5,7 @@
  * These functions return picklist options for Result and Regarding dropdowns.
  * They support two modes:
  *   1. Config-driven: When an admin config object is passed, options come from
- *      the Widget_Picklist_Config Zoho CRM module.
+ *      the Widget_Picklist_Config CRM module.
  *   2. Hard-coded fallback: When no config is passed (or config has no entries
  *      for the given type), the original ACT-migrated hard-coded values are used.
  */

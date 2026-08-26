@@ -1,0 +1,130 @@
+Name,Category,Parent_Type,Sort_Order,Active
+Meeting,Type,,10,TRUE
+To-Do,Type,,20,TRUE
+Appointment,Type,,30,TRUE
+Boardroom,Type,,40,TRUE
+Call Billing,Type,,50,TRUE
+Email Billing,Type,,60,TRUE
+Initial Consultation,Type,,70,TRUE
+Call,Type,,80,TRUE
+Mail,Type,,90,TRUE
+Meeting Billing,Type,,100,TRUE
+Personal Activity,Type,,110,TRUE
+Room 1,Type,,120,TRUE
+Room 2,Type,,130,TRUE
+Room 3,Type,,140,TRUE
+To Do Billing,Type,,150,TRUE
+Vacation,Type,,160,TRUE
+Other,Type,,170,TRUE
+Meeting Held,Result,Meeting,10,TRUE
+Meeting Not Held,Result,Meeting,20,TRUE
+To-do Done,Result,To-Do,10,TRUE
+To-do Not Done,Result,To-Do,20,TRUE
+Appointment Completed,Result,Appointment,10,TRUE
+Appointment Not Completed,Result,Appointment,20,TRUE
+Boardroom - Completed,Result,Boardroom,10,TRUE
+Boardroom - Not Completed,Result,Boardroom,20,TRUE
+Call Billing - Completed,Result,Call Billing,10,TRUE
+Call Billing - Not Completed,Result,Call Billing,20,TRUE
+Email Billing - Completed,Result,Email Billing,10,TRUE
+Email Billing - Not Completed,Result,Email Billing,20,TRUE
+Initial Consultation - Completed,Result,Initial Consultation,10,TRUE
+Initial Consultation - Not Completed,Result,Initial Consultation,20,TRUE
+Call Attempted,Result,Call,10,TRUE
+Call Completed,Result,Call,20,TRUE
+Call Left Message,Result,Call,30,TRUE
+Call Received,Result,Call,40,TRUE
+Mail - Completed,Result,Mail,10,TRUE
+Mail - Not Completed,Result,Mail,20,TRUE
+Meeting Billing - Completed,Result,Meeting Billing,10,TRUE
+Meeting Billing - Not Completed,Result,Meeting Billing,20,TRUE
+Personal Activity - Completed,Result,Personal Activity,10,TRUE
+Personal Activity - Not Completed,Result,Personal Activity,20,TRUE
+Note,Result,Personal Activity,30,TRUE
+Mail Received,Result,Personal Activity,40,TRUE
+Mail Sent,Result,Personal Activity,50,TRUE
+Email Received,Result,Personal Activity,60,TRUE
+Courier Sent,Result,Personal Activity,70,TRUE
+Email Sent,Result,Personal Activity,80,TRUE
+Payment Received,Result,Personal Activity,90,TRUE
+Room 1 - Completed,Result,Room 1,10,TRUE
+Room 1 - Not Completed,Result,Room 1,20,TRUE
+Room 2 - Completed,Result,Room 2,10,TRUE
+Room 2 - Not Completed,Result,Room 2,20,TRUE
+Room 3 - Completed,Result,Room 3,10,TRUE
+Room 3 - Not Completed,Result,Room 3,20,TRUE
+To Do Billing - Completed,Result,To Do Billing,10,TRUE
+To Do Billing - Not Completed,Result,To Do Billing,20,TRUE
+Vacation - Completed,Result,Vacation,10,TRUE
+Vacation - Not Completed,Result,Vacation,20,TRUE
+Vacation Cancelled,Result,Vacation,30,TRUE
+Attachment,Result,Other,10,TRUE
+E-mail Attachment,Result,Other,20,TRUE
+E-mail Auto Attached,Result,Other,30,TRUE
+E-mail Sent,Result,Other,40,TRUE
+Hourly Consult $220,Regarding,Meeting,10,TRUE
+Initial Consultation Fee $165.00,Regarding,Meeting,20,TRUE
+No appointments today (check with Mark),Regarding,Meeting,30,TRUE
+No Appointments Tonight,Regarding,Meeting,40,TRUE
+No clients or appointments 4.00-5.00pm,Regarding,Meeting,50,TRUE
+Assemble catalogs,Regarding,To-Do,10,TRUE
+DEADLINE REMINDER,Regarding,To-Do,20,TRUE
+Deadline to lodge app,Regarding,To-Do,30,TRUE
+Deadline to provide additional docu,Regarding,To-Do,40,TRUE
+Deadline to respond,Regarding,To-Do,50,TRUE
+DEADLINE TODAY - Email received,Regarding,To-Do,60,TRUE
+Make travel arrangements,Regarding,To-Do,70,TRUE
+Send contract,Regarding,To-Do,80,TRUE
+Send follow-up letter,Regarding,To-Do,90,TRUE
+Send literature,Regarding,To-Do,100,TRUE
+Send proposal,Regarding,To-Do,110,TRUE
+Send quote,Regarding,To-Do,120,TRUE
+Send SMS reminder,Regarding,To-Do,130,TRUE
+2nd Followup,Regarding,Call,10,TRUE
+3rd Followup,Regarding,Call,20,TRUE
+4th Followup,Regarding,Call,30,TRUE
+5th Followup,Regarding,Call,40,TRUE
+Cold call,Regarding,Call,50,TRUE
+Confirm appointment,Regarding,Call,60,TRUE
+Discuss legal points,Regarding,Call,70,TRUE
+Follow up,Regarding,Call,80,TRUE
+New Client,Regarding,Call,90,TRUE
+Nomination and Visa Lodgement,Regarding,Call,100,TRUE
+Payment Made?,Regarding,Call,110,TRUE
+Returning call,Regarding,Call,120,TRUE
+Schedule a meeting,Regarding,Call,130,TRUE
+Appointment,Regarding,Appointment,10,TRUE
+Call,Regarding,Appointment,20,TRUE
+Dentist Appointment,Regarding,Appointment,30,TRUE
+Doctor Appointment,Regarding,Appointment,40,TRUE
+Eye Doctor Appointment,Regarding,Appointment,50,TRUE
+Make Appointment,Regarding,Appointment,60,TRUE
+Meeting,Regarding,Appointment,70,TRUE
+Parent-Teacher Conference,Regarding,Appointment,80,TRUE
+Shopping,Regarding,Appointment,90,TRUE
+Time Off,Regarding,Appointment,100,TRUE
+Workout,Regarding,Appointment,110,TRUE
+10,Duration,,10,TRUE
+20,Duration,,20,TRUE
+30,Duration,,30,TRUE
+40,Duration,,40,TRUE
+50,Duration,,50,TRUE
+60,Duration,,60,TRUE
+70,Duration,,70,TRUE
+80,Duration,,80,TRUE
+90,Duration,,90,TRUE
+100,Duration,,100,TRUE
+110,Duration,,110,TRUE
+120,Duration,,120,TRUE
+130,Duration,,130,TRUE
+140,Duration,,140,TRUE
+150,Duration,,150,TRUE
+160,Duration,,160,TRUE
+170,Duration,,170,TRUE
+180,Duration,,180,TRUE
+190,Duration,,190,TRUE
+200,Duration,,200,TRUE
+210,Duration,,210,TRUE
+220,Duration,,220,TRUE
+230,Duration,,230,TRUE
+240,Duration,,240,TRUE

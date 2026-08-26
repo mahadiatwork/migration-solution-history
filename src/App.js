@@ -161,7 +161,7 @@ const parseCoqlV8Response = (response) => {
 // STEP 2: Component State Management
 // ============================================================================
 const App = () => {
-  const { module, recordId } = useZohoInit();
+  const { module, recordId, initZoho } = useZohoInit();
   const { enqueueSnackbar } = useSnackbar();
   const [initPageContent, setInitPageContent] = React.useState(
     <CircularProgress />
@@ -564,6 +564,29 @@ const App = () => {
   // ============================================================================
   // Initialization Effect: Fetch data when contact changes
   // ============================================================================
+  React.useEffect(() => {
+    if (!initZoho) return undefined;
+    let cancelled = false;
+    (async () => {
+      try {
+        const config = await fetchPicklistConfig();
+        if (cancelled) return;
+        setPicklistConfig(config);
+        const fromModule = getTypeOptionsFromConfig(config);
+        setTypeList((prev) =>
+          [...new Set([...fromModule, ...prev])].sort((a, b) =>
+            a.localeCompare(b)
+          )
+        );
+      } catch (configError) {
+        console.warn("Failed to load Widget_Picklist_Config:", configError);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [initZoho]);
+
   React.useEffect(() => {
     if (module && recordId) {
       // Clear cache when contact changes to avoid mixing data from different contacts

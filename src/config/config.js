@@ -46,12 +46,13 @@ export const MATTER_SOURCE_FIELDS = {
 };
 
 // ============================================================================
-// Admin-Configurable Picklist Config Module
+// Widget Picklist Config — Zoho CRM custom module (primary source)
 // ============================================================================
-// Zoho CRM custom module that stores picklist entries for the widget.
-// Admin users can add/edit/remove entries without code changes.
-// If this module doesn't exist or has no records, the widget falls back
-// to the hard-coded defaults in dialogConstants.js / helperFunc.js.
+// Admins add / edit / hide History Type, Result, Regarding, and Duration
+// options as records in Widget_Picklist_Config.
+// Setup notes and CSV seed: src/config/WIDGET_PICKLIST_CONFIG_SETUP.md
+// If the module is empty or unreachable, the widget uses hard-coded lists
+// in dialogConstants.js / helperFunc.js.
 export const PICKLIST_CONFIG_MODULE = "Widget_Picklist_Config";
 
 // Field API names on the Widget_Picklist_Config module

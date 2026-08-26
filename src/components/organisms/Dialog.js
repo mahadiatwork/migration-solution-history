@@ -1035,7 +1035,13 @@ export function Dialog({
               <Autocomplete
                 options={durationOptions || []}
                 getOptionLabel={(option) => (option != null ? String(option) : "")}
-                value={formData?.duration ?? null}
+                value={
+                  formData?.duration == null
+                    ? null
+                    : (durationOptions || []).find(
+                        (d) => Number(d) === Number(formData.duration)
+                      ) ?? formData.duration
+                }
                 onChange={(event, newValue) =>
                   handleInputChange("duration", newValue)
                 }
