@@ -123,6 +123,20 @@ export const buildViewOwner = (owner) => {
   };
 };
 
+/** Fields that must stay in sync on every History X Contacts junction row. */
+export const buildJunctionSyncFields = ({ Owner, Stakeholder } = {}) => ({
+  ...(Owner?.id ? { Owner: { id: Owner.id } } : {}),
+  Stakeholder: Stakeholder?.id ? { id: Stakeholder.id } : null,
+});
+
+export const requireSuccessfulRecordResponse = (response, action) => {
+  const result = response?.data?.[0];
+  if (result?.code === "SUCCESS") return response;
+
+  const detail = result?.message || result?.code;
+  throw new Error(`${action} failed${detail ? `: ${detail}` : "."}`);
+};
+
 export const typeOptions = mergeCategoryOptions();
 
 // Maps each category/type to the first Activity Type/Result used on selection.

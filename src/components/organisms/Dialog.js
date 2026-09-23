@@ -40,7 +40,9 @@ import Stakeholder from "../atoms/Stakeholder";
 import { Close } from "@mui/icons-material";
 import {
   fetchMatterById,
+  normalizeSingleMultiSelectValue,
   resolveMatterContextForContact,
+  serializeMultiSelectPicklist,
 } from "../../services/matterSnapshot";
 import {
   fetchMatterPicklistMetadata,
@@ -50,12 +52,14 @@ import {
 } from "../../services/matterMetadata";
 import {
   billingTypeOptions,
+  buildJunctionSyncFields,
   buildViewOwner,
   DEFAULT_ACTIVITY_TYPE,
   DEFAULT_BILLING_TYPE,
   DEFAULT_CATEGORY,
   durationOptions as fallbackDurationOptions,
   mergeOrderedUnique,
+  requireSuccessfulRecordResponse,
   serializeDuration,
   typeOptions as fallbackTypeOptions,
 } from "./dialogConstants";
@@ -95,7 +99,7 @@ const matterFormValuesFromHistory = (history) => ({
   matter: normalizeLookup(history?.Matter),
   matterNo: history?.Matter_No ?? "",
   currentStage: normalizePicklistValue(history?.Current_Stage),
-  matterProgress: normalizePicklistValue(history?.Matter_Progress),
+  matterProgress: normalizeSingleMultiSelectValue(history?.Matter_Progress),
   billingType: history?.Billing_Type ?? DEFAULT_BILLING_TYPE,
 });
 
@@ -233,7 +237,7 @@ export function Dialog({
           currentStage: normalizePicklistValue(
             selectedRowData?.currentStage
           ),
-          matterProgress: normalizePicklistValue(
+          matterProgress: normalizeSingleMultiSelectValue(
             selectedRowData?.matterProgress
           ),
           billingType:
@@ -299,7 +303,7 @@ export function Dialog({
             matter: selectedRowData.matter || null,
             matterNo: selectedRowData.matterNo ?? "",
             currentStage: normalizePicklistValue(selectedRowData.currentStage),
-            matterProgress: normalizePicklistValue(
+            matterProgress: normalizeSingleMultiSelectValue(
               selectedRowData.matterProgress
             ),
             billingType:
@@ -549,7 +553,7 @@ export function Dialog({
       Date: dateTimeFormatted,
       Matter_No: formData.matterNo || null,
       Current_Stage: formData.currentStage || null,
-      Matter_Progress: formData.matterProgress || null,
+      Matter_Progress: serializeMultiSelectPicklist(formData.matterProgress),
       Billing_Type: formData.billingType || DEFAULT_BILLING_TYPE,
     };
 
@@ -654,18 +658,18 @@ export function Dialog({
             APIData: {
               Contact_History_Info: { id: historyId },
               Contact_Details: { id: contact.id },
-              Owner: finalData.Owner,
+              ...buildJunctionSyncFields(finalData),
             },
             Trigger: ["workflow"],
           });
-
-          if (contactResponse?.data[0]?.code === "SUCCESS") {
-            contactRecordIds.push(contactResponse.data[0].details.id);
-          } else {
-            console.warn(`Failed to insert contact for ID ${contact.id}`);
-          }
+          requireSuccessfulRecordResponse(
+            contactResponse,
+            `Contact junction create for ${contact.id}`
+          );
+          contactRecordIds.push(contactResponse.data[0].details.id);
         } catch (error) {
           console.error(`Error inserting contact ${contact.id}:`, error);
+          throw error;
         }
       }
 
@@ -763,20 +767,22 @@ export function Dialog({
       const existingContactIds = existingContacts.map(c => c.Contact_Details?.id);
       const selectedContactIds = selectedParticipants.map(c => c.id);
 
-      if (finalData?.Owner?.id) {
-        await Promise.all(
-          existingContacts
-            .filter((record) => record?.id)
-            .map((record) =>
-              ZOHO.CRM.API.updateRecord({
-                Entity: "History_X_Contacts",
-                RecordID: record.id,
-                APIData: { Owner: { id: finalData.Owner.id } },
-                Trigger: ["workflow"],
-              })
-            )
-        );
-      }
+      await Promise.all(
+        existingContacts
+          .filter((record) => record?.id)
+          .map(async (record) => {
+            const response = await ZOHO.CRM.API.updateRecord({
+              Entity: "History_X_Contacts",
+              RecordID: record.id,
+              APIData: buildJunctionSyncFields(finalData),
+              Trigger: ["workflow"],
+            });
+            return requireSuccessfulRecordResponse(
+              response,
+              `Contact junction update for ${record.id}`
+            );
+          })
+      );
 
       const toDeleteContactIds = existingContactIds.filter(id => !selectedContactIds.includes(id));
       const toAddContacts = selectedParticipants.filter(c => !existingContactIds.includes(c.id));
@@ -793,18 +799,22 @@ export function Dialog({
 
       for (const contact of toAddContacts) {
         try {
-          await ZOHO.CRM.API.insertRecord({
+          const response = await ZOHO.CRM.API.insertRecord({
             Entity: "History_X_Contacts",
             APIData: {
               Contact_History_Info: { id: historyId },
               Contact_Details: { id: contact.id },
-              Stakeholder: finalData?.Stakeholder,
-              Owner: finalData?.Owner,
+              ...buildJunctionSyncFields(finalData),
             },
             Trigger: ["workflow"],
           });
+          requireSuccessfulRecordResponse(
+            response,
+            `Contact junction create for ${contact.id}`
+          );
         } catch (error) {
           console.error(`Error inserting contact ${contact.id}:`, error);
+          throw error;
         }
       }
 

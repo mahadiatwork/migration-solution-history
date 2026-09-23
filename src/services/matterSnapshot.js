@@ -66,11 +66,31 @@ export const fetchMatterById = async (matterId) => {
   return response?.data?.[0] || null;
 };
 
-const formatMultiSelect = (value) => {
-  if (value == null || value === "") return null;
-  if (Array.isArray(value)) return value.filter(Boolean).join(", ");
-  return String(value);
+/** Serialize a Zoho multi-select picklist value for create/update requests. */
+export const serializeMultiSelectPicklist = (value) => {
+  const values = Array.isArray(value) ? value : [value];
+  const seen = new Set();
+  const serialized = [];
+
+  values.forEach((item) => {
+    if (item == null) return;
+    const rawValue =
+      typeof item === "object"
+        ? item.actual_value ?? item.display_value ?? item.value ?? item.name
+        : item;
+    if (rawValue == null) return;
+    const normalized = String(rawValue).trim();
+    if (!normalized || seen.has(normalized)) return;
+    seen.add(normalized);
+    serialized.push(normalized);
+  });
+
+  return serialized.length > 0 ? serialized : null;
 };
+
+/** The Contact History dialog intentionally edits one progress value at a time. */
+export const normalizeSingleMultiSelectValue = (value) =>
+  serializeMultiSelectPicklist(value)?.[0] || "";
 
 /**
  * Build History1 matter snapshot payload from a Matter record.
@@ -84,7 +104,7 @@ export const buildMatterSnapshotFields = (matter) => {
   return {
     [matterNo]: matter[src.matterNo] || null,
     [currentStage]: matter[src.currentStage] || null,
-    [matterProgress]: formatMultiSelect(matter[src.matterProgress]),
+    [matterProgress]: serializeMultiSelectPicklist(matter[src.matterProgress]),
   };
 };
 

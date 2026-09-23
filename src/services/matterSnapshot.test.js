@@ -1,6 +1,8 @@
 import {
   buildMatterSnapshotFields,
+  normalizeSingleMultiSelectValue,
   resolveMatterContextForContact,
+  serializeMultiSelectPicklist,
   selectPrimaryMatter,
 } from "./matterSnapshot";
 
@@ -29,8 +31,23 @@ describe("contact Matter snapshot", () => {
     ).toEqual({
       Matter_No: "MAT-1001",
       Current_Stage: "Open",
-      Matter_Progress: "Collecting",
+      Matter_Progress: ["Collecting"],
     });
+  });
+
+  test("serializes a selected Matter Progress as a Zoho multi-select value", () => {
+    expect(serializeMultiSelectPicklist("Collecting")).toEqual(["Collecting"]);
+    expect(
+      serializeMultiSelectPicklist(["Collecting", "", "Collecting"])
+    ).toEqual(["Collecting"]);
+    expect(serializeMultiSelectPicklist("")).toBeNull();
+  });
+
+  test("round-trips one valid option when a record contains multiple progress values", () => {
+    const selectedValue = normalizeSingleMultiSelectValue(["Collecting", "Review"]);
+
+    expect(selectedValue).toBe("Collecting");
+    expect(serializeMultiSelectPicklist(selectedValue)).toEqual(["Collecting"]);
   });
 
   test("hydrates a sparse related Matter before building the snapshot", async () => {
@@ -64,7 +81,7 @@ describe("contact Matter snapshot", () => {
       snapshot: {
         Matter_No: "MAT-1001",
         Current_Stage: "7. Decision",
-        Matter_Progress: "Awaiting decision",
+        Matter_Progress: ["Awaiting decision"],
       },
     });
 

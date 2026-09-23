@@ -1,4 +1,5 @@
 import {
+  buildJunctionSyncFields,
   buildViewOwner,
   DEFAULT_ACTIVITY_TYPE,
   DEFAULT_CATEGORY,
@@ -7,11 +8,43 @@ import {
   mandatoryCategoryOptions,
   mergeCategoryOptions,
   mergeDurationOptions,
+  requireSuccessfulRecordResponse,
   serializeDuration,
 } from "./dialogConstants";
 import { getResultOptions } from "./helperFunc";
 
 describe("matter history required options", () => {
+  test("keeps owner and stakeholder aligned on contact junction rows", () => {
+    const stakeholder = { id: "stakeholder-1", name: "abc 2" };
+
+    expect(
+      buildJunctionSyncFields({
+        Owner: { id: "owner-1", name: "Admin" },
+        Stakeholder: stakeholder,
+      })
+    ).toEqual({
+      Owner: { id: "owner-1" },
+      Stakeholder: { id: "stakeholder-1" },
+    });
+    expect(buildJunctionSyncFields({ Owner: { id: "owner-1" } })).toEqual({
+      Owner: { id: "owner-1" },
+      Stakeholder: null,
+    });
+  });
+
+  test("rejects a contact junction response that Zoho did not mark successful", () => {
+    const success = { data: [{ code: "SUCCESS" }] };
+    expect(requireSuccessfulRecordResponse(success, "Contact sync")).toBe(
+      success
+    );
+    expect(() =>
+      requireSuccessfulRecordResponse(
+        { data: [{ code: "INVALID_DATA", message: "bad lookup" }] },
+        "Contact sync"
+      )
+    ).toThrow("Contact sync failed: bad lookup");
+  });
+
   test("preserves the selected owner name for the immediate UI update", () => {
     expect(
       buildViewOwner({
