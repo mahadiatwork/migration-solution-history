@@ -1,5 +1,6 @@
 import {
   buildJunctionSyncFields,
+  buildJunctionUpdateData,
   buildViewOwner,
   DEFAULT_ACTIVITY_TYPE,
   DEFAULT_CATEGORY,
@@ -29,6 +30,19 @@ describe("matter history required options", () => {
     expect(buildJunctionSyncFields({ Owner: { id: "owner-1" } })).toEqual({
       Owner: { id: "owner-1" },
       Stakeholder: null,
+    });
+  });
+
+  test("includes the junction id required by Zoho update requests", () => {
+    expect(
+      buildJunctionUpdateData("junction-1", {
+        Owner: { id: "owner-1" },
+        Stakeholder: { id: "stakeholder-1" },
+      })
+    ).toEqual({
+      id: "junction-1",
+      Owner: { id: "owner-1" },
+      Stakeholder: { id: "stakeholder-1" },
     });
   });
 

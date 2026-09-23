@@ -129,6 +129,12 @@ export const buildJunctionSyncFields = ({ Owner, Stakeholder } = {}) => ({
   Stakeholder: Stakeholder?.id ? { id: Stakeholder.id } : null,
 });
 
+/** Zoho requires the junction record ID inside APIData for updates. */
+export const buildJunctionUpdateData = (recordId, fields) => ({
+  id: recordId,
+  ...buildJunctionSyncFields(fields),
+});
+
 export const requireSuccessfulRecordResponse = (response, action) => {
   const result = response?.data?.[0];
   if (result?.code === "SUCCESS") return response;

@@ -56,6 +56,7 @@ import {
 import {
   billingTypeOptions,
   buildJunctionSyncFields,
+  buildJunctionUpdateData,
   buildViewOwner,
   DEFAULT_ACTIVITY_TYPE,
   DEFAULT_BILLING_TYPE,
@@ -926,7 +927,7 @@ export function Dialog({
             const response = await ZOHO.CRM.API.updateRecord({
               Entity: "History_X_Contacts",
               RecordID: record.id,
-              APIData: buildJunctionSyncFields(finalData),
+              APIData: buildJunctionUpdateData(record.id, finalData),
               Trigger: ["workflow"],
             });
             return requireSuccessfulRecordResponse(
