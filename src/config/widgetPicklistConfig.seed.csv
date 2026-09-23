@@ -1,4 +1,9 @@
 Name,Category,Parent_Type,Sort_Order,Active
+Communication & Meetings,Type,,1,TRUE
+Assessment & Analysis,Type,,2,TRUE
+Technical casework,Type,,3,TRUE
+Administration,Type,,4,TRUE
+Other,Type,,5,TRUE
 Meeting,Type,,10,TRUE
 To-Do,Type,,20,TRUE
 Appointment,Type,,30,TRUE
@@ -15,7 +20,32 @@ Room 2,Type,,130,TRUE
 Room 3,Type,,140,TRUE
 To Do Billing,Type,,150,TRUE
 Vacation,Type,,160,TRUE
-Other,Type,,170,TRUE
+Call,Result,Communication & Meetings,10,TRUE
+Email,Result,Communication & Meetings,20,TRUE
+Meeting,Result,Communication & Meetings,30,TRUE
+Consultation,Result,Communication & Meetings,40,TRUE
+Assessment,Result,Assessment & Analysis,10,TRUE
+Research,Result,Assessment & Analysis,20,TRUE
+Strategy & Problem Solving,Result,Assessment & Analysis,30,TRUE
+Evidence & Risk Analysis,Result,Assessment & Analysis,40,TRUE
+Document Collection/Management,Result,Technical casework,10,TRUE
+Document Review,Result,Technical casework,20,TRUE
+Drafting/Preparation,Result,Technical casework,30,TRUE
+Review/Checking,Result,Technical casework,40,TRUE
+Amendments,Result,Technical casework,50,TRUE
+Lodgement/Submission,Result,Technical casework,60,TRUE
+RFI,Result,Technical casework,70,TRUE
+Matter Administration,Result,Administration,10,TRUE
+CRM/File Management,Result,Administration,20,TRUE
+Allocation/Handover,Result,Administration,30,TRUE
+Billing/Payment,Result,Administration,40,TRUE
+Closure/Archiving,Result,Administration,50,TRUE
+Training,Result,Other,10,TRUE
+Business Development,Result,Other,20,TRUE
+Internal Project/Process Improvement,Result,Other,30,TRUE
+Internal Meeting,Result,Other,40,TRUE
+General Management,Result,Other,50,TRUE
+Other,Result,Other,60,TRUE
 Meeting Held,Result,Meeting,10,TRUE
 Meeting Not Held,Result,Meeting,20,TRUE
 To-do Done,Result,To-Do,10,TRUE
@@ -58,10 +88,6 @@ To Do Billing - Not Completed,Result,To Do Billing,20,TRUE
 Vacation - Completed,Result,Vacation,10,TRUE
 Vacation - Not Completed,Result,Vacation,20,TRUE
 Vacation Cancelled,Result,Vacation,30,TRUE
-Attachment,Result,Other,10,TRUE
-E-mail Attachment,Result,Other,20,TRUE
-E-mail Auto Attached,Result,Other,30,TRUE
-E-mail Sent,Result,Other,40,TRUE
 Hourly Consult $220,Regarding,Meeting,10,TRUE
 Initial Consultation Fee $165.00,Regarding,Meeting,20,TRUE
 No appointments today (check with Mark),Regarding,Meeting,30,TRUE
@@ -104,27 +130,52 @@ Parent-Teacher Conference,Regarding,Appointment,80,TRUE
 Shopping,Regarding,Appointment,90,TRUE
 Time Off,Regarding,Appointment,100,TRUE
 Workout,Regarding,Appointment,110,TRUE
+0,Duration,,1,TRUE
+5,Duration,,5,TRUE
 10,Duration,,10,TRUE
+15,Duration,,15,TRUE
 20,Duration,,20,TRUE
+25,Duration,,25,TRUE
 30,Duration,,30,TRUE
+35,Duration,,35,TRUE
 40,Duration,,40,TRUE
+45,Duration,,45,TRUE
 50,Duration,,50,TRUE
+55,Duration,,55,TRUE
 60,Duration,,60,TRUE
+65,Duration,,65,TRUE
 70,Duration,,70,TRUE
+75,Duration,,75,TRUE
 80,Duration,,80,TRUE
+85,Duration,,85,TRUE
 90,Duration,,90,TRUE
+95,Duration,,95,TRUE
 100,Duration,,100,TRUE
+105,Duration,,105,TRUE
 110,Duration,,110,TRUE
+115,Duration,,115,TRUE
 120,Duration,,120,TRUE
+125,Duration,,125,TRUE
 130,Duration,,130,TRUE
+135,Duration,,135,TRUE
 140,Duration,,140,TRUE
+145,Duration,,145,TRUE
 150,Duration,,150,TRUE
+155,Duration,,155,TRUE
 160,Duration,,160,TRUE
+165,Duration,,165,TRUE
 170,Duration,,170,TRUE
+175,Duration,,175,TRUE
 180,Duration,,180,TRUE
+185,Duration,,185,TRUE
 190,Duration,,190,TRUE
+195,Duration,,195,TRUE
 200,Duration,,200,TRUE
+205,Duration,,205,TRUE
 210,Duration,,210,TRUE
+215,Duration,,215,TRUE
 220,Duration,,220,TRUE
+225,Duration,,225,TRUE
 230,Duration,,230,TRUE
+235,Duration,,235,TRUE
 240,Duration,,240,TRUE

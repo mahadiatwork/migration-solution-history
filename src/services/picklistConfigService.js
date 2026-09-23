@@ -16,6 +16,9 @@ import {
   typeOptions as defaultTypeOptions,
   resultMapping as defaultResultMapping,
   durationOptions as defaultDurationOptions,
+  mandatoryActivityTypes,
+  mergeCategoryOptions,
+  mergeDurationOptions,
 } from "../components/organisms/dialogConstants";
 
 const ZOHO = window.ZOHO;
@@ -312,12 +315,15 @@ const _buildFallbackConfig = () => ({
 
 export const getTypeOptionsFromConfig = (config) => {
   if (config?.types && config.types.length > 0) {
-    return config.types;
+    return mergeCategoryOptions(config.types);
   }
-  return defaultTypeOptions;
+  return mergeCategoryOptions(defaultTypeOptions);
 };
 
 export const getResultOptionsFromConfig = (type, config) => {
+  if (mandatoryActivityTypes[type]) {
+    return mandatoryActivityTypes[type];
+  }
   if (config?.results) {
     const typeResults = config.results[type];
     if (typeResults && typeResults.length > 0) {
@@ -347,14 +353,22 @@ export const getRegardingOptionsFromConfig = (type, config) => {
 
 export const getDurationOptionsFromConfig = (config) => {
   if (config?.durations && config.durations.length > 0) {
-    return config.durations;
+    return mergeDurationOptions(config.durations);
   }
-  return defaultDurationOptions;
+  return mergeDurationOptions(defaultDurationOptions);
 };
 
 export const getResultMappingFromConfig = (config) => {
   if (config?.resultMapping && Object.keys(config.resultMapping).length > 0) {
-    return config.resultMapping;
+    return {
+      ...config.resultMapping,
+      ...Object.fromEntries(
+        Object.entries(mandatoryActivityTypes).map(([category, activities]) => [
+          category,
+          activities[0],
+        ])
+      ),
+    };
   }
   return defaultResultMapping;
 };

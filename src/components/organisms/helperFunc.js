@@ -1,4 +1,6 @@
 
+import { mandatoryActivityTypes, mergeOrderedUnique } from "./dialogConstants";
+
 /**
  * Helper Functions for Dialog Picklists
  *
@@ -16,7 +18,16 @@
  * @param {Object|null} [config] - Admin picklist config from picklistConfigService
  * @returns {string[]} Array of result option values
  */
-export const getResultOptions = (type, config) => {
+export const getResultOptions = (type, config, existingValue) => {
+  // The new matter-history categories are product requirements, not optional
+  // admin configuration. Keep their exact dependency map ahead of all legacy
+  // and CRM-configured fallbacks, while retaining an existing historical value
+  // so older records remain editable.
+  const mandatoryResults = mandatoryActivityTypes[type];
+  if (mandatoryResults) {
+    return mergeOrderedUnique(mandatoryResults, [existingValue]);
+  }
+
   // If admin config is available and has results for this type, use them
   if (config?.results) {
     const typeResults = config.results[type];
@@ -138,4 +149,3 @@ export const getRegardingOptions = (type, existingValue, config) => {
 
   return predefinedOptions;
 };
-

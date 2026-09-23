@@ -157,6 +157,16 @@ const parseCoqlV8Response = (response) => {
   return { data, moreRecords, errorCode, errorMessage, raw: response };
 };
 
+const normalizeLookupValue = (lookup) => {
+  if (!lookup || typeof lookup !== "object") return null;
+  const id = lookup.id ?? lookup.ID ?? lookup.Id;
+  if (id == null) return null;
+  return {
+    id: String(id),
+    name: lookup.name ?? lookup.Name ?? lookup.display_value ?? "",
+  };
+};
+
 // ============================================================================
 // STEP 2: Component State Management
 // ============================================================================
@@ -246,7 +256,7 @@ const App = () => {
   // ============================================================================
   // Visible in UI so we can confirm the paginated build is what CRM is serving
   const HISTORY_FETCH_BUILD = "paginated-v3";
-  const COQL_HISTORY_SELECT = `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date,Contact_History_Info.Stakeholder from History_X_Contacts`;
+  const COQL_HISTORY_SELECT = `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date,Contact_History_Info.Stakeholder,Contact_History_Info.Matter,Contact_History_Info.Matter_No,Contact_History_Info.Current_Stage,Contact_History_Info.Matter_Progress,Contact_History_Info.Billing_Type from History_X_Contacts`;
   const COQL_HISTORY_ORDER = "order by Contact_History_Info.Date desc, id desc";
   const COQL_PAGE_SIZE = 2000; // Zoho COQL v8 hard cap per request
   const COQL_MAX_RECORDS = 100000; // Zoho COQL pagination ceiling
@@ -448,9 +458,9 @@ const App = () => {
           name: obj["Contact_Details.Full_Name"] || "No Name",
           id: obj?.id,
           date_time: obj["Contact_History_Info.Date"] || "No Date",
-          type: obj["Contact_History_Info.History_Type"] || "Unknown Type",
-          result: obj["Contact_History_Info.History_Result"] || "No Result",
-          duration: obj["Contact_History_Info.Duration"] || "N/A",
+          type: obj["Contact_History_Info.History_Type"] || "Unknown Category",
+          result: obj["Contact_History_Info.History_Result"] || "No Activity Type",
+          duration: obj["Contact_History_Info.Duration"] ?? "N/A",
           regarding: obj["Contact_History_Info.Regarding"] || "No Regarding",
           details: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
           icon: <DownloadIcon />,
@@ -476,6 +486,11 @@ const App = () => {
 
             return id != null ? { id, name: rawName || "" } : null;
           })(),
+          matter: normalizeLookupValue(obj["Contact_History_Info.Matter"]),
+          matterNo: obj["Contact_History_Info.Matter_No"] ?? "",
+          currentStage: obj["Contact_History_Info.Current_Stage"] ?? "",
+          matterProgress: obj["Contact_History_Info.Matter_Progress"] ?? "",
+          billingType: obj["Contact_History_Info.Billing_Type"] ?? "Billable",
           history_id: obj["Contact_History_Info.id"]
         };
       });
@@ -633,9 +648,9 @@ const App = () => {
         ? newRecord.Participants.map((c) => c.Full_Name).join(", ")
         : newRecord.name || "Unknown Name",
       date_time: newRecord.Date || dayjs().format(), // Ensure date is consistent
-      type: newRecord.History_Type || "Unknown Type",
-      result: newRecord.History_Result || "No Result",
-      duration: newRecord.Duration || "N/A",
+      type: newRecord.History_Type || "Unknown Category",
+      result: newRecord.History_Result || "No Activity Type",
+      duration: newRecord.Duration ?? "N/A",
       regarding: newRecord.Regarding || "No Regarding",
       details: newRecord.History_Details_Plain || "No Details",
       ownerName: newRecord.Owner?.full_name || "Unknown Owner",
@@ -646,6 +661,11 @@ const App = () => {
           : newRecord.historyDetails?.name || "Unknown",
       },
       stakeHolder: newRecord.Stakeholder || null,
+      matter: normalizeLookupValue(newRecord.Matter),
+      matterNo: newRecord.Matter_No ?? "",
+      currentStage: newRecord.Current_Stage ?? "",
+      matterProgress: newRecord.Matter_Progress ?? "",
+      billingType: newRecord.Billing_Type ?? "Billable",
       Participants: participantsArray,
     };
 
@@ -688,6 +708,11 @@ const App = () => {
       ownerName: updatedRecord?.Owner?.full_name,
       date_time: updatedRecord?.Date, // Ensure date is consistent
       stakeHolder: updatedRecord?.Stakeholder,
+      matter: normalizeLookupValue(updatedRecord?.Matter),
+      matterNo: updatedRecord?.Matter_No ?? "",
+      currentStage: updatedRecord?.Current_Stage ?? "",
+      matterProgress: updatedRecord?.Matter_Progress ?? "",
+      billingType: updatedRecord?.Billing_Type ?? "Billable",
       // name: updatedRecord.Participants
       //     ? updatedRecord.Participants.map((c) => c.Full_Name).join(", ")
       //     : updatedRecord.name,
@@ -804,7 +829,7 @@ const App = () => {
 
     // Type filter
     if (filterType.length > 0) {
-      activeFilters.push("Type");
+      activeFilters.push("Category");
     }
 
     // Owner filter (only if subset is selected)
@@ -989,7 +1014,7 @@ const App = () => {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Types"
+                    label="Categories"
                     size="small"
                     InputLabelProps={{ style: { fontSize: "9pt" } }}
                   />
@@ -1258,7 +1283,7 @@ const App = () => {
                   },
                 }}
                 renderInput={(params) => (
-                  <TextField {...params} label="Types" size="small" />
+                  <TextField {...params} label="Categories" size="small" />
                 )}
                 renderTags={(value) =>
                   value.length > 0 ? (
@@ -1347,8 +1372,8 @@ const App = () => {
                   <TableHead>
                     <TableRow>
                       <TableCell>Name</TableCell>
-                      <TableCell>Type</TableCell>
-                      <TableCell>Result</TableCell>
+                      <TableCell>Category</TableCell>
+                      <TableCell>Activity Type</TableCell>
                       <TableCell>Date & Time</TableCell>
                       <TableCell>Owner</TableCell>
                     </TableRow>
@@ -1366,8 +1391,8 @@ const App = () => {
                           }}
                         >
                           <TableCell>{row.name || "Unknown Name"}</TableCell>
-                          <TableCell>{row.type || "Unknown Type"}</TableCell>
-                          <TableCell>{row.result || "No Result"}</TableCell>
+                          <TableCell>{row.type || "Unknown Category"}</TableCell>
+                          <TableCell>{row.result || "No Activity Type"}</TableCell>
                           <TableCell>
                             {row.date_time
                               ? dayjs(row.date_time).format(

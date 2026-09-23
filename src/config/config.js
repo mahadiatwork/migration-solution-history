@@ -25,6 +25,7 @@ export const APPLICATIONS_MODULE_NAMES = ["Applications", "Applications1", "Deal
 
 // Related list on Contacts linking to Matters (Applications module).
 export const CONTACT_MATTERS_RELATED_LIST = "Applications";
+export const MATTERS_MODULE = "Applications";
 
 // History1 custom fields for matter snapshot at creation time.
 // Create these fields in Zoho CRM (Setup > Developer Hub > Fields) if not present.
@@ -33,6 +34,7 @@ export const HISTORY_MATTER_FIELDS = {
   matterNo: "Matter_No",
   currentStage: "Current_Stage",
   matterProgress: "Matter_Progress",
+  billingType: "Billing_Type",
 };
 
 // Applications (Matters) module fields read when building the snapshot.

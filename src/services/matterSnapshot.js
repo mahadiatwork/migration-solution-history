@@ -5,6 +5,7 @@
 import {
   CONTACT_MATTERS_RELATED_LIST,
   HISTORY_MATTER_FIELDS,
+  MATTERS_MODULE,
   MATTER_SOURCE_FIELDS,
 } from "../config/config";
 
@@ -54,6 +55,19 @@ export const fetchContactMatters = async (contactId) => {
   return Array.isArray(response?.data) ? response.data : [];
 };
 
+/** Fetch one Matter record without mutating it. Used to identify its layout. */
+export const fetchMatterById = async (matterId) => {
+  if (!matterId) return null;
+
+  const response = await ZOHO.CRM.API.getRecord({
+    Entity: MATTERS_MODULE,
+    approved: "both",
+    RecordID: matterId,
+  });
+
+  return response?.data?.[0] || null;
+};
+
 const formatMultiSelect = (value) => {
   if (value == null || value === "") return null;
   if (Array.isArray(value)) return value.filter(Boolean).join(", ");
@@ -79,15 +93,28 @@ export const buildMatterSnapshotFields = (matter) => {
 };
 
 /**
- * Resolve matter snapshot fields for a contact at history creation time.
+ * Resolve both the selected source Matter and the History1 snapshot payload.
+ * Keeping the record alongside the payload lets the dialog use the source
+ * Matter's layout metadata without a second related-list request.
  */
-export const resolveMatterSnapshotForContact = async (contactId) => {
+export const resolveMatterContextForContact = async (contactId) => {
   try {
     const matters = await fetchContactMatters(contactId);
     const matter = selectPrimaryMatter(matters);
-    return buildMatterSnapshotFields(matter);
+    return {
+      matter,
+      snapshot: buildMatterSnapshotFields(matter),
+    };
   } catch (error) {
-    console.warn("Could not resolve matter snapshot for history create:", error);
-    return {};
+    console.warn("Could not resolve matter context for history create:", error);
+    return { matter: null, snapshot: {} };
   }
+};
+
+/**
+ * Resolve matter snapshot fields for a contact at history creation time.
+ */
+export const resolveMatterSnapshotForContact = async (contactId) => {
+  const { snapshot } = await resolveMatterContextForContact(contactId);
+  return snapshot;
 };
