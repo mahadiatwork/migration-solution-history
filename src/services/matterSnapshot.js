@@ -29,6 +29,37 @@ export const selectPrimaryMatter = (matters = []) => {
 };
 
 /**
+ * Match a saved History snapshot back to one of the Contact's related Matters.
+ * A saved ID is authoritative. Legacy Matter No matching is only safe when the
+ * name is unique, otherwise the user must select the intended Matter.
+ */
+export const findRelatedMatter = (
+  matters = [],
+  { matterId = null, matterNo = "" } = {}
+) => {
+  if (!Array.isArray(matters)) return null;
+  const validMatters = matters.filter((matter) => matter?.id);
+
+  if (matterId != null && matterId !== "") {
+    return (
+      validMatters.find(
+        (matter) => String(matter.id) === String(matterId)
+      ) || null
+    );
+  }
+
+  const normalizedMatterNo = String(matterNo || "").trim();
+  if (!normalizedMatterNo) return null;
+
+  const matches = validMatters.filter(
+    (matter) =>
+      String(matter?.[MATTER_SOURCE_FIELDS.matterNo] || "").trim() ===
+      normalizedMatterNo
+  );
+  return matches.length === 1 ? matches[0] : null;
+};
+
+/**
  * Fetch related Matters (Applications) for a contact.
  */
 export const fetchContactMatters = async (contactId) => {

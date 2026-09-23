@@ -1,5 +1,6 @@
 import {
   buildMatterSnapshotFields,
+  findRelatedMatter,
   normalizeSingleMultiSelectValue,
   resolveMatterContextForContact,
   serializeMultiSelectPicklist,
@@ -7,6 +8,36 @@ import {
 } from "./matterSnapshot";
 
 describe("contact Matter snapshot", () => {
+  test("matches an edit Matter by ID before considering its saved number", () => {
+    const first = { id: "matter-1", Name: "MAT-1" };
+    const second = { id: "matter-2", Name: "MAT-2" };
+
+    expect(
+      findRelatedMatter([first, second], {
+        matterId: "matter-2",
+        matterNo: "MAT-1",
+      })
+    ).toBe(second);
+    expect(
+      findRelatedMatter([first], {
+        matterId: "missing",
+        matterNo: "MAT-1",
+      })
+    ).toBeNull();
+  });
+
+  test("matches a legacy Matter No only when it is unique", () => {
+    const unique = { id: "matter-1", Name: "Testing" };
+    expect(findRelatedMatter([unique], { matterNo: "Testing" })).toBe(unique);
+    expect(
+      findRelatedMatter(
+        [unique, { id: "matter-2", Name: "Testing" }],
+        { matterNo: "Testing" }
+      )
+    ).toBeNull();
+    expect(findRelatedMatter([unique], {})).toBeNull();
+  });
+
   test("selects the most recently modified related Matter", () => {
     const older = {
       id: "older",

@@ -39,9 +39,12 @@ import ApplicationDialog from "./ApplicationTable";
 import Stakeholder from "../atoms/Stakeholder";
 import { Close } from "@mui/icons-material";
 import {
+  buildMatterSnapshotFields,
+  fetchContactMatters,
   fetchMatterById,
+  findRelatedMatter,
   normalizeSingleMultiSelectValue,
-  resolveMatterContextForContact,
+  selectPrimaryMatter,
   serializeMultiSelectPicklist,
 } from "../../services/matterSnapshot";
 import {
@@ -94,6 +97,9 @@ const normalizeLookup = (lookup) => {
     name: lookup.name ?? lookup.Name ?? lookup.display_value ?? "",
   };
 };
+
+const getMatterOptionLabel = (matter) =>
+  String(matter?.Name ?? matter?.name ?? matter?.Matter_No ?? "").trim();
 
 const matterFormValuesFromHistory = (history) => ({
   matter: normalizeLookup(history?.Matter),
@@ -153,6 +159,9 @@ export function Dialog({
   });
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isMatterLoading, setIsMatterLoading] = React.useState(false);
+  const [matterOptions, setMatterOptions] = React.useState([]);
+  const [matterOptionsError, setMatterOptionsError] = React.useState("");
+  const matterSelectionRequest = React.useRef(0);
   const [matterMetadata, setMatterMetadata] = React.useState(
     EMPTY_MATTER_METADATA
   );
@@ -281,8 +290,11 @@ export function Dialog({
     } else {
       // Reset formData to avoid stale data
       setFormData({});
+      setMatterOptions([]);
+      setMatterOptionsError("");
       setMatterMetadata(EMPTY_MATTER_METADATA);
       setIsMatterLoading(false);
+      matterSelectionRequest.current += 1;
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- ownerList, setSelectedContacts intentionally omitted
   }, [openDialog, selectedRowData, loggedInUser, currentContact]);
@@ -293,11 +305,34 @@ export function Dialog({
     let cancelled = false;
 
     const loadMatterContext = async () => {
+      matterSelectionRequest.current += 1;
       setIsMatterLoading(true);
+      setMatterOptionsError("");
       setMatterMetadata(EMPTY_MATTER_METADATA);
       let sourceMatter = null;
 
       try {
+        const primaryContactId =
+          currentContact?.id ||
+          (Array.isArray(selectedRowData?.Participants)
+            ? selectedRowData.Participants.find((contact) => contact?.id)?.id
+            : null) ||
+          null;
+        let relatedMatters = [];
+        if (primaryContactId) {
+          try {
+            relatedMatters = await fetchContactMatters(primaryContactId);
+          } catch (error) {
+            console.warn("Could not load related Matters for selection:", error);
+            if (!cancelled) {
+              setMatterOptionsError(
+                "Related Matters could not be loaded. Close and reopen the history to retry."
+              );
+            }
+          }
+        }
+        if (!cancelled) setMatterOptions(relatedMatters);
+
         if (selectedRowData) {
           const rowValues = {
             matter: selectedRowData.matter || null,
@@ -339,27 +374,41 @@ export function Dialog({
             }
           }
 
+          const matchedMatter = findRelatedMatter(relatedMatters, {
+            matterId: historyValues.matter?.id,
+            matterNo: historyValues.matterNo,
+          });
+          if (matchedMatter?.id) {
+            try {
+              sourceMatter =
+                (await fetchMatterById(matchedMatter.id)) || matchedMatter;
+            } catch (error) {
+              console.warn("Could not load source Matter layout:", error);
+              sourceMatter = matchedMatter;
+            }
+            historyValues = {
+              ...historyValues,
+              matter: normalizeLookup(sourceMatter),
+            };
+          }
+
           if (!cancelled) {
             setFormData((previous) => ({ ...previous, ...historyValues }));
           }
-
-          const matterId = historyValues.matter?.id;
-          if (matterId) {
+        } else {
+          const primaryMatter = selectPrimaryMatter(relatedMatters);
+          sourceMatter = primaryMatter;
+          if (primaryMatter?.id) {
             try {
-              sourceMatter = await fetchMatterById(matterId);
+              sourceMatter =
+                (await fetchMatterById(primaryMatter.id)) || primaryMatter;
             } catch (error) {
-              console.warn("Could not load source Matter layout:", error);
-              sourceMatter = historyValues.matter;
+              console.warn("Could not hydrate primary Matter record:", error);
             }
           }
-        } else {
-          const primaryContactId = currentContact?.id || null;
-          const context = primaryContactId
-            ? await resolveMatterContextForContact(primaryContactId)
-            : { matter: null, snapshot: {} };
-          sourceMatter = context.matter;
           const snapshotValues = matterFormValuesFromHistory({
-            ...context.snapshot,
+            ...buildMatterSnapshotFields(sourceMatter),
+            Matter: sourceMatter,
             Billing_Type: DEFAULT_BILLING_TYPE,
           });
 
@@ -384,6 +433,7 @@ export function Dialog({
     loadMatterContext();
     return () => {
       cancelled = true;
+      matterSelectionRequest.current += 1;
     };
   }, [openDialog, selectedRowData, currentContact?.id, ZOHO]);
 
@@ -440,6 +490,108 @@ export function Dialog({
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const matchedMatterOption = findRelatedMatter(matterOptions, {
+    matterId: formData.matter?.id,
+    matterNo: formData.matterNo,
+  });
+  const historicalMatterOption =
+    !matchedMatterOption && formData.matterNo
+      ? {
+          id: `history-snapshot:${formData.matterNo}`,
+          Name: formData.matterNo,
+          _historySnapshot: true,
+        }
+      : null;
+  const visibleMatterOptions = historicalMatterOption
+    ? [historicalMatterOption, ...matterOptions]
+    : matterOptions;
+  const selectedMatterOption =
+    matchedMatterOption || historicalMatterOption || null;
+  const matterHelperText = isMatterLoading
+    ? ""
+    : matterOptionsError ||
+      (matterOptions.length === 0
+        ? "No related matter found for this contact."
+        : !selectedMatterOption
+          ? "Select a related matter."
+          : "");
+  const formatMatterOptionLabel = (matter) => {
+    const label = getMatterOptionLabel(matter);
+    const duplicateCount = matterOptions.filter(
+      (option) => getMatterOptionLabel(option) === label
+    ).length;
+    return duplicateCount > 1
+      ? `${label} (${String(matter?.id || "").slice(-6)})`
+      : label;
+  };
+
+  const handleMatterSelection = async (nextMatter) => {
+    if (nextMatter?._historySnapshot) return;
+
+    const requestId = matterSelectionRequest.current + 1;
+    matterSelectionRequest.current = requestId;
+    setIsMatterLoading(true);
+
+    try {
+      if (!nextMatter) {
+        const metadata = await fetchMatterPicklistMetadata(null);
+        if (matterSelectionRequest.current !== requestId) return;
+        setFormData((previous) => ({
+          ...previous,
+          matter: null,
+          matterNo: "",
+          currentStage: "",
+          matterProgress: "",
+        }));
+        setMatterMetadata(metadata);
+        return;
+      }
+
+      let selectedMatter = nextMatter;
+      try {
+        selectedMatter = await fetchMatterById(nextMatter.id);
+        if (!selectedMatter) {
+          throw new Error("Zoho returned no Matter record.");
+        }
+      } catch (error) {
+        console.warn("Could not hydrate selected Matter record:", error);
+        throw new Error(
+          "Could not load the selected Matter details. Please try again."
+        );
+      }
+
+      const snapshot = buildMatterSnapshotFields(selectedMatter);
+      const matterValues = matterFormValuesFromHistory({
+        ...snapshot,
+        Matter: selectedMatter,
+      });
+      const metadata = await fetchMatterPicklistMetadata(selectedMatter);
+      if (matterSelectionRequest.current !== requestId) return;
+
+      setFormData((previous) => ({
+        ...previous,
+        matter: matterValues.matter,
+        matterNo: matterValues.matterNo,
+        currentStage: matterValues.currentStage,
+        matterProgress: matterValues.matterProgress,
+      }));
+      setMatterMetadata(metadata);
+    } catch (error) {
+      console.error("Could not select Matter:", error);
+      if (matterSelectionRequest.current === requestId) {
+        setSnackbar({
+          open: true,
+          message: error?.message || "Could not load the selected Matter.",
+          severity: "error",
+        });
+      }
+    } finally {
+      if (matterSelectionRequest.current === requestId) {
+        setIsMatterLoading(false);
+      }
+    }
   };
 
   const currentStageOptions = getStageOptions(
@@ -1090,17 +1242,29 @@ export function Dialog({
         >
           <Grid container spacing={1}>
             <Grid item xs={12} sm={3}>
-              <TextField
+              <Autocomplete
                 fullWidth
-                variant="standard"
-                label="Matter No"
-                value={formData.matterNo ?? ""}
-                helperText={
-                  !isMatterLoading && !formData.matterNo
-                    ? "No related matter found for this contact."
-                    : ""
+                options={visibleMatterOptions}
+                value={selectedMatterOption}
+                loading={isMatterLoading}
+                disabled={isMatterLoading}
+                getOptionLabel={formatMatterOptionLabel}
+                getOptionKey={(option) => String(option?.id || "")}
+                isOptionEqualToValue={(option, value) =>
+                  String(option?.id || "") === String(value?.id || "")
                 }
-                InputProps={{ readOnly: true }}
+                getOptionDisabled={(option) =>
+                  Boolean(option?._historySnapshot)
+                }
+                onChange={(_, value) => handleMatterSelection(value)}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    variant="standard"
+                    label="Matter No"
+                    helperText={matterHelperText}
+                  />
+                )}
                 sx={{
                   "& .MuiInputBase-input, & .MuiInputLabel-root": {
                     fontSize: "9pt",
