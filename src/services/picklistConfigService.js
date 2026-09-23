@@ -17,8 +17,7 @@ import {
   resultMapping as defaultResultMapping,
   durationOptions as defaultDurationOptions,
   mandatoryActivityTypes,
-  mergeCategoryOptions,
-  mergeDurationOptions,
+  mergeOrderedUnique,
 } from "../components/organisms/dialogConstants";
 
 const ZOHO = window.ZOHO;
@@ -61,18 +60,19 @@ const _doFetch = async () => {
       return _buildFallbackConfig();
     }
 
-    let records = await _fetchViaSdk();
-    if (!records.length) {
-      records = await _fetchViaCoql();
+    let fetchResult = await _fetchViaSdk();
+    if (!fetchResult.reached) {
+      fetchResult = await _fetchViaCoql();
     }
 
-    const activeRecords = records.filter(_isActive);
-    if (!activeRecords.length) {
+    if (!fetchResult.reached) {
       console.warn(
-        "Widget_Picklist_Config: No active records returned. Using hard-coded defaults."
+        "Widget_Picklist_Config: Could not read the module. Using hard-coded defaults."
       );
       return _buildFallbackConfig();
     }
+
+    const activeRecords = fetchResult.records.filter(_isActive);
 
     console.info(
       `Widget_Picklist_Config: Loaded ${activeRecords.length} option(s) from CRM.`
@@ -121,14 +121,15 @@ const _extractRecordArray = (response) => {
 
 const _fetchViaSdk = async () => {
   for (const entity of MODULE_API_NAMES) {
-    const records = await _paginateSdk(entity);
-    if (records.length) return records;
+    const result = await _paginateSdk(entity);
+    if (result.reached) return result;
   }
-  return [];
+  return { records: [], reached: false };
 };
 
 const _paginateSdk = async (entity) => {
   const all = [];
+  let reached = false;
   let page = 1;
   const perPage = 200;
 
@@ -150,22 +151,34 @@ const _paginateSdk = async (entity) => {
           page,
         });
       } else {
-        return [];
+        return { records: [], reached: false };
       }
     } catch (error) {
       console.warn(
         `Widget_Picklist_Config SDK fetch failed for ${entity} page ${page}:`,
         error
       );
-      return all;
+      return { records: all, reached };
+    }
+
+    const responseEntries = [
+      response,
+      ...(Array.isArray(response?.data) ? response.data : []),
+    ].filter(Boolean);
+    const errorEntry = responseEntries.find(
+      (entry) =>
+        entry?.status === "error" ||
+        (entry?.code &&
+          entry.code !== "SUCCESS" &&
+          entry?.status !== "success")
+    );
+    if (errorEntry) {
+      console.warn(`Widget_Picklist_Config SDK error for ${entity}:`, response);
+      return { records: [], reached: false };
     }
 
     const chunk = _extractRecordArray(response);
-    if (response?.status === "error" || response?.code === "INVALID_MODULE") {
-      console.warn(`Widget_Picklist_Config SDK error for ${entity}:`, response);
-      return [];
-    }
-
+    reached = true;
     all.push(...chunk);
     const more =
       response?.info?.more_records === true ||
@@ -174,7 +187,7 @@ const _paginateSdk = async (entity) => {
     page += 1;
   }
 
-  return all;
+  return { records: all, reached };
 };
 
 const _parseCoqlResponse = (response) => {
@@ -196,21 +209,33 @@ const _parseCoqlResponse = (response) => {
     (c) => c && typeof c === "object"
   );
 
+  let data = [];
+  let errorCode = null;
   for (const candidate of candidates) {
-    if (Array.isArray(candidate.data) && candidate.data.length > 0) {
-      return candidate.data;
+    if (!data.length && Array.isArray(candidate.data)) {
+      data = candidate.data;
+    }
+    if (
+      candidate.status === "error" ||
+      candidate.code === "INVALID_MODULE" ||
+      candidate.code === "INVALID_QUERY" ||
+      Number(candidate.statusCode) >= 400
+    ) {
+      errorCode = candidate.code || candidate.statusCode || "ERROR";
     }
   }
 
-  if (Array.isArray(response?.data)) return response.data;
-  return [];
+  if (!data.length && Array.isArray(response?.data)) data = response.data;
+  return { data, errorCode };
 };
 
 const _fetchViaCoql = async () => {
   const { name, category, parentType, sortOrder, active } =
     PICKLIST_CONFIG_FIELDS;
 
-  if (!ZOHO?.CRM?.CONNECTION?.invoke) return [];
+  if (!ZOHO?.CRM?.CONNECTION?.invoke) {
+    return { records: [], reached: false };
+  }
 
   for (const moduleApiName of MODULE_API_NAMES) {
     const selectQuery = `select ${name}, ${category}, ${parentType}, ${sortOrder}, ${active} from ${moduleApiName} where ${active} = true order by ${sortOrder} asc LIMIT 0, 2000`;
@@ -222,8 +247,10 @@ const _fetchViaCoql = async () => {
         parameters: { select_query: selectQuery },
       };
       const response = await ZOHO.CRM.CONNECTION.invoke(conn_name, req_data);
-      const data = _parseCoqlResponse(response);
-      if (data.length) return data;
+      const parsed = _parseCoqlResponse(response);
+      if (!parsed.errorCode && response != null) {
+        return { records: parsed.data, reached: true };
+      }
     } catch (coqlError) {
       console.warn(
         `COQL picklist fetch failed for ${moduleApiName}:`,
@@ -231,7 +258,7 @@ const _fetchViaCoql = async () => {
       );
     }
   }
-  return [];
+  return { records: [], reached: false };
 };
 
 const _pushUnique = (list, value) => {
@@ -287,19 +314,14 @@ const _groupRecords = (records) => {
     }
   }
 
-  const fromModule = types.length > 0 || Object.keys(results).length > 0;
-
   return {
-    types: types.length > 0 ? types : defaultTypeOptions,
-    results: Object.keys(results).length > 0 ? results : null,
-    resultMapping:
-      Object.keys(resultMapping).length > 0
-        ? resultMapping
-        : defaultResultMapping,
-    regarding: Object.keys(regarding).length > 0 ? regarding : null,
-    durations: durations.length > 0 ? durations : defaultDurationOptions,
-    _fromAdmin: fromModule,
-    _source: fromModule ? "custom_module" : "fallback",
+    types,
+    results,
+    resultMapping,
+    regarding,
+    durations,
+    _fromAdmin: true,
+    _source: "custom_module",
   };
 };
 
@@ -314,25 +336,30 @@ const _buildFallbackConfig = () => ({
 });
 
 export const getTypeOptionsFromConfig = (config) => {
-  if (config?.types && config.types.length > 0) {
-    return mergeCategoryOptions(config.types);
+  if (Array.isArray(config?.types)) {
+    return mergeOrderedUnique(config.types);
   }
-  return mergeCategoryOptions(defaultTypeOptions);
+  return defaultTypeOptions;
 };
 
 export const getResultOptionsFromConfig = (type, config) => {
-  if (mandatoryActivityTypes[type]) {
-    return mandatoryActivityTypes[type];
-  }
-  if (config?.results) {
-    const typeResults = config.results[type];
+  const hasConfiguredResults =
+    config?._source === "custom_module" ||
+    (config?.results && typeof config.results === "object");
+  if (hasConfiguredResults) {
+    const configuredResults = config?.results || {};
+    const typeResults = configuredResults[type];
     if (typeResults && typeResults.length > 0) {
       return typeResults;
     }
-    const defaultResults = config.results["_default"];
+    const defaultResults = configuredResults["_default"];
     if (defaultResults && defaultResults.length > 0) {
       return defaultResults;
     }
+    return [];
+  }
+  if (mandatoryActivityTypes[type]) {
+    return mandatoryActivityTypes[type];
   }
   return null;
 };
@@ -352,23 +379,19 @@ export const getRegardingOptionsFromConfig = (type, config) => {
 };
 
 export const getDurationOptionsFromConfig = (config) => {
-  if (config?.durations && config.durations.length > 0) {
-    return mergeDurationOptions(config.durations);
+  if (Array.isArray(config?.durations)) {
+    return [...config.durations];
   }
-  return mergeDurationOptions(defaultDurationOptions);
+  return defaultDurationOptions;
 };
 
 export const getResultMappingFromConfig = (config) => {
-  if (config?.resultMapping && Object.keys(config.resultMapping).length > 0) {
-    return {
-      ...config.resultMapping,
-      ...Object.fromEntries(
-        Object.entries(mandatoryActivityTypes).map(([category, activities]) => [
-          category,
-          activities[0],
-        ])
-      ),
-    };
+  if (
+    config?.resultMapping &&
+    typeof config.resultMapping === "object" &&
+    !Array.isArray(config.resultMapping)
+  ) {
+    return { ...config.resultMapping };
   }
   return defaultResultMapping;
 };

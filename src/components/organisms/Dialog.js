@@ -29,7 +29,6 @@ import { getRegardingOptions, getResultOptions } from "./helperFunc";
 import {
   getTypeOptionsFromConfig,
   getDurationOptionsFromConfig,
-  getResultMappingFromConfig,
 } from "../../services/picklistConfigService";
 import ContactField from "./ContactFields";
 import RegardingField from "./RegardingField";
@@ -56,9 +55,8 @@ import {
   DEFAULT_BILLING_TYPE,
   DEFAULT_CATEGORY,
   durationOptions as fallbackDurationOptions,
-  resultMapping as fallbackResultMapping,
+  mergeOrderedUnique,
   serializeDuration,
-  typeMapping as fallbackTypeMapping,
   typeOptions as fallbackTypeOptions,
 } from "./dialogConstants";
 import { conn_name } from "../../config/config";
@@ -123,15 +121,6 @@ export function Dialog({
   const durationOptions = picklistConfig
     ? getDurationOptionsFromConfig(picklistConfig)
     : fallbackDurationOptions;
-  const resultMapping = picklistConfig
-    ? getResultMappingFromConfig(picklistConfig)
-    : fallbackResultMapping;
-  const typeMapping = {
-    ...Object.fromEntries(
-      Object.entries(resultMapping).map(([type, result]) => [result, type])
-    ),
-    ...fallbackTypeMapping,
-  };
   const typeOptions = picklistConfig
     ? getTypeOptionsFromConfig(picklistConfig)
     : fallbackTypeOptions;
@@ -148,6 +137,10 @@ export function Dialog({
   const [loadedAttachmentFromRecord, setLoadedAttachmentFromRecord] =
     React.useState();
   const [formData, setFormData] = React.useState(selectedRowData || {}); // Form data state
+  const visibleTypeOptions = mergeOrderedUnique(
+    typeOptions,
+    selectedRowData ? [selectedRowData.type, formData.type] : []
+  );
   // console.log({ formData });
   const [snackbar, setSnackbar] = React.useState({
     open: false,
@@ -214,15 +207,23 @@ export function Dialog({
     if (openDialog) {
       setIsSubmitting(false);
       setFormData((prev) => {
+        const crmConfigLoaded = picklistConfig?._source === "custom_module";
+        const defaultType =
+          typeOptions[0] || (crmConfigLoaded ? "" : DEFAULT_CATEGORY);
+        const defaultResult =
+          getResultOptions(defaultType, picklistConfig)[0] ||
+          (crmConfigLoaded ? "" : DEFAULT_ACTIVITY_TYPE);
+        const defaultDuration =
+          durationOptions[0] ?? (crmConfigLoaded ? null : 0);
         const base = {
           Participants: selectedRowData?.Participants || [],
-          result: selectedRowData?.result ?? DEFAULT_ACTIVITY_TYPE,
-          type: selectedRowData?.type ?? DEFAULT_CATEGORY,
-          duration: selectedRowData?.duration ?? 0,
+          result: selectedRowData?.result ?? defaultResult,
+          type: selectedRowData?.type ?? defaultType,
+          duration: selectedRowData?.duration ?? defaultDuration,
           regarding:
             selectedRowData?.regarding ??
             (getRegardingOptions(
-              DEFAULT_CATEGORY,
+              defaultType,
               "",
               picklistConfig
             )[0] || ""),
@@ -1212,7 +1213,7 @@ export function Dialog({
                     },
                   }}
                 >
-                  {typeOptions.map((type) => (
+                  {visibleTypeOptions.map((type) => (
                     <MenuItem key={type} value={type} sx={{ fontSize: "9pt" }}>
                       {type}
                     </MenuItem>
@@ -1231,14 +1232,7 @@ export function Dialog({
                 <Select
                   value={formData.result || ""} // Ensure a fallback value
                   onChange={(e) => {
-                    const selectedResult = e.target.value;
-                    handleInputChange("result", selectedResult);
-
-                    // Autopopulate the type if a mapping exists
-                    const correspondingType = typeMapping[selectedResult];
-                    if (correspondingType) {
-                      handleInputChange("type", correspondingType);
-                    }
+                    handleInputChange("result", e.target.value);
                   }}
                   label="Activity Type"
                   sx={{

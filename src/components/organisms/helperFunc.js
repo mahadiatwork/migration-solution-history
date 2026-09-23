@@ -19,65 +19,101 @@ import { mandatoryActivityTypes, mergeOrderedUnique } from "./dialogConstants";
  * @returns {string[]} Array of result option values
  */
 export const getResultOptions = (type, config, existingValue) => {
-  // The new matter-history categories are product requirements, not optional
-  // admin configuration. Keep their exact dependency map ahead of all legacy
-  // and CRM-configured fallbacks, while retaining an existing historical value
-  // so older records remain editable.
+  // CRM configuration is authoritative when it is available. Retain an
+  // existing historical value in edit mode so deactivating an option does not
+  // make an older record impossible to save.
+  const hasConfiguredResults =
+    config?._source === "custom_module" ||
+    (config?.results && typeof config.results === "object");
+  if (hasConfiguredResults) {
+    const configuredResults = config?.results || {};
+    const typeResults = configuredResults[type];
+    if (typeResults && typeResults.length > 0) {
+      return mergeOrderedUnique(typeResults, [existingValue]);
+    }
+    // Check for default results (entries with no specific parent type)
+    const defaultResults = configuredResults["_default"];
+    if (defaultResults && defaultResults.length > 0) {
+      return mergeOrderedUnique(defaultResults, [existingValue]);
+    }
+    return mergeOrderedUnique([existingValue]);
+  }
+
+  // Fall back to the required matter-history values if CRM cannot supply a
+  // dependency for this type.
   const mandatoryResults = mandatoryActivityTypes[type];
   if (mandatoryResults) {
     return mergeOrderedUnique(mandatoryResults, [existingValue]);
   }
 
-  // If admin config is available and has results for this type, use them
-  if (config?.results) {
-    const typeResults = config.results[type];
-    if (typeResults && typeResults.length > 0) {
-      return typeResults;
-    }
-    // Check for default results (entries with no specific parent type)
-    const defaultResults = config.results["_default"];
-    if (defaultResults && defaultResults.length > 0) {
-      return defaultResults;
-    }
-  }
-
   // Fall back to hard-coded ACT-migrated values
-  switch (type) {
-    case "Meeting":
-      return ["Meeting Held", "Meeting Not Held"]; // Wrap in an array
-    case "To-Do":
-      return ["To-do Done", "To-do Not Done"];
-    case "Appointment":
-      return ["Appointment Completed", "Appointment Not Completed"];
-    case "Boardroom":
-      return ["Boardroom - Completed","Boardroom - Not Completed"];
-    case "Call Billing":
-      return ["Call Billing - Completed", "Call Billing - Not Completed"];
-    case "Email Billing":
-      return ["Email Billing - Completed", "Email Billing - Not Completed"];
-    case "Initial Consultation":
-      return ["Initial Consultation - Completed", "Initial Consultation - Not Completed"];
-    case "Call":
-      return ["Call Attempted","Call Completed", "Call Left Message", "Call Received"];
-    case "Mail":
-      return ["Mail - Completed", "Mail - Not Completed"];
-    case "Meeting Billing":
-      return ["Meeting Billing - Completed", "Meeting Billing - Not Completed"];
-    case "Personal Activity":
-      return ["Personal Activity - Completed", "Personal Activity - Not Completed", "Note", "Mail Received", "Mail Sent", "Email Received", "Courier Sent", "Email Sent", "Payment Received"];
-    case "To Do Billing":
-      return ["To Do Billing - Completed","To Do Billing - Not Completed"];
-    case "Vacation":
-      return ["Vacation - Completed", "Vacation - Not Completed", "Vacation Cancelled"];
-    case "Room 1":
-    case "Room 2":
-    case "Room 3":
-      return [`${type} - Completed`,`${type} - Not Completed`]; // Wrap in an array
-    case "Other":
-      return ["Attachment", "E-mail Attachment", "E-mail Auto Attached", "E-mail Sent"];
-    default:
-      return ["Note"]; // Wrap default return in an array
-  }
+  const fallbackResults = (() => {
+    switch (type) {
+      case "Meeting":
+        return ["Meeting Held", "Meeting Not Held"];
+      case "To-Do":
+        return ["To-do Done", "To-do Not Done"];
+      case "Appointment":
+        return ["Appointment Completed", "Appointment Not Completed"];
+      case "Boardroom":
+        return ["Boardroom - Completed", "Boardroom - Not Completed"];
+      case "Call Billing":
+        return ["Call Billing - Completed", "Call Billing - Not Completed"];
+      case "Email Billing":
+        return ["Email Billing - Completed", "Email Billing - Not Completed"];
+      case "Initial Consultation":
+        return [
+          "Initial Consultation - Completed",
+          "Initial Consultation - Not Completed",
+        ];
+      case "Call":
+        return [
+          "Call Attempted",
+          "Call Completed",
+          "Call Left Message",
+          "Call Received",
+        ];
+      case "Mail":
+        return ["Mail - Completed", "Mail - Not Completed"];
+      case "Meeting Billing":
+        return ["Meeting Billing - Completed", "Meeting Billing - Not Completed"];
+      case "Personal Activity":
+        return [
+          "Personal Activity - Completed",
+          "Personal Activity - Not Completed",
+          "Note",
+          "Mail Received",
+          "Mail Sent",
+          "Email Received",
+          "Courier Sent",
+          "Email Sent",
+          "Payment Received",
+        ];
+      case "To Do Billing":
+        return ["To Do Billing - Completed", "To Do Billing - Not Completed"];
+      case "Vacation":
+        return [
+          "Vacation - Completed",
+          "Vacation - Not Completed",
+          "Vacation Cancelled",
+        ];
+      case "Room 1":
+      case "Room 2":
+      case "Room 3":
+        return [`${type} - Completed`, `${type} - Not Completed`];
+      case "Other":
+        return [
+          "Attachment",
+          "E-mail Attachment",
+          "E-mail Auto Attached",
+          "E-mail Sent",
+        ];
+      default:
+        return ["Note"];
+    }
+  })();
+
+  return mergeOrderedUnique(fallbackResults, [existingValue]);
 };
 
 /**

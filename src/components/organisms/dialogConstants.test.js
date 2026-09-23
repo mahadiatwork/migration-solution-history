@@ -47,13 +47,13 @@ describe("matter history required options", () => {
     ]);
   });
 
-  test("uses the exact required Category to Activity Type mapping before config", () => {
+  test("uses CRM Category to Activity Type dependencies before fallback", () => {
     const conflictingConfig = {
       results: { [DEFAULT_CATEGORY]: ["Configured override"] },
     };
 
     expect(getResultOptions(DEFAULT_CATEGORY, conflictingConfig)).toEqual(
-      mandatoryActivityTypes[DEFAULT_CATEGORY]
+      ["Configured override"]
     );
     expect(DEFAULT_ACTIVITY_TYPE).toBe(
       mandatoryActivityTypes[DEFAULT_CATEGORY][0]
@@ -61,10 +61,35 @@ describe("matter history required options", () => {
   });
 
   test("retains a historical Activity Type as an edit-only fallback", () => {
-    expect(getResultOptions("Other", null, "Attachment")).toEqual([
-      ...mandatoryActivityTypes.Other,
+    expect(
+      getResultOptions(
+        "Other",
+        { results: { Other: ["Training", "Business Development"] } },
+        "Attachment"
+      )
+    ).toEqual([
+      "Training",
+      "Business Development",
       "Attachment",
     ]);
+  });
+
+  test("does not resurrect deactivated Results after CRM loads", () => {
+    expect(
+      getResultOptions(
+        DEFAULT_CATEGORY,
+        { _source: "custom_module", results: {} }
+      )
+    ).toEqual([]);
+  });
+
+  test("retains a historical legacy Result when CRM is unavailable", () => {
+    expect(getResultOptions("Meeting", null, "Configured historical result"))
+      .toEqual([
+        "Meeting Held",
+        "Meeting Not Held",
+        "Configured historical result",
+      ]);
   });
 
   test("always supplies 0 through 240 in five-minute order", () => {

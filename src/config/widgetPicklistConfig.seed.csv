@@ -46,6 +46,10 @@ Internal Project/Process Improvement,Result,Other,30,TRUE
 Internal Meeting,Result,Other,40,TRUE
 General Management,Result,Other,50,TRUE
 Other,Result,Other,60,TRUE
+Attachment,Result,Other,70,TRUE
+E-mail Attachment,Result,Other,80,TRUE
+E-mail Auto Attached,Result,Other,90,TRUE
+E-mail Sent,Result,Other,100,TRUE
 Meeting Held,Result,Meeting,10,TRUE
 Meeting Not Held,Result,Meeting,20,TRUE
 To-do Done,Result,To-Do,10,TRUE

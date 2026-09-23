@@ -1,9 +1,8 @@
 /**
  * Dialog constants and small, pure option helpers.
  *
- * The five matter-history categories and their activity types are mandatory.
- * CRM configuration may add legacy options, but it must not replace or reorder
- * this required slice.
+ * These values keep the dialog usable when Widget_Picklist_Config cannot be
+ * read. A successfully loaded CRM configuration remains authoritative.
  */
 
 export const DEFAULT_CATEGORY = "Communication & Meetings";
