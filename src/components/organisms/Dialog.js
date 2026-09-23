@@ -61,6 +61,7 @@ import {
   typeMapping as fallbackTypeMapping,
   typeOptions as fallbackTypeOptions,
 } from "./dialogConstants";
+import { conn_name } from "../../config/config";
 
 const VisuallyHiddenInput = styled("input")({
   clip: "rect(0 0 0 0)",
@@ -1153,7 +1154,7 @@ export function Dialog({
                       sx={{ mt: 0.5, fontSize: "8pt" }}
                     >
                       {matterMetadata.dependencyError
-                        ? "Matter Progress rules could not be loaded. The zoho_crm_conn connection requires map_dependency.READ access."
+                        ? `Matter Progress rules could not be loaded. The ${conn_name} connection requires map_dependency.READ access.`
                         : "No Matter Progress values are mapped to this Current Stage in Zoho."}
                     </Typography>
                   )}

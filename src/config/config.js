@@ -7,7 +7,7 @@ export const dataCenterMap = {
   JP: "https://www.zohoapis.jp",
 };
 
-export const conn_name = "zoho_crm_conn";
+export const conn_name = "crm_conn";
 
 // Applications_History module: API name for the Stakeholder/Account lookup field.
 // If stakeholder doesn't transfer when moving history, change to your module's field API name
