@@ -112,6 +112,18 @@ export const mergeDurationOptions = (configuredOptions = []) => {
 export const serializeDuration = (value) =>
   value === null || value === undefined || value === "" ? null : String(value);
 
+export const buildViewOwner = (owner) => {
+  if (!owner || typeof owner !== "object") return null;
+  const fullName =
+    owner.full_name ||
+    [owner.first_name, owner.last_name].filter(Boolean).join(" ").trim();
+
+  return {
+    ...(owner.id != null ? { id: owner.id } : {}),
+    ...(fullName ? { full_name: fullName } : {}),
+  };
+};
+
 export const typeOptions = mergeCategoryOptions();
 
 // Maps each category/type to the first Activity Type/Result used on selection.

@@ -2,6 +2,7 @@ import {
   extractMatterDependencyMetadata,
   extractMatterLayoutMetadata,
   getProgressOptions,
+  getInvokeError,
   getStageOptions,
   mergeMatterMetadata,
 } from "./matterMetadata";
@@ -44,6 +45,23 @@ const layoutResponse = {
 };
 
 describe("Applications matter metadata", () => {
+  test("surfaces connection errors instead of treating them as no dependency", () => {
+    expect(
+      getInvokeError({
+        details: {
+          statusMessage: JSON.stringify({
+            code: "OAUTH_SCOPE_MISMATCH",
+            message: "invalid oauth scope",
+            status: "error",
+          }),
+        },
+      })
+    ).toEqual({
+      code: "OAUTH_SCOPE_MISMATCH",
+      message: "invalid oauth scope",
+    });
+  });
+
   test("extracts active layout options and embedded dependencies", () => {
     const metadata = extractMatterLayoutMetadata(layoutResponse);
 

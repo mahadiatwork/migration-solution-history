@@ -30,7 +30,6 @@ export const MATTERS_MODULE = "Applications";
 // History1 custom fields for matter snapshot at creation time.
 // Create these fields in Zoho CRM (Setup > Developer Hub > Fields) if not present.
 export const HISTORY_MATTER_FIELDS = {
-  matterLookup: "Matter",
   matterNo: "Matter_No",
   currentStage: "Current_Stage",
   matterProgress: "Matter_Progress",

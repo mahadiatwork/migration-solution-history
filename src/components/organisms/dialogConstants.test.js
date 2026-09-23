@@ -1,4 +1,5 @@
 import {
+  buildViewOwner,
   DEFAULT_ACTIVITY_TYPE,
   DEFAULT_CATEGORY,
   durationOptions,
@@ -11,6 +12,16 @@ import {
 import { getResultOptions } from "./helperFunc";
 
 describe("matter history required options", () => {
+  test("preserves the selected owner name for the immediate UI update", () => {
+    expect(
+      buildViewOwner({
+        id: "owner-1",
+        first_name: "Maddie",
+        last_name: "Developer",
+      })
+    ).toEqual({ id: "owner-1", full_name: "Maddie Developer" });
+  });
+
   test("keeps the five required categories first and removes duplicates", () => {
     expect(
       mergeCategoryOptions(["Legacy", "Other", "Communication & Meetings"])

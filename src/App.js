@@ -21,6 +21,12 @@ import {
   getTypeOptionsFromConfig,
 } from "./services/picklistConfigService";
 import {
+  CONTACT_HISTORY_CORE_SELECT,
+  CONTACT_HISTORY_SELECT,
+  getCoqlOwnerName,
+  requireSuccessfulCoqlPage,
+} from "./services/contactHistoryList";
+import {
   TableBody,
   TableCell,
   TableContainer,
@@ -255,8 +261,7 @@ const App = () => {
   // COQL v8 Fetch Helpers (2000 records per page, paginated for full history)
   // ============================================================================
   // Visible in UI so we can confirm the paginated build is what CRM is serving
-  const HISTORY_FETCH_BUILD = "paginated-v3";
-  const COQL_HISTORY_SELECT = `select Name,id,Contact_History_Info.id,Owner.first_name,Owner.last_name,Contact_Details.Full_Name,Contact_History_Info.History_Type,Contact_History_Info.History_Result,Contact_History_Info.Duration,Contact_History_Info.Regarding,Contact_History_Info.History_Details_Plain,Contact_History_Info.Date,Contact_History_Info.Stakeholder,Contact_History_Info.Matter,Contact_History_Info.Matter_No,Contact_History_Info.Current_Stage,Contact_History_Info.Matter_Progress,Contact_History_Info.Billing_Type from History_X_Contacts`;
+  const HISTORY_FETCH_BUILD = "contact-fix-v4";
   const COQL_HISTORY_ORDER = "order by Contact_History_Info.Date desc, id desc";
   const COQL_PAGE_SIZE = 2000; // Zoho COQL v8 hard cap per request
   const COQL_MAX_RECORDS = 100000; // Zoho COQL pagination ceiling
@@ -279,7 +284,8 @@ const App = () => {
   const fetchHistoryViaCoqlV8 = async (
     contactId,
     limit = 2000,
-    cursor = null
+    cursor = null,
+    selectFields = CONTACT_HISTORY_SELECT
   ) => {
     let whereClause = `Contact_Details = '${escapeCoqlString(contactId)}'`;
 
@@ -290,7 +296,7 @@ const App = () => {
       whereClause += ` and ((Contact_History_Info.Date < '${dateVal}') or (Contact_History_Info.Date = '${dateVal}' and id < '${idVal}'))`;
     }
 
-    const selectQuery = `${COQL_HISTORY_SELECT} where ${whereClause} ${COQL_HISTORY_ORDER} LIMIT 0, ${limit}`;
+    const selectQuery = `select ${selectFields} from History_X_Contacts where ${whereClause} ${COQL_HISTORY_ORDER} LIMIT 0, ${limit}`;
 
     const req_data = {
       url: `${dataCenterMap.AU}/crm/v8/coql`,
@@ -322,9 +328,10 @@ const App = () => {
   const fetchHistoryViaCoqlV8Offset = async (
     contactId,
     limit = 2000,
-    offset = 0
+    offset = 0,
+    selectFields = CONTACT_HISTORY_SELECT
   ) => {
-    const selectQuery = `${COQL_HISTORY_SELECT} where Contact_Details = '${escapeCoqlString(contactId)}' ${COQL_HISTORY_ORDER} LIMIT ${offset}, ${limit}`;
+    const selectQuery = `select ${selectFields} from History_X_Contacts where Contact_Details = '${escapeCoqlString(contactId)}' ${COQL_HISTORY_ORDER} LIMIT ${offset}, ${limit}`;
     const req_data = {
       url: `${dataCenterMap.AU}/crm/v8/coql`,
       method: "POST",
@@ -341,7 +348,11 @@ const App = () => {
    * Fallback: LIMIT offset if keyset query fails.
    * Stops when a page returns fewer than pageSize rows.
    */
-  const fetchAllHistoryViaCoqlV8 = async (contactId, onProgress) => {
+  const fetchAllHistoryViaCoqlV8 = async (
+    contactId,
+    onProgress,
+    selectFields = CONTACT_HISTORY_SELECT
+  ) => {
     const pageSize = COQL_PAGE_SIZE;
     const seenIds = new Set();
     const allRecords = [];
@@ -353,23 +364,36 @@ const App = () => {
     while (allRecords.length < COQL_MAX_RECORDS) {
       let page;
       if (useKeyset) {
-        page = await fetchHistoryViaCoqlV8(contactId, pageSize, cursor);
+        page = await fetchHistoryViaCoqlV8(
+          contactId,
+          pageSize,
+          cursor,
+          selectFields
+        );
         if (page.errorCode && page.data.length === 0 && pageIndex > 0) {
           console.warn(
             `[${HISTORY_FETCH_BUILD}] keyset page failed; falling back to offset pagination`
           );
           useKeyset = false;
           offset = allRecords.length;
-          page = await fetchHistoryViaCoqlV8Offset(contactId, pageSize, offset);
+          page = await fetchHistoryViaCoqlV8Offset(
+            contactId,
+            pageSize,
+            offset,
+            selectFields
+          );
         }
       } else {
-        page = await fetchHistoryViaCoqlV8Offset(contactId, pageSize, offset);
+        page = await fetchHistoryViaCoqlV8Offset(
+          contactId,
+          pageSize,
+          offset,
+          selectFields
+        );
       }
 
       if (page.errorCode && page.data.length === 0) {
-        throw new Error(
-          `COQL failed on page ${pageIndex}: ${page.errorCode} ${page.errorMessage || ""}`
-        );
+        requireSuccessfulCoqlPage(page, `page ${pageIndex}`);
       }
 
       let addedThisPage = 0;
@@ -438,9 +462,12 @@ const App = () => {
       try {
         dataArray = await fetchAllHistoryViaCoqlV8(recordId, onProgress);
       } catch (coqlError) {
-        console.warn("COQL v8 paginated fetch failed, falling back to 200:", coqlError);
-        const fallback = await fetchHistoryViaCoqlV8(recordId, 200, null);
-        dataArray = fallback.data;
+        console.warn("COQL v8 owner-enriched fetch failed, retrying core fields:", coqlError);
+        dataArray = await fetchAllHistoryViaCoqlV8(
+          recordId,
+          onProgress,
+          CONTACT_HISTORY_CORE_SELECT
+        );
       }
       dataArray = Array.isArray(dataArray) ? dataArray : [];
 
@@ -449,11 +476,6 @@ const App = () => {
       );
 
       const tempData = dataArray?.map((obj) => {
-        const ownerFirst = obj["Owner.first_name"] || "";
-        const ownerLast = obj["Owner.last_name"] || "";
-
-        const ownerName = `${ownerFirst} ${ownerLast}`.trim() || "Unknown Owner";
-
         return {
           name: obj["Contact_Details.Full_Name"] || "No Name",
           id: obj?.id,
@@ -464,7 +486,7 @@ const App = () => {
           regarding: obj["Contact_History_Info.Regarding"] || "No Regarding",
           details: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
           icon: <DownloadIcon />,
-          ownerName: ownerName,
+          ownerName: getCoqlOwnerName(obj),
           historyDetails: {
             id: obj["Contact_History_Info.id"],
             text: obj["Contact_History_Info.History_Details_Plain"] || "No Details",

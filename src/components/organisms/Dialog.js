@@ -51,6 +51,7 @@ import {
 } from "../../services/matterMetadata";
 import {
   billingTypeOptions,
+  buildViewOwner,
   DEFAULT_ACTIVITY_TYPE,
   DEFAULT_BILLING_TYPE,
   DEFAULT_CATEGORY,
@@ -78,6 +79,7 @@ const EMPTY_MATTER_METADATA = {
   stages: [],
   progress: [],
   progressByStage: {},
+  dependencyError: null,
 };
 
 const normalizeLookup = (lookup) => {
@@ -350,14 +352,6 @@ export function Dialog({
             ? await resolveMatterContextForContact(primaryContactId)
             : { matter: null, snapshot: {} };
           sourceMatter = context.matter;
-          if (sourceMatter?.id) {
-            try {
-              sourceMatter =
-                (await fetchMatterById(sourceMatter.id)) || sourceMatter;
-            } catch (error) {
-              console.warn("Could not load source Matter layout:", error);
-            }
-          }
           const snapshotValues = matterFormValuesFromHistory({
             ...context.snapshot,
             Billing_Type: DEFAULT_BILLING_TYPE,
@@ -551,7 +545,6 @@ export function Dialog({
       History_Type: formData.type || "",
       Duration: serializeDuration(formData.duration),
       Date: dateTimeFormatted,
-      Matter: formData.matter?.id ? { id: formData.matter.id } : null,
       Matter_No: formData.matterNo || null,
       Current_Stage: formData.currentStage || null,
       Matter_Progress: formData.matterProgress || null,
@@ -659,6 +652,7 @@ export function Dialog({
             APIData: {
               Contact_History_Info: { id: historyId },
               Contact_Details: { id: contact.id },
+              Owner: finalData.Owner,
             },
             Trigger: ["workflow"],
           });
@@ -682,6 +676,7 @@ export function Dialog({
       const updatedRecord = {
         id: contactRecordIds[0] || null,
         ...finalData,
+        Owner: buildViewOwner(selectedOwner),
         Participants: selectedParticipants,
         historyDetails: {
           name: selectedParticipants.map((c) => c.Full_Name).join(", "),
@@ -766,6 +761,21 @@ export function Dialog({
       const existingContactIds = existingContacts.map(c => c.Contact_Details?.id);
       const selectedContactIds = selectedParticipants.map(c => c.id);
 
+      if (finalData?.Owner?.id) {
+        await Promise.all(
+          existingContacts
+            .filter((record) => record?.id)
+            .map((record) =>
+              ZOHO.CRM.API.updateRecord({
+                Entity: "History_X_Contacts",
+                RecordID: record.id,
+                APIData: { Owner: { id: finalData.Owner.id } },
+                Trigger: ["workflow"],
+              })
+            )
+        );
+      }
+
       const toDeleteContactIds = existingContactIds.filter(id => !selectedContactIds.includes(id));
       const toAddContacts = selectedParticipants.filter(c => !existingContactIds.includes(c.id));
 
@@ -787,6 +797,7 @@ export function Dialog({
               Contact_History_Info: { id: historyId },
               Contact_Details: { id: contact.id },
               Stakeholder: finalData?.Stakeholder,
+              Owner: finalData?.Owner,
             },
             Trigger: ["workflow"],
           });
@@ -798,6 +809,7 @@ export function Dialog({
       const updatedRecord = {
         id: selectedRowData.id || null,
         ...finalData,
+        Owner: buildViewOwner(selectedOwner),
         Participants: selectedParticipants,
         Stakeholder: formData.stakeHolder || null,
         historyDetails: {
@@ -1071,6 +1083,11 @@ export function Dialog({
                 variant="standard"
                 label="Matter No"
                 value={formData.matterNo ?? ""}
+                helperText={
+                  !isMatterLoading && !formData.matterNo
+                    ? "No related matter found for this contact."
+                    : ""
+                }
                 InputProps={{ readOnly: true }}
                 sx={{
                   "& .MuiInputBase-input, & .MuiInputLabel-root": {
@@ -1127,6 +1144,19 @@ export function Dialog({
                     </MenuItem>
                   ))}
                 </Select>
+                {!isMatterLoading &&
+                  formData.currentStage &&
+                  currentProgressOptions.length === 0 && (
+                    <Typography
+                      variant="caption"
+                      color="error"
+                      sx={{ mt: 0.5, fontSize: "8pt" }}
+                    >
+                      {matterMetadata.dependencyError
+                        ? "Matter Progress rules could not be loaded. The zoho_crm_conn connection requires map_dependency.READ access."
+                        : "No Matter Progress values are mapped to this Current Stage in Zoho."}
+                    </Typography>
+                  )}
               </FormControl>
             </Grid>
 

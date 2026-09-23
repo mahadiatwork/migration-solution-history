@@ -9,7 +9,7 @@ import {
   MATTER_SOURCE_FIELDS,
 } from "../config/config";
 
-const ZOHO = window.ZOHO;
+const getZoho = () => window.ZOHO;
 
 /**
  * Pick the most relevant matter when a contact has multiple.
@@ -37,13 +37,11 @@ export const fetchContactMatters = async (contactId) => {
   const fieldList = [
     MATTER_SOURCE_FIELDS.id,
     MATTER_SOURCE_FIELDS.matterNo,
-    MATTER_SOURCE_FIELDS.currentStage,
-    MATTER_SOURCE_FIELDS.matterProgress,
     MATTER_SOURCE_FIELDS.modifiedTime,
     MATTER_SOURCE_FIELDS.createdTime,
   ].join(",");
 
-  const response = await ZOHO.CRM.API.getRelatedRecords({
+  const response = await getZoho().CRM.API.getRelatedRecords({
     Entity: "Contacts",
     RecordID: contactId,
     RelatedList: CONTACT_MATTERS_RELATED_LIST,
@@ -59,7 +57,7 @@ export const fetchContactMatters = async (contactId) => {
 export const fetchMatterById = async (matterId) => {
   if (!matterId) return null;
 
-  const response = await ZOHO.CRM.API.getRecord({
+  const response = await getZoho().CRM.API.getRecord({
     Entity: MATTERS_MODULE,
     approved: "both",
     RecordID: matterId,
@@ -80,12 +78,10 @@ const formatMultiSelect = (value) => {
 export const buildMatterSnapshotFields = (matter) => {
   if (!matter?.id) return {};
 
-  const { matterLookup, matterNo, currentStage, matterProgress } =
-    HISTORY_MATTER_FIELDS;
+  const { matterNo, currentStage, matterProgress } = HISTORY_MATTER_FIELDS;
   const src = MATTER_SOURCE_FIELDS;
 
   return {
-    [matterLookup]: { id: matter.id },
     [matterNo]: matter[src.matterNo] || null,
     [currentStage]: matter[src.currentStage] || null,
     [matterProgress]: formatMultiSelect(matter[src.matterProgress]),
@@ -100,7 +96,15 @@ export const buildMatterSnapshotFields = (matter) => {
 export const resolveMatterContextForContact = async (contactId) => {
   try {
     const matters = await fetchContactMatters(contactId);
-    const matter = selectPrimaryMatter(matters);
+    const relatedMatter = selectPrimaryMatter(matters);
+    let matter = relatedMatter;
+    if (relatedMatter?.id) {
+      try {
+        matter = (await fetchMatterById(relatedMatter.id)) || relatedMatter;
+      } catch (error) {
+        console.warn("Could not hydrate related Matter record:", error);
+      }
+    }
     return {
       matter,
       snapshot: buildMatterSnapshotFields(matter),

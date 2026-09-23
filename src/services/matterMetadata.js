@@ -69,6 +69,26 @@ const unwrapInvokeResponse = (response) => {
   return response?.details?.data ? response.details : response;
 };
 
+export const getInvokeError = (response) => {
+  const payload = unwrapInvokeResponse(response) || {};
+  const candidates = [payload, payload?.data, response, response?.details].filter(
+    (candidate) => candidate && typeof candidate === "object"
+  );
+  const error = candidates.find(
+    (candidate) =>
+      candidate.status === "error" ||
+      (typeof candidate.code === "string" &&
+        candidate.code !== "SUCCESS" &&
+        candidate.code !== "200")
+  );
+
+  if (!error) return null;
+  return {
+    code: error.code || "ERROR",
+    message: error.message || error.statusMessage || "Request failed",
+  };
+};
+
 const extractLayouts = (response) => {
   const payload = unwrapInvokeResponse(response) || {};
   if (Array.isArray(payload.layouts)) return payload.layouts;
@@ -227,11 +247,16 @@ export const getProgressOptions = (metadata, stage, currentValue) => {
 
 const invokeSettingsGet = async (url) => {
   if (!ZOHO?.CRM?.CONNECTION?.invoke) return null;
-  return ZOHO.CRM.CONNECTION.invoke(conn_name, {
+  const response = await ZOHO.CRM.CONNECTION.invoke(conn_name, {
     url,
     method: "GET",
     param_type: 1,
   });
+  const requestError = getInvokeError(response);
+  if (requestError) {
+    throw new Error(`${requestError.code}: ${requestError.message}`);
+  }
+  return response;
 };
 
 const fetchLayouts = async () => {
@@ -285,6 +310,7 @@ export const fetchMatterPicklistMetadata = async (matter = null) => {
       progress: [],
       progressByStage: {},
     };
+    let dependencyError = null;
     if (layoutMetadata.layoutId) {
       try {
         const dependencyResponse = await fetchMappedDependency(
@@ -295,12 +321,22 @@ export const fetchMatterPicklistMetadata = async (matter = null) => {
         );
       } catch (error) {
         console.warn("Applications map dependency request failed:", error);
+        dependencyError = error?.message || "Matter Progress rules could not be loaded.";
       }
     }
 
-    return mergeMatterMetadata(layoutMetadata, dependencyMetadata);
+    return {
+      ...mergeMatterMetadata(layoutMetadata, dependencyMetadata),
+      dependencyError,
+    };
   } catch (error) {
     console.warn("Could not load Applications picklist metadata:", error);
-    return { layoutId: null, stages: [], progress: [], progressByStage: {} };
+    return {
+      layoutId: null,
+      stages: [],
+      progress: [],
+      progressByStage: {},
+      dependencyError: error?.message || "Matter metadata could not be loaded.",
+    };
   }
 };
