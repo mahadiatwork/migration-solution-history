@@ -480,10 +480,10 @@ const App = () => {
           name: obj["Contact_Details.Full_Name"] || "No Name",
           id: obj?.id,
           date_time: obj["Contact_History_Info.Date"] || "No Date",
-          type: obj["Contact_History_Info.History_Type"] || "Unknown Category",
-          result: obj["Contact_History_Info.History_Result"] || "No Activity Type",
-          duration: obj["Contact_History_Info.Duration"] ?? "N/A",
-          regarding: obj["Contact_History_Info.Regarding"] || "No Regarding",
+          type: obj["Contact_History_Info.History_Type"] ?? "",
+          result: obj["Contact_History_Info.History_Result"] ?? "",
+          duration: obj["Contact_History_Info.Duration"] ?? null,
+          regarding: obj["Contact_History_Info.Regarding"] ?? "",
           details: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
           icon: <DownloadIcon />,
           ownerName: getCoqlOwnerName(obj),
@@ -556,7 +556,7 @@ const App = () => {
 
       const types = dataArray
         ?.map((el) => el["Contact_History_Info.History_Type"])
-        ?.filter((el) => el !== undefined && el !== null);
+        ?.filter(Boolean);
 
       const sortedTypes = [...new Set(types)].sort((a, b) =>
         a.localeCompare(b)
@@ -567,10 +567,12 @@ const App = () => {
       // Falls back to hard-coded defaults if the module doesn't exist
       // ============================================================================
       let configTypeOptions;
+      let configIsAuthoritative = false;
       try {
         const config = await fetchPicklistConfig();
         setPicklistConfig(config);
         configTypeOptions = getTypeOptionsFromConfig(config);
+        configIsAuthoritative = config?._source === "custom_module";
       } catch (configError) {
         console.warn("Failed to fetch picklist config, using defaults:", configError);
         configTypeOptions = [
@@ -581,9 +583,11 @@ const App = () => {
         ];
       }
 
-      const sortedTypesWithAdditional = [
-        ...new Set([...configTypeOptions, ...sortedTypes]), // Merge admin/config types with existing data types
-      ].sort((a, b) => a.localeCompare(b)); // Sort alphabetically
+      const sortedTypesWithAdditional = configIsAuthoritative
+        ? [...configTypeOptions]
+        : [...new Set([...configTypeOptions, ...sortedTypes])].sort((a, b) =>
+            a.localeCompare(b)
+          );
 
       setTypeList(sortedTypesWithAdditional);
 
@@ -611,9 +615,11 @@ const App = () => {
         setPicklistConfig(config);
         const fromModule = getTypeOptionsFromConfig(config);
         setTypeList((prev) =>
-          [...new Set([...fromModule, ...prev])].sort((a, b) =>
-            a.localeCompare(b)
-          )
+          config?._source === "custom_module"
+            ? [...fromModule]
+            : [...new Set([...fromModule, ...prev])].sort((a, b) =>
+                a.localeCompare(b)
+              )
         );
       } catch (configError) {
         console.warn("Failed to load Widget_Picklist_Config:", configError);
@@ -670,10 +676,10 @@ const App = () => {
         ? newRecord.Participants.map((c) => c.Full_Name).join(", ")
         : newRecord.name || "Unknown Name",
       date_time: newRecord.Date || dayjs().format(), // Ensure date is consistent
-      type: newRecord.History_Type || "Unknown Category",
-      result: newRecord.History_Result || "No Activity Type",
-      duration: newRecord.Duration ?? "N/A",
-      regarding: newRecord.Regarding || "No Regarding",
+      type: newRecord.History_Type ?? "",
+      result: newRecord.History_Result ?? "",
+      duration: newRecord.Duration ?? null,
+      regarding: newRecord.Regarding ?? "",
       details: newRecord.History_Details_Plain || "No Details",
       ownerName: newRecord.Owner?.full_name || "Unknown Owner",
       historyDetails: {

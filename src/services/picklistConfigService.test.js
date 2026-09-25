@@ -2,6 +2,7 @@ import {
   getDurationOptionsFromConfig,
   getResultMappingFromConfig,
   getResultOptionsFromConfig,
+  getRegardingOptionsFromConfig,
   getTypeOptionsFromConfig,
 } from "./picklistConfigService";
 import {
@@ -19,6 +20,9 @@ describe("Widget_Picklist_Config selectors", () => {
     },
     resultMapping: {
       "Communication & Meetings": "Configured activity",
+    },
+    regarding: {
+      "Communication & Meetings": ["Configured regarding"],
     },
     durations: [15, 5],
   };
@@ -39,8 +43,26 @@ describe("Widget_Picklist_Config selectors", () => {
     });
   });
 
+  test("an explicit empty parent does not fall through to _default", () => {
+    const scopedConfig = {
+      _source: "custom_module",
+      results: { Meeting: [], _default: ["Default result"] },
+      regarding: { Meeting: [], _default: ["Default regarding"] },
+    };
+
+    expect(getResultOptionsFromConfig("Meeting", scopedConfig)).toEqual([]);
+    expect(getRegardingOptionsFromConfig("Meeting", scopedConfig)).toEqual([]);
+  });
+
   test("preserves configured Duration membership and Sort_Order", () => {
     expect(getDurationOptionsFromConfig(config)).toEqual([15, 5]);
+  });
+
+  test("uses configured Regarding and does not invent a missing parent", () => {
+    expect(
+      getRegardingOptionsFromConfig("Communication & Meetings", config)
+    ).toEqual(["Configured regarding"]);
+    expect(getRegardingOptionsFromConfig("Missing", config)).toEqual([]);
   });
 
   test("uses hard-coded values only when CRM configuration is unavailable", () => {
@@ -58,6 +80,7 @@ describe("Widget_Picklist_Config selectors", () => {
       types: [],
       results: {},
       resultMapping: {},
+      regarding: {},
       durations: [],
     };
 
@@ -66,6 +89,7 @@ describe("Widget_Picklist_Config selectors", () => {
       getResultOptionsFromConfig("Communication & Meetings", emptyConfig)
     ).toEqual([]);
     expect(getResultMappingFromConfig(emptyConfig)).toEqual({});
+    expect(getRegardingOptionsFromConfig("Missing", emptyConfig)).toEqual([]);
     expect(getDurationOptionsFromConfig(emptyConfig)).toEqual([]);
   });
 });

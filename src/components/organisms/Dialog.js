@@ -129,9 +129,20 @@ export function Dialog({
   picklistConfig = null, // Admin-configurable picklist config from App.js
 }) {
   // Derive picklist options from admin config (or fallback to hard-coded defaults)
-  const durationOptions = picklistConfig
+  const configuredDurationOptions = picklistConfig
     ? getDurationOptionsFromConfig(picklistConfig)
     : fallbackDurationOptions;
+  const existingDuration = selectedRowData?.duration;
+  const durationOptions =
+    selectedRowData &&
+    existingDuration !== null &&
+    existingDuration !== undefined &&
+    existingDuration !== "" &&
+    !configuredDurationOptions.some(
+      (duration) => Number(duration) === Number(existingDuration)
+    )
+      ? [existingDuration, ...configuredDurationOptions]
+      : configuredDurationOptions;
   const typeOptions = picklistConfig
     ? getTypeOptionsFromConfig(picklistConfig)
     : fallbackTypeOptions;

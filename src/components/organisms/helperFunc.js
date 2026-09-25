@@ -8,8 +8,7 @@ import { mandatoryActivityTypes, mergeOrderedUnique } from "./dialogConstants";
  * They support two modes:
  *   1. Config-driven: When an admin config object is passed, options come from
  *      the Widget_Picklist_Config CRM module.
- *   2. Hard-coded fallback: When no config is passed (or config has no entries
- *      for the given type), the original ACT-migrated hard-coded values are used.
+ *   2. Hard-coded fallback: Only when the CRM module cannot be read.
  */
 
 /**
@@ -27,13 +26,17 @@ export const getResultOptions = (type, config, existingValue) => {
     (config?.results && typeof config.results === "object");
   if (hasConfiguredResults) {
     const configuredResults = config?.results || {};
-    const typeResults = configuredResults[type];
-    if (typeResults && typeResults.length > 0) {
+    if (Object.prototype.hasOwnProperty.call(configuredResults, type)) {
+      const typeResults = Array.isArray(configuredResults[type])
+        ? configuredResults[type]
+        : [];
       return mergeOrderedUnique(typeResults, [existingValue]);
     }
     // Check for default results (entries with no specific parent type)
-    const defaultResults = configuredResults["_default"];
-    if (defaultResults && defaultResults.length > 0) {
+    if (Object.prototype.hasOwnProperty.call(configuredResults, "_default")) {
+      const defaultResults = Array.isArray(configuredResults._default)
+        ? configuredResults._default
+        : [];
       return mergeOrderedUnique(defaultResults, [existingValue]);
     }
     return mergeOrderedUnique([existingValue]);
@@ -124,28 +127,27 @@ export const getResultOptions = (type, config, existingValue) => {
  * @returns {string[]} Array of regarding option values
  */
 export const getRegardingOptions = (type, existingValue, config) => {
-  // If admin config is available and has regarding options for this type, use them
-  if (config?.regarding) {
-    const typeRegarding = config.regarding[type];
-    if (typeRegarding && typeRegarding.length > 0) {
-      let options = [...typeRegarding];
-      // Ensure existing value is included if not already present
-      const safeValue = typeof existingValue === "string" ? existingValue : "";
-      if (safeValue.trim() !== "" && !options.includes(safeValue)) {
-        options = [safeValue, ...options];
-      }
-      return options;
+  // A successfully loaded CRM module is authoritative, including an empty
+  // parent/category. Keep only the current edit value for compatibility.
+  const hasConfiguredRegarding =
+    config?._source === "custom_module" ||
+    (config?.regarding && typeof config.regarding === "object");
+  if (hasConfiguredRegarding) {
+    const configuredRegarding = config?.regarding || {};
+    if (Object.prototype.hasOwnProperty.call(configuredRegarding, type)) {
+      const typeRegarding = Array.isArray(configuredRegarding[type])
+        ? configuredRegarding[type]
+        : [];
+      return mergeOrderedUnique(typeRegarding, [existingValue]);
     }
     // Check for default regarding (entries with no specific parent type)
-    const defaultRegarding = config.regarding["_default"];
-    if (defaultRegarding && defaultRegarding.length > 0) {
-      let options = [...defaultRegarding];
-      const safeValue = typeof existingValue === "string" ? existingValue : "";
-      if (safeValue.trim() !== "" && !options.includes(safeValue)) {
-        options = [safeValue, ...options];
-      }
-      return options;
+    if (Object.prototype.hasOwnProperty.call(configuredRegarding, "_default")) {
+      const defaultRegarding = Array.isArray(configuredRegarding._default)
+        ? configuredRegarding._default
+        : [];
+      return mergeOrderedUnique(defaultRegarding, [existingValue]);
     }
+    return mergeOrderedUnique([existingValue]);
   }
 
   // Fall back to hard-coded ACT-migrated values
