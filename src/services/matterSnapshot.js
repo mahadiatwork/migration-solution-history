@@ -60,6 +60,24 @@ export const findRelatedMatter = (
 };
 
 /**
+ * Resolve the source Matter while hydrating an existing History row.
+ * Falling back is safe only when the History has no saved reference and the
+ * Contact has exactly one related Matter.
+ */
+export const findRelatedMatterForEdit = (matters = [], reference = {}) => {
+  const matchedMatter = findRelatedMatter(matters, reference);
+  if (matchedMatter) return matchedMatter;
+
+  const hasSavedReference =
+    (reference?.matterId != null && reference.matterId !== "") ||
+    String(reference?.matterNo || "").trim() !== "";
+  if (hasSavedReference || !Array.isArray(matters)) return null;
+
+  const validMatters = matters.filter((matter) => matter?.id);
+  return validMatters.length === 1 ? validMatters[0] : null;
+};
+
+/**
  * Fetch related Matters (Applications) for a contact.
  */
 export const fetchContactMatters = async (contactId) => {

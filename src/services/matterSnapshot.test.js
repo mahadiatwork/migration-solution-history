@@ -1,6 +1,7 @@
 import {
   buildMatterSnapshotFields,
   findRelatedMatter,
+  findRelatedMatterForEdit,
   normalizeSingleMultiSelectValue,
   resolveMatterContextForContact,
   serializeMultiSelectPicklist,
@@ -36,6 +37,21 @@ describe("contact Matter snapshot", () => {
       )
     ).toBeNull();
     expect(findRelatedMatter([unique], {})).toBeNull();
+  });
+
+  test("uses the sole related Matter only for an edit with no saved reference", () => {
+    const soleMatter = { id: "matter-1", Name: "MAT-1" };
+
+    expect(findRelatedMatterForEdit([soleMatter], {})).toBe(soleMatter);
+    expect(
+      findRelatedMatterForEdit(
+        [soleMatter, { id: "matter-2", Name: "MAT-2" }],
+        {}
+      )
+    ).toBeNull();
+    expect(
+      findRelatedMatterForEdit([soleMatter], { matterNo: "Missing" })
+    ).toBeNull();
   });
 
   test("selects the most recently modified related Matter", () => {

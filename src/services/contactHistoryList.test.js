@@ -2,6 +2,7 @@ import {
   CONTACT_HISTORY_CORE_SELECT,
   CONTACT_HISTORY_SELECT,
   getCoqlOwnerName,
+  mergeHistoryListRecord,
   requireSuccessfulCoqlPage,
 } from "./contactHistoryList";
 
@@ -40,5 +41,37 @@ describe("Contact History list query", () => {
         "Owner.last_name": "Creator",
       })
     ).toBe("Selected Owner");
+  });
+
+  test("preserves hydrated Matter fields across a sparse list refresh", () => {
+    const existing = {
+      id: "junction-1",
+      matterNo: "MAT-1001",
+      currentStage: "2. Strategy & Eligibility",
+      matterProgress: "Consultation confirmed",
+      billingType: "Billable",
+    };
+    const incoming = {
+      id: "junction-1",
+      details: "Updated by the background list refresh",
+    };
+
+    expect(mergeHistoryListRecord(existing, incoming)).toEqual({
+      ...existing,
+      ...incoming,
+    });
+  });
+
+  test("allows an explicit snapshot clear to replace cached values", () => {
+    expect(
+      mergeHistoryListRecord(
+        { id: "junction-1", currentStage: "Open", matterProgress: "Review" },
+        { id: "junction-1", currentStage: "", matterProgress: "" }
+      )
+    ).toEqual({
+      id: "junction-1",
+      currentStage: "",
+      matterProgress: "",
+    });
   });
 });

@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import dayjs from "dayjs";
-import { APPLICATIONS_HISTORY_STAKEHOLDER_FIELD } from "../../config/config";
+import React, { useEffect, useState } from "react";
+import { zohoApi } from "../../zohoApi";
+import { moveContactHistoryToApplication } from "../../services/contactHistoryMove";
 import {
   Table,
   TableBody,
@@ -17,6 +17,8 @@ import {
   Alert,
   CircularProgress,
   Box,
+  Checkbox,
+  FormControlLabel,
 } from "@mui/material";
 
 
@@ -24,7 +26,6 @@ const ApplicationTable = ({
   applications,
   selectedApplicationId,
   setSelectedApplicationId,
-  currentContact,
 }) => {
   const handleRowSelect = (id) => {
     setSelectedApplicationId(id);
@@ -90,14 +91,11 @@ const ApplicationDialog = ({
   handleApplicationDialogClose,
   applications,
   ZOHO,
-  handleDelete,
-  formData,
-  historyContacts,
   selectedRowData,
-  currentContact,
-  selectedOwner,
+  onMoveCompleted,
 }) => {
   const [selectedApplicationId, setSelectedApplicationId] = useState(null);
+  const [confirmedSaved, setConfirmedSaved] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -109,7 +107,16 @@ const ApplicationDialog = ({
     setSnackbar({ open: false, message: "", severity: "success" });
   };
 
+  useEffect(() => {
+    if (openApplicationDialog) {
+      setSelectedApplicationId(null);
+      setConfirmedSaved(false);
+    }
+  }, [openApplicationDialog]);
+
   const handleApplicationSelect = async () => {
+    if (isMoving) return;
+    if (!confirmedSaved) return;
     if (!selectedApplicationId) {
       setSnackbar({
         open: true,
@@ -119,20 +126,12 @@ const ApplicationDialog = ({
       return;
     }
 
-    const contacts = Array.isArray(historyContacts) ? historyContacts : [];
-    if (contacts.length === 0) {
+    const sourceHistoryId =
+      selectedRowData?.historyDetails?.id || selectedRowData?.history_id;
+    if (!sourceHistoryId) {
       setSnackbar({
         open: true,
-        message: "No contacts associated with this history. Please add at least one contact.",
-        severity: "error",
-      });
-      return;
-    }
-
-    if (!selectedRowData) {
-      setSnackbar({
-        open: true,
-        message: "History record data is missing. Please close and try again.",
+        message: "The source history ID is missing. Please close and try again.",
         severity: "error",
       });
       return;
@@ -140,88 +139,14 @@ const ApplicationDialog = ({
 
     setIsMoving(true);
     try {
-      const firstContactName = contacts[0]?.Full_Name || contacts[0]?.full_name || "Unknown";
-      // Use formData first (current form values), then selectedRowData (original row)
-      const stakeHolder = formData?.stakeHolder ?? selectedRowData?.stakeHolder;
-      const stakeholderId =
-        stakeHolder && typeof stakeHolder === "object"
-          ? stakeHolder.id ?? stakeHolder.Id ?? stakeHolder.ID
-          : null;
-      const stakeholderForApi =
-        stakeholderId != null
-          ? { id: String(stakeholderId) }
-          : null;
-
-      const apiData = {
-        Name: firstContactName,
-        Application: { id: selectedApplicationId },
-        History_Details: formData?.details ?? selectedRowData?.details ?? "",
-        History_Result: formData?.result ?? selectedRowData?.result ?? "",
-        History_Type: formData?.type ?? selectedRowData?.type ?? "",
-        Regarding: formData?.regarding ?? selectedRowData?.regarding ?? "",
-        Duration_Min: formData?.duration ?? selectedRowData?.duration ?? null,
-        Date: (() => {
-          const dt = formData?.date_time ?? selectedRowData?.date_time;
-          return dt ? dayjs(dt).format("YYYY-MM-DDTHH:mm:ssZ") : null;
-        })(),
-        [APPLICATIONS_HISTORY_STAKEHOLDER_FIELD]: stakeholderForApi,
-        Owner: selectedOwner,
-      };
-
-      const createApplicationHistory = await ZOHO.CRM.API.insertRecord({
-        Entity: "Applications_History",
-        APIData: apiData,
-        Trigger: ["workflow"],
+      const result = await moveContactHistoryToApplication({
+        zoho: ZOHO,
+        sourceHistoryId,
+        targetMatterId: selectedApplicationId,
+        listAttachments: zohoApi.file.getAttachments,
       });
-
-      if (createApplicationHistory?.data[0]?.code === "SUCCESS") {
-        const newHistoryId = createApplicationHistory.data[0].details.id;
-
-        // Create junction records linking Application History to Contacts
-        for (const contact of contacts) {
-          const contactId = contact?.id;
-          if (!contactId) continue;
-          await ZOHO.CRM.API.insertRecord({
-            Entity: "Application_Hstory",
-            APIData: {
-              Application_Hstory: { id: newHistoryId },
-              Contact: { id: contactId },
-            },
-            Trigger: ["workflow"],
-          });
-        }
-
-        var func_name = "copy_attachment_form_contact_history_to_applicatio";
-
-        const history_id =
-          selectedRowData?.historyDetails?.id || selectedRowData?.history_id;
-
-        var req_data = {
-          arguments: JSON.stringify({
-            fromModule: "History1",
-            toModule: "Applications_History",
-            fromID: history_id,
-            ToID: newHistoryId,
-          }),
-        };
-
-        await ZOHO.CRM.FUNCTIONS.execute(func_name, req_data).then(function (
-          data
-        ) {
-          console.log(data);
-        });
-
-        // Delete the current history and associated contacts
-        await handleDelete();
-
-        setSnackbar({
-          open: true,
-          message: "History moved successfully!",
-          severity: "success",
-        });
-      } else {
-        throw new Error("Failed to create new application history.");
-      }
+      handleApplicationDialogClose();
+      onMoveCompleted?.(result);
     } catch (error) {
       console.error("Error moving history:", error);
       setSnackbar({
@@ -231,7 +156,6 @@ const ApplicationDialog = ({
       });
     } finally {
       setIsMoving(false);
-      handleApplicationDialogClose();
     }
   };
 
@@ -239,7 +163,7 @@ const ApplicationDialog = ({
     <>
       <MUIDialog
         open={openApplicationDialog}
-        onClose={handleApplicationDialogClose}
+        onClose={isMoving ? undefined : handleApplicationDialogClose}
         PaperProps={{
           sx: {
             minWidth: "600px",
@@ -272,7 +196,20 @@ const ApplicationDialog = ({
             applications={applications}
             selectedApplicationId={selectedApplicationId}
             setSelectedApplicationId={setSelectedApplicationId}
-            currentContact={currentContact}
+          />
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            The move uses the last saved version of this History. Save any edits
+            in the editor before moving.
+          </Alert>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={confirmedSaved}
+                onChange={(event) => setConfirmedSaved(event.target.checked)}
+                disabled={isMoving}
+              />
+            }
+            label="I have saved the edits I want to keep."
           />
         </DialogContent>
         <DialogActions>
@@ -284,9 +221,9 @@ const ApplicationDialog = ({
             Cancel
           </Button>
           <Button
-            onClick={() => handleApplicationSelect(currentContact)}
+            onClick={handleApplicationSelect}
             color="primary"
-            disabled={!selectedApplicationId || isMoving}
+            disabled={!selectedApplicationId || !confirmedSaved || isMoving}
             startIcon={isMoving ? <CircularProgress size={16} color="inherit" /> : null}
           >
             {isMoving ? "Moving..." : "Move"}

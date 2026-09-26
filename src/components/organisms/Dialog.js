@@ -43,6 +43,7 @@ import {
   fetchContactMatters,
   fetchMatterById,
   findRelatedMatter,
+  findRelatedMatterForEdit,
   normalizeSingleMultiSelectValue,
   selectPrimaryMatter,
   serializeMultiSelectPicklist,
@@ -126,6 +127,7 @@ export function Dialog({
   applications,
   openApplicationDialog,
   setOpenApplicationDialog,
+  onMoveCompleted,
   picklistConfig = null, // Admin-configurable picklist config from App.js
 }) {
   // Derive picklist options from admin config (or fallback to hard-coded defaults)
@@ -386,7 +388,7 @@ export function Dialog({
             }
           }
 
-          const matchedMatter = findRelatedMatter(relatedMatters, {
+          const matchedMatter = findRelatedMatterForEdit(relatedMatters, {
             matterId: historyValues.matter?.id,
             matterNo: historyValues.matterNo,
           });
@@ -398,9 +400,18 @@ export function Dialog({
               console.warn("Could not load source Matter layout:", error);
               sourceMatter = matchedMatter;
             }
+            const sourceValues = matterFormValuesFromHistory({
+              ...buildMatterSnapshotFields(sourceMatter),
+              Matter: sourceMatter,
+            });
             historyValues = {
               ...historyValues,
-              matter: normalizeLookup(sourceMatter),
+              matter: sourceValues.matter,
+              matterNo: historyValues.matterNo || sourceValues.matterNo,
+              currentStage:
+                historyValues.currentStage || sourceValues.currentStage,
+              matterProgress:
+                historyValues.matterProgress || sourceValues.matterProgress,
             };
           }
 
@@ -1828,12 +1839,8 @@ export function Dialog({
         handleApplicationDialogClose={handleApplicationDialogClose}
         applications={applications}
         ZOHO={ZOHO}
-        handleDelete={handleDelete}
-        formData={formData}
-        historyContacts={historyContacts}
         selectedRowData={selectedRowData}
-        currentContact={currentContact}
-        selectedOwner={selectedOwner}
+        onMoveCompleted={onMoveCompleted}
       />
       <Snackbar
         open={snackbar.open}

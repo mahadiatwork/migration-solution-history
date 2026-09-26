@@ -24,6 +24,7 @@ import {
   CONTACT_HISTORY_CORE_SELECT,
   CONTACT_HISTORY_SELECT,
   getCoqlOwnerName,
+  mergeHistoryListRecord,
   requireSuccessfulCoqlPage,
 } from "./services/contactHistoryList";
 import {
@@ -91,7 +92,10 @@ const mergeRecordsIntoCache = (newRecords) => {
       // Use junction ID as key (or history_id as fallback)
       const cacheKey = record.id || record.history_id;
       if (cacheKey) {
-        globalHistoryCache.set(cacheKey, record);
+        globalHistoryCache.set(
+          cacheKey,
+          mergeHistoryListRecord(globalHistoryCache.get(cacheKey), record)
+        );
       }
     }
   });
@@ -261,7 +265,7 @@ const App = () => {
   // COQL v8 Fetch Helpers (2000 records per page, paginated for full history)
   // ============================================================================
   // Visible in UI so we can confirm the paginated build is what CRM is serving
-  const HISTORY_FETCH_BUILD = "contact-id-fix-v5";
+  const HISTORY_FETCH_BUILD = "contact-matter-fix-v6";
   const COQL_HISTORY_ORDER = "order by Contact_History_Info.Date desc, id desc";
   const COQL_PAGE_SIZE = 2000; // Zoho COQL v8 hard cap per request
   const COQL_MAX_RECORDS = 100000; // Zoho COQL pagination ceiling
@@ -508,11 +512,6 @@ const App = () => {
 
             return id != null ? { id, name: rawName || "" } : null;
           })(),
-          matter: normalizeLookupValue(obj["Contact_History_Info.Matter"]),
-          matterNo: obj["Contact_History_Info.Matter_No"] ?? "",
-          currentStage: obj["Contact_History_Info.Current_Stage"] ?? "",
-          matterProgress: obj["Contact_History_Info.Matter_Progress"] ?? "",
-          billingType: obj["Contact_History_Info.Billing_Type"] ?? "Billable",
           history_id: obj["Contact_History_Info.id"]
         };
       });
@@ -769,6 +768,23 @@ const App = () => {
     setRegarding(updatedRecord.Regarding || "No Regarding");
     setDetails(updatedRecord.History_Details_Plain || "No Details");
     setHighlightedRecordId(updatedRecord.id); // Highlight the updated record
+    fetchRLData({ isBackground: true });
+  };
+
+  const handleMoveCompleted = ({ sourceHistoryId }) => {
+    for (const [key, record] of globalHistoryCache.entries()) {
+      const cachedHistoryId =
+        record?.history_id || record?.historyDetails?.id;
+      if (String(cachedHistoryId) === String(sourceHistoryId)) {
+        globalHistoryCache.delete(key);
+      }
+    }
+    setRelatedListData(getAllRecordsFromCache());
+    setCacheVersion((previous) => previous + 1);
+    handleCloseEditDialog();
+    enqueueSnackbar("History moved to the selected Matter.", {
+      variant: "success",
+    });
     fetchRLData({ isBackground: true });
   };
 
@@ -1460,6 +1476,7 @@ const App = () => {
         setSelectedContacts={setSelectedContacts}
         buttonText="Update"
         handleMoveToApplication={handleMoveToApplication}
+        onMoveCompleted={handleMoveCompleted}
         applications={applications}
         openApplicationDialog={openApplicationDialog}
         setOpenApplicationDialog={setOpenApplicationDialog}

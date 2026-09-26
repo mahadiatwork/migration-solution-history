@@ -41,6 +41,18 @@ export const getCoqlOwnerName = (row = {}) => {
   return `${firstName} ${lastName}`.trim() || "Unknown Owner";
 };
 
+/**
+ * Merge a sparse list response into an already hydrated History row.
+ *
+ * The Contact History COQL query intentionally omits optional Matter snapshot
+ * fields, so a background refresh must not discard values loaded from
+ * History1 or returned by a successful update.
+ */
+export const mergeHistoryListRecord = (existingRecord, incomingRecord) => ({
+  ...(existingRecord || {}),
+  ...(incomingRecord || {}),
+});
+
 export const requireSuccessfulCoqlPage = (page, pageLabel = "history") => {
   if (page?.errorCode) {
     throw new Error(
