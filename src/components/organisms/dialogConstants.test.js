@@ -5,6 +5,8 @@ import {
   DEFAULT_ACTIVITY_TYPE,
   DEFAULT_CATEGORY,
   durationOptions,
+  getContactHistoryDefaults,
+  getContactHistoryTypeOptions,
   mandatoryActivityTypes,
   mandatoryCategoryOptions,
   mergeCategoryOptions,
@@ -92,6 +94,50 @@ describe("matter history required options", () => {
       "To Do Billing",
       "Vacation",
     ]);
+  });
+
+  test("Contact create hides Matter types while retaining legacy and custom CRM types", () => {
+    const configured = [
+      "Communication & Meetings",
+      "Assessment & Analysis",
+      "Technical casework",
+      "Administration",
+      "Meeting",
+      "Other",
+      "Custom consultation",
+    ];
+
+    expect(getContactHistoryTypeOptions(configured)).toEqual([
+      "Meeting",
+      "Custom consultation",
+      "Other",
+    ]);
+    expect(
+      getContactHistoryTypeOptions(configured, "Communication & Meetings")
+    ).toEqual([
+      "Meeting",
+      "Custom consultation",
+      "Other",
+      "Communication & Meetings",
+    ]);
+  });
+
+  test("Contact create prefers legacy Meeting and Meeting Held in CRM config", () => {
+    const config = {
+      _source: "custom_module",
+      results: {
+        Meeting: ["Meeting Not Held", "Meeting Held", "Custom meeting result"],
+        "Custom consultation": ["Custom outcome", "Meeting Held"],
+      },
+    };
+    const getResults = (type) => getResultOptions(type, config);
+
+    expect(
+      getContactHistoryDefaults(["Custom consultation", "Meeting"], getResults)
+    ).toEqual({ type: "Meeting", result: "Meeting Held" });
+    expect(
+      getContactHistoryDefaults(["Custom consultation"], getResults)
+    ).toEqual({ type: "Custom consultation", result: "Custom outcome" });
   });
 
   test("uses CRM Category to Activity Type dependencies before fallback", () => {

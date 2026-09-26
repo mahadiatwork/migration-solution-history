@@ -735,11 +735,6 @@ const App = () => {
       ownerName: updatedRecord?.Owner?.full_name,
       date_time: updatedRecord?.Date, // Ensure date is consistent
       stakeHolder: updatedRecord?.Stakeholder,
-      matter: normalizeLookupValue(updatedRecord?.Matter),
-      matterNo: updatedRecord?.Matter_No ?? "",
-      currentStage: updatedRecord?.Current_Stage ?? "",
-      matterProgress: updatedRecord?.Matter_Progress ?? "",
-      billingType: updatedRecord?.Billing_Type ?? "Billable",
       // name: updatedRecord.Participants
       //     ? updatedRecord.Participants.map((c) => c.Full_Name).join(", ")
       //     : updatedRecord.name,
@@ -873,7 +868,7 @@ const App = () => {
 
     // Type filter
     if (filterType.length > 0) {
-      activeFilters.push("Category");
+      activeFilters.push("Type");
     }
 
     // Owner filter (only if subset is selected)
@@ -1058,7 +1053,7 @@ const App = () => {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Categories"
+                    label="Types"
                     size="small"
                     InputLabelProps={{ style: { fontSize: "9pt" } }}
                   />
@@ -1327,7 +1322,7 @@ const App = () => {
                   },
                 }}
                 renderInput={(params) => (
-                  <TextField {...params} label="Categories" size="small" />
+                  <TextField {...params} label="Types" size="small" />
                 )}
                 renderTags={(value) =>
                   value.length > 0 ? (
@@ -1416,8 +1411,8 @@ const App = () => {
                   <TableHead>
                     <TableRow>
                       <TableCell>Name</TableCell>
-                      <TableCell>Category</TableCell>
-                      <TableCell>Activity Type</TableCell>
+                      <TableCell>Type</TableCell>
+                      <TableCell>Result</TableCell>
                       <TableCell>Date & Time</TableCell>
                       <TableCell>Owner</TableCell>
                     </TableRow>
@@ -1435,8 +1430,8 @@ const App = () => {
                           }}
                         >
                           <TableCell>{row.name || "Unknown Name"}</TableCell>
-                          <TableCell>{row.type || "Unknown Category"}</TableCell>
-                          <TableCell>{row.result || "No Activity Type"}</TableCell>
+                          <TableCell>{row.type || "Unknown Type"}</TableCell>
+                          <TableCell>{row.result || "No Result"}</TableCell>
                           <TableCell>
                             {row.date_time
                               ? dayjs(row.date_time).format(

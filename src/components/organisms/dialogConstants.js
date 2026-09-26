@@ -92,6 +92,33 @@ export const mergeCategoryOptions = (configuredOptions = []) =>
     legacyTypeOptions
   );
 
+const matterOnlyHistoryTypes = new Set([
+  "Communication & Meetings",
+  "Assessment & Analysis",
+  "Technical casework",
+  "Administration",
+]);
+
+/** Keep Contact History's legacy Type choices while preserving custom CRM values. */
+export const getContactHistoryTypeOptions = (options = [], savedType = null) => {
+  const types = options.filter((type) => !matterOnlyHistoryTypes.has(type));
+  return mergeOrderedUnique(
+    types.filter((type) => type === "Meeting"),
+    types.filter((type) => type !== "Meeting" && type !== "Other"),
+    types.filter((type) => type === "Other"),
+    savedType ? [savedType] : []
+  );
+};
+
+export const getContactHistoryDefaults = (types, getResults) => {
+  const type = types.includes("Meeting") ? "Meeting" : types[0] || "";
+  const results = type ? getResults(type) : [];
+  const result = type === "Meeting" && results.includes("Meeting Held")
+    ? "Meeting Held"
+    : results[0] || "";
+  return { type, result };
+};
+
 export const mergeDurationOptions = (configuredOptions = []) => {
   const required = [...durationOptions];
   const seen = new Set(required);
