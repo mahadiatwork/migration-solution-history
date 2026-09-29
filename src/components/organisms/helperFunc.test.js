@@ -1,4 +1,8 @@
-import { getRegardingOptions, getResultOptions } from "./helperFunc";
+import {
+  CUSTOM_REGARDING_VALUE,
+  getRegardingOptions,
+  getResultOptions,
+} from "./helperFunc";
 
 describe("authoritative Widget_Picklist_Config helpers", () => {
   const config = {
@@ -41,5 +45,21 @@ describe("authoritative Widget_Picklist_Config helpers", () => {
     expect(getRegardingOptions("Call", "Legacy regarding", config)).toEqual([
       "Legacy regarding",
     ]);
+  });
+
+  test("removes reserved custom values while keeping configured Other", () => {
+    const reservedConfig = {
+      _source: "custom_module",
+      regarding: {
+        Meeting: ["Custom", CUSTOM_REGARDING_VALUE, "Other"],
+      },
+    };
+
+    expect(getRegardingOptions("Meeting", "", reservedConfig)).toEqual([
+      "Other",
+    ]);
+    expect(
+      getRegardingOptions("Call", CUSTOM_REGARDING_VALUE, reservedConfig)
+    ).toEqual([]);
   });
 });

@@ -172,10 +172,14 @@ export function Dialog({
     if (openDialog) {
       setIsSubmitting(false);
       setFormData((prev) => {
-        const { type: defaultType, result: defaultResult } =
-          getContactHistoryDefaults(contactTypeOptions, (type) =>
-            getResultOptions(type, picklistConfig)
-          );
+        const {
+          type: defaultType,
+          result: defaultResult,
+          regarding: defaultRegarding,
+        } = getContactHistoryDefaults(
+          contactTypeOptions,
+          (type) => getResultOptions(type, picklistConfig)
+        );
         const crmConfigLoaded = picklistConfig?._source === "custom_module";
         const defaultDuration =
           durationOptions.find((duration) => Number(duration) === 60) ??
@@ -186,13 +190,7 @@ export function Dialog({
           result: selectedRowData?.result ?? defaultResult,
           type: selectedRowData?.type ?? defaultType,
           duration: selectedRowData?.duration ?? defaultDuration,
-          regarding:
-            selectedRowData?.regarding ??
-            (getRegardingOptions(
-              defaultType,
-              "",
-              picklistConfig
-            )[0] || ""),
+          regarding: selectedRowData?.regarding ?? defaultRegarding,
           details: selectedRowData?.details || "",
           stakeHolder: (selectedRowData?.stakeHolder && typeof selectedRowData.stakeHolder === "object" && selectedRowData.stakeHolder?.id != null)
             ? selectedRowData.stakeHolder
@@ -911,15 +909,19 @@ export function Dialog({
                 <Select
                   value={formData.type || ""} // Ensure a fallback value
                   onChange={(e) => {
-                    handleInputChange("type", e.target.value);
+                    const type = e.target.value;
+                    const results = getResultOptions(type, picklistConfig);
+                    const nextResult =
+                      type === "Meeting" && results.includes("Meeting Held")
+                        ? "Meeting Held"
+                        : results[0] || "";
+                    handleInputChange("type", type);
+                    handleInputChange("result", nextResult);
                     handleInputChange(
-                      "result",
-                      getContactHistoryDefaults([e.target.value], (type) =>
-                        getResultOptions(type, picklistConfig)
-                      ).result
+                      "regarding",
+                      getRegardingOptions(type, undefined, picklistConfig)[0]
                     );
-                    handleInputChange("regarding", getRegardingOptions(e.target.value, undefined, picklistConfig)[0]);
-                    setSelectedType(e.target.value);
+                    setSelectedType(type);
                   }}
                   label="Type"
                   sx={{

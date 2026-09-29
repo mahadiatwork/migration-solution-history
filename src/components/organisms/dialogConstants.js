@@ -111,12 +111,20 @@ export const getContactHistoryTypeOptions = (options = [], savedType = null) => 
 };
 
 export const getContactHistoryDefaults = (types, getResults) => {
-  const type = types.includes("Meeting") ? "Meeting" : types[0] || "";
-  const results = type ? getResults(type) : [];
-  const result = type === "Meeting" && results.includes("Meeting Held")
-    ? "Meeting Held"
-    : results[0] || "";
-  return { type, result };
+  if (!types.includes("Meeting")) {
+    return { type: "", result: "", regarding: "" };
+  }
+
+  const results = getResults("Meeting");
+  if (!results.includes("Meeting Held")) {
+    return { type: "Meeting", result: "", regarding: "" };
+  }
+
+  return {
+    type: "Meeting",
+    result: "Meeting Held",
+    regarding: "",
+  };
 };
 
 export const mergeDurationOptions = (configuredOptions = []) => {

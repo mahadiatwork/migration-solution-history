@@ -14,7 +14,7 @@ import {
   requireSuccessfulRecordResponse,
   serializeDuration,
 } from "./dialogConstants";
-import { getResultOptions } from "./helperFunc";
+import { getRegardingOptions, getResultOptions } from "./helperFunc";
 
 describe("matter history required options", () => {
   test("keeps owner and stakeholder aligned on contact junction rows", () => {
@@ -122,22 +122,52 @@ describe("matter history required options", () => {
     ]);
   });
 
-  test("Contact create prefers legacy Meeting and Meeting Held in CRM config", () => {
+  test("Contact create uses only the semantic Meeting defaults", () => {
     const config = {
       _source: "custom_module",
       results: {
         Meeting: ["Meeting Not Held", "Meeting Held", "Custom meeting result"],
         "Custom consultation": ["Custom outcome", "Meeting Held"],
       },
+      regarding: {
+        _default: ["Pear"],
+      },
     };
     const getResults = (type) => getResultOptions(type, config);
 
+    expect(getRegardingOptions("Meeting", "", config)).toEqual(["Pear"]);
+
     expect(
-      getContactHistoryDefaults(["Custom consultation", "Meeting"], getResults)
-    ).toEqual({ type: "Meeting", result: "Meeting Held" });
+      getContactHistoryDefaults(
+        ["Custom consultation", "Meeting"],
+        getResults
+      )
+    ).toEqual({
+      type: "Meeting",
+      result: "Meeting Held",
+      regarding: "",
+    });
     expect(
       getContactHistoryDefaults(["Custom consultation"], getResults)
-    ).toEqual({ type: "Custom consultation", result: "Custom outcome" });
+    ).toEqual({ type: "", result: "", regarding: "" });
+  });
+
+  test("Contact create never promotes Fruit, Apple, or Pear to defaults", () => {
+    const getResults = jest.fn(() => ["Apple"]);
+
+    expect(
+      getContactHistoryDefaults(["Fruit"], getResults)
+    ).toEqual({ type: "", result: "", regarding: "" });
+    expect(getResults).not.toHaveBeenCalled();
+  });
+
+  test("Contact create stays blank when Meeting Held is unavailable", () => {
+    expect(
+      getContactHistoryDefaults(
+        ["Meeting", "Fruit"],
+        () => ["Apple"]
+      )
+    ).toEqual({ type: "Meeting", result: "", regarding: "" });
   });
 
   test("uses CRM Category to Activity Type dependencies before fallback", () => {

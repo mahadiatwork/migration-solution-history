@@ -1,6 +1,16 @@
 
 import { mandatoryActivityTypes, mergeOrderedUnique } from "./dialogConstants";
 
+export const CUSTOM_REGARDING_LABEL = "Custom";
+export const CUSTOM_REGARDING_VALUE = "__custom_regarding__";
+
+const filterReservedRegardingOptions = (options) =>
+  (Array.isArray(options) ? options : []).filter(
+    (option) =>
+      option !== CUSTOM_REGARDING_LABEL &&
+      option !== CUSTOM_REGARDING_VALUE
+  );
+
 /**
  * Helper Functions for Dialog Picklists
  *
@@ -138,16 +148,20 @@ export const getRegardingOptions = (type, existingValue, config) => {
       const typeRegarding = Array.isArray(configuredRegarding[type])
         ? configuredRegarding[type]
         : [];
-      return mergeOrderedUnique(typeRegarding, [existingValue]);
+      return filterReservedRegardingOptions(
+        mergeOrderedUnique(typeRegarding, [existingValue])
+      );
     }
     // Check for default regarding (entries with no specific parent type)
     if (Object.prototype.hasOwnProperty.call(configuredRegarding, "_default")) {
       const defaultRegarding = Array.isArray(configuredRegarding._default)
         ? configuredRegarding._default
         : [];
-      return mergeOrderedUnique(defaultRegarding, [existingValue]);
+      return filterReservedRegardingOptions(
+        mergeOrderedUnique(defaultRegarding, [existingValue])
+      );
     }
-    return mergeOrderedUnique([existingValue]);
+    return filterReservedRegardingOptions(mergeOrderedUnique([existingValue]));
   }
 
   // Fall back to hard-coded ACT-migrated values
@@ -185,5 +199,5 @@ export const getRegardingOptions = (type, existingValue, config) => {
     predefinedOptions = [safeValue, ...predefinedOptions];
   }
 
-  return predefinedOptions;
+  return filterReservedRegardingOptions(predefinedOptions);
 };

@@ -1,21 +1,18 @@
 import React, { useState, useEffect, useRef } from "react";
 import { FormControl, InputLabel, Select, MenuItem, TextField, Box } from "@mui/material";
-import { getRegardingOptions } from "./helperFunc";
+import {
+  CUSTOM_REGARDING_LABEL,
+  CUSTOM_REGARDING_VALUE,
+  getRegardingOptions,
+} from "./helperFunc";
 
 const RegardingField = ({ formData, handleInputChange, selectedRowData, picklistConfig }) => {
   const existingValue = formData?.regarding ?? selectedRowData?.regarding ?? "";
-  const moduleIsAuthoritative = picklistConfig?._source === "custom_module";
-  const configuredOptions = React.useMemo(
-    () => getRegardingOptions(formData?.type, "", picklistConfig) || [],
-    [formData?.type, picklistConfig]
-  );
   const predefinedOptions = React.useMemo(
     () =>
       getRegardingOptions(formData?.type, existingValue, picklistConfig) || [],
     [existingValue, formData?.type, picklistConfig]
   );
-  const allowManualOther =
-    !moduleIsAuthoritative || configuredOptions.includes("Other");
 
   const [selectedValue, setSelectedValue] = useState("");
   const [manualInput, setManualInput] = useState("");
@@ -27,43 +24,38 @@ const RegardingField = ({ formData, handleInputChange, selectedRowData, picklist
     previousType.current = formData?.type;
 
     // Keep the manual editor stable while its text is mirrored into formData.
-    if (!typeChanged && allowManualOther && showManualInput) return;
+    if (!typeChanged && showManualInput) return;
 
     if (existingValue) {
       if (predefinedOptions.includes(existingValue)) {
         setSelectedValue(existingValue);
         setManualInput("");
-        setShowManualInput(
-          allowManualOther && existingValue === "Other"
-        );
-      } else if (allowManualOther) {
-        setSelectedValue("Other");
-        setManualInput(existingValue);
-        setShowManualInput(true);
-      } else {
-        setSelectedValue("");
-        setManualInput("");
         setShowManualInput(false);
+      } else {
+        setSelectedValue(CUSTOM_REGARDING_VALUE);
+        setManualInput(
+          existingValue === CUSTOM_REGARDING_VALUE ? "" : existingValue
+        );
+        setShowManualInput(true);
       }
     } else {
       setSelectedValue("");
       setManualInput("");
       setShowManualInput(false);
     }
-  }, [allowManualOther, existingValue, formData?.type, predefinedOptions, showManualInput]);
+  }, [existingValue, formData?.type, predefinedOptions, showManualInput]);
   
 
   const handleSelectChange = (event) => {
     const value = event.target.value;
     setSelectedValue(value);
-  
-    if (value === "Other" && allowManualOther) {
-      setShowManualInput(true); 
-      setManualInput(""); 
-      handleInputChange("regarding", "Other"); // ✅ Set "Other" in formData
+
+    if (value === CUSTOM_REGARDING_VALUE) {
+      setShowManualInput(true);
+      setManualInput("");
+      handleInputChange("regarding", "");
     } else {
-      console.log({value})
-      setShowManualInput(false); 
+      setShowManualInput(false);
       setManualInput("");
       handleInputChange("regarding", value);
     }
@@ -94,15 +86,13 @@ const RegardingField = ({ formData, handleInputChange, selectedRowData, picklist
               {option}
             </MenuItem>
           ))}
-          {allowManualOther && !predefinedOptions.includes("Other") && (
-            <MenuItem value="Other" sx={{ fontSize: "9pt" }}>
-              Other (Manually enter)
-            </MenuItem>
-          )}
+          <MenuItem value={CUSTOM_REGARDING_VALUE} sx={{ fontSize: "9pt" }}>
+            {CUSTOM_REGARDING_LABEL}
+          </MenuItem>
         </Select>
       </FormControl>
 
-      {allowManualOther && showManualInput ?
+      {showManualInput ?
         <TextField
           label="Enter your custom regarding"
           fullWidth
