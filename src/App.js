@@ -43,6 +43,10 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { Dialog as MUIDialog } from "@mui/material";
 import { useSnackbar } from "notistack";
 import LinkifyText from "./components/atoms/LinkifyText";
+import {
+  formatDateTimeForDisplay,
+  parseCrmDateTime,
+} from "./util/dateTime";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -58,7 +62,7 @@ const parentContainerStyle = {
 function isInLastNDays(date, pre) {
   const now = dayjs();
   const daysAgo = now.subtract(pre, "day");
-  return dayjs(date).isAfter(daysAgo);
+  return parseCrmDateTime(date)?.isAfter(daysAgo) ?? false;
 }
 
 const dateOptions = [
@@ -817,23 +821,23 @@ const App = () => {
       // 3. Date Filter
       let dateMatch = true;
       if (dateRange?.preDay) {
-        const isValidDate = dayjs(el?.date_time).isValid();
-        dateMatch = isValidDate && isInLastNDays(el?.date_time, dateRange?.preDay);
+        dateMatch = isInLastNDays(el?.date_time, dateRange?.preDay);
       } else if (dateRange?.startDate && dateRange?.endDate) {
         // Normalize dates to start/end of day for accurate comparison
         const startDate = dayjs(dateRange.startDate).startOf("day");
         const endDate = dayjs(dateRange.endDate).endOf("day");
-        const recordDate = dayjs(el?.date_time);
+        const recordDate = parseCrmDateTime(el?.date_time);
 
         // Use inclusive boundaries: records on startDate and endDate should be included
-        dateMatch = (
+        dateMatch = Boolean(recordDate) && (
           (recordDate.isSame(startDate, "day") || recordDate.isAfter(startDate)) &&
           (recordDate.isSame(endDate, "day") || recordDate.isBefore(endDate))
         );
       } else if (dateRange?.custom) {
         const startDate = dayjs(dateRange.custom());
         const endDate = dayjs();
-        dateMatch = dayjs(el?.date_time).isBetween(startDate, endDate, null, "[]");
+        const recordDate = parseCrmDateTime(el?.date_time);
+        dateMatch = recordDate?.isBetween(startDate, endDate, null, "[]") ?? false;
       }
 
       // 4. Keyword Filter
@@ -1434,9 +1438,10 @@ const App = () => {
                           <TableCell>{row.result || "No Result"}</TableCell>
                           <TableCell>
                             {row.date_time
-                              ? dayjs(row.date_time).format(
-                                "DD/MM/YYYY HH:mm A"
-                              )
+                              ? formatDateTimeForDisplay(
+                                  row.date_time,
+                                  "DD/MM/YYYY HH:mm A"
+                                )
                               : "No Date"}
                           </TableCell>
                           <TableCell>

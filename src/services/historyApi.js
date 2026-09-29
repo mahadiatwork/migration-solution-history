@@ -2,12 +2,9 @@
  * History API Service
  * Handles all Zoho CRM API operations for History records
  */
-import dayjs from "dayjs";
-import timezone from "dayjs/plugin/timezone";
 import { zohoApi } from "../../zohoApi";
 import { resolveMatterSnapshotForContact } from "./matterSnapshot";
-
-dayjs.extend(timezone);
+import { formatDateTimeForCrm } from "../util/dateTime";
 
 const ZOHO = window.ZOHO;
 
@@ -24,9 +21,7 @@ export const logResponse = async ({
     Widget_Source,
 }) => {
     try {
-        const timeOccurred = dayjs()
-            .tz("Australia/Adelaide")
-            .format("YYYY-MM-DDTHH:mm:ssZ");
+        const timeOccurred = formatDateTimeForCrm(new Date());
 
         const logInsertResponse = await ZOHO.CRM.API.insertRecord({
             Entity: "Log_Module",

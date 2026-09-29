@@ -1,5 +1,4 @@
 import * as React from "react";
-import dayjs from "dayjs";
 import Box from "@mui/material/Box";
 import { Table as MUITable } from "@mui/material";
 import TableBody from "@mui/material/TableBody";
@@ -16,6 +15,10 @@ import { visuallyHidden } from "@mui/utils";
 import { useSnackbar } from "notistack";
 import { zohoApi } from "../../zohoApi";
 import DownloadIcon from "@mui/icons-material/Download";
+import {
+  compareCrmDateTimes,
+  formatDateTimeForDisplay,
+} from "../../util/dateTime";
 
 
 const highlightText = (text, keyword) => {
@@ -94,6 +97,10 @@ function descendingComparator(a, b, orderBy) {
 }
 
 function getComparator(order, orderBy) {
+  if (orderBy === "date_time") {
+    return (a, b) => compareCrmDateTimes(a?.date_time, b?.date_time, order);
+  }
+
   return order === "desc"
     ? (a, b) => descendingComparator(a, b, orderBy)
     : (a, b) => -descendingComparator(a, b, orderBy);
@@ -271,8 +278,8 @@ export function Table({
                         }}
                       >
                         {/* <span>{row.date_time}</span> */}
-                        <span>{dayjs(row.date_time).format("DD/MM/YYYY")}</span>
-                        <span>{dayjs(row.date_time).format("h:mm A")}</span>
+                        <span>{formatDateTimeForDisplay(row.date_time, "DD/MM/YYYY")}</span>
+                        <span>{formatDateTimeForDisplay(row.date_time, "h:mm A")}</span>
                       </Box>
                     </TableCell>
                     <TableCell size="small">

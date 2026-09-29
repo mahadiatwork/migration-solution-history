@@ -49,6 +49,11 @@ import {
   serializeDuration,
   typeOptions as fallbackTypeOptions,
 } from "./dialogConstants";
+import {
+  formatDateTimeForCrm,
+  getDeviceTimezone,
+  parseCrmDateTime,
+} from "../../util/dateTime";
 
 const VisuallyHiddenInput = styled("input")({
   clip: "rect(0 0 0 0)",
@@ -196,7 +201,7 @@ export function Dialog({
             ? selectedRowData.stakeHolder
             : null,
           date_time: selectedRowData?.date_time
-            ? dayjs(selectedRowData.date_time)
+            ? parseCrmDateTime(selectedRowData.date_time)
             : dayjs(),
         };
         return {
@@ -347,7 +352,7 @@ export function Dialog({
       .join(", ");
 
     const dateTimeFormatted = formData.date_time
-      ? dayjs(formData.date_time).format("YYYY-MM-DDTHH:mm:ssZ")
+      ? formatDateTimeForCrm(formData.date_time)
       : null;
 
     const finalData = {
@@ -395,7 +400,7 @@ export function Dialog({
 
   const logResponse = async ({ name, payload, response, result, trigger, meetingType, Widget_Source }) => {
     try {
-      const timeOccurred = dayjs().tz("Australia/Adelaide").format("YYYY-MM-DDTHH:mm:ssZ");
+      const timeOccurred = formatDateTimeForCrm(dayjs());
 
       const logInsertResponse = await ZOHO.CRM.API.insertRecord({
         Entity: "Log_Module",
@@ -1014,6 +1019,7 @@ export function Dialog({
                       id="date_time"
                       label="Date & Time"
                       name="date_time"
+                      timezone={getDeviceTimezone()}
                       value={formData.date_time || dayjs()}
                       onChange={(newValue) =>
                         handleInputChange("date_time", newValue || dayjs())
@@ -1047,6 +1053,7 @@ export function Dialog({
                         textField: {
                           variant: "standard",
                           margin: "dense",
+                          helperText: `Timezone: ${getDeviceTimezone()}`,
                         },
                       }}
                     />
