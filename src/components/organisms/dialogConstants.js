@@ -100,8 +100,13 @@ const matterOnlyHistoryTypes = new Set([
 ]);
 
 /** Keep Contact History's legacy Type choices while preserving custom CRM values. */
-export const getContactHistoryTypeOptions = (options = [], savedType = null) => {
+export const getContactHistoryTypeOptions = (
+  options = [], savedType = null, preserveOrder = false
+) => {
   const types = options.filter((type) => !matterOnlyHistoryTypes.has(type));
+  if (preserveOrder) {
+    return mergeOrderedUnique(types, savedType ? [savedType] : []);
+  }
   return mergeOrderedUnique(
     types.filter((type) => type === "Meeting"),
     types.filter((type) => type !== "Meeting" && type !== "Other"),

@@ -104,7 +104,10 @@ export function Dialog({
   const typeOptions = picklistConfig
     ? getTypeOptionsFromConfig(picklistConfig)
     : fallbackTypeOptions;
-  const contactTypeOptions = getContactHistoryTypeOptions(typeOptions);
+  const preserveTypeOrder = picklistConfig?._source === "custom_module";
+  const contactTypeOptions = getContactHistoryTypeOptions(
+    typeOptions, null, preserveTypeOrder
+  );
   const [, setHistoryName] = React.useState("");
   const [historyContacts, setHistoryContacts] = React.useState([]);
   const [selectedOwner, setSelectedOwner] = React.useState(
@@ -120,7 +123,8 @@ export function Dialog({
   const [formData, setFormData] = React.useState(selectedRowData || {}); // Form data state
   const visibleTypeOptions = getContactHistoryTypeOptions(
     typeOptions,
-    selectedRowData?.type || formData.type
+    selectedRowData?.type || formData.type,
+    preserveTypeOrder
   );
   // console.log({ formData });
   const [snackbar, setSnackbar] = React.useState({

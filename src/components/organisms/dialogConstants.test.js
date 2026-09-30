@@ -152,6 +152,17 @@ describe("matter history required options", () => {
     ).toEqual({ type: "", result: "", regarding: "" });
   });
 
+  test("Contact dropdown preserves CRM order instead of pinning Meeting and Other", () => {
+    const configured = ["Other", "Communication & Meetings", "Fruit", "Meeting", "Call"];
+
+    expect(getContactHistoryTypeOptions(configured, null, true)).toEqual([
+      "Other", "Fruit", "Meeting", "Call",
+    ]);
+    expect(getContactHistoryTypeOptions(configured, "Legacy", true)).toEqual([
+      "Other", "Fruit", "Meeting", "Call", "Legacy",
+    ]);
+  });
+
   test("Contact create never promotes Fruit, Apple, or Pear to defaults", () => {
     const getResults = jest.fn(() => ["Apple"]);
 

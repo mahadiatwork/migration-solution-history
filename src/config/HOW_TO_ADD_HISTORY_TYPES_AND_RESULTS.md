@@ -31,6 +31,20 @@ Save.
 
 The Type dropdown uses **Name** exactly as typed.
 
+### How Sort Order works
+
+Sort Order is a numeric priority, not a numbered position in the dropdown.
+Lower numbers appear first, including `0`. For example, the seed data gives
+Other order `5` and Meeting order `10`, so Fruit with order `9` appears between
+them. It does not mean Fruit is the ninth option. Use unique priorities within
+each list when you need an exact order; equal priorities retain the CRM response
+order. Blank or invalid priorities appear after all numbered options.
+
+The same rule applies to Type, Duration, and the Result/Regarding options for
+each Parent Type. Contact History still hides Matter-only types while preserving
+the configured order of its visible options. Reload the widget after saving
+configuration changes.
+
 ---
 
 ## Add Results for that Type

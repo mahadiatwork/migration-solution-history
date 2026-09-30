@@ -112,6 +112,63 @@ describe("Widget_Picklist_Config fetch state", () => {
     });
   });
 
+  test("sorts every picklist by numeric priority, keeping zero first and missing orders last", async () => {
+    const ranks = [null, "10", "9", "", 0, 10000, "invalid", "  ", "5", "Infinity"];
+    const categories = ["Type", "Result", "Regarding", "Duration"];
+    const records = categories.flatMap((category) =>
+      ranks.map((rank, index) => ({
+        Name: category === "Duration" ? String(index * 5) : `Option ${index}`,
+        Category: category,
+        Parent_Type: "Fruit",
+        Sort_Order: rank,
+        Active: true,
+      }))
+    );
+    const getAllRecords = jest.fn(({ page }) => Promise.resolve({
+      data: page === 1 ? records.slice(0, 15) : records.slice(15),
+      info: { more_records: page === 1 },
+    }));
+    window.ZOHO = { CRM: { API: { getAllRecords } } };
+
+    const { fetchPicklistConfig } = require("./picklistConfigService");
+    const config = await fetchPicklistConfig();
+    const orderedIndices = [4, 8, 2, 1, 5, 0, 3, 6, 7, 9];
+    const expected = orderedIndices.map((index) => `Option ${index}`);
+
+    expect(getAllRecords).toHaveBeenCalledTimes(2);
+    expect(config.types).toEqual(expected);
+    expect(config.results.Fruit).toEqual(expected);
+    expect(config.regarding.Fruit).toEqual(expected);
+    expect(config.durations).toEqual(orderedIndices.map((index) => index * 5));
+    expect(config.resultMapping.Fruit).toBe("Option 4");
+  });
+
+  test("supports wrapped numeric orders and preserves the source order for ties", async () => {
+    const ranks = [
+      { display_value: "10" },
+      { actual_value: 0, display_value: "zero" },
+      { actual_value: "9" },
+      { name: "5" },
+      { Name: "9" },
+      true,
+      {},
+    ];
+    window.ZOHO = { CRM: { API: { getAllRecords: jest.fn().mockResolvedValue({
+      data: ranks.map((rank, index) => ({
+        Name: `Option ${index}`,
+        Category: "Type",
+        Sort_Order: rank,
+        Active: true,
+      })),
+      info: { more_records: false },
+    }) } } };
+
+    const { fetchPicklistConfig } = require("./picklistConfigService");
+    const config = await fetchPicklistConfig();
+
+    expect(config.types).toEqual([1, 3, 2, 4, 0, 5, 6].map((index) => `Option ${index}`));
+  });
+
   test("does not cache partial SDK pagination after a later page fails", async () => {
     const partialPage = Array.from({ length: 200 }, (_, index) => ({
       Name: `Partial ${index}`,
