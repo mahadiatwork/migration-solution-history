@@ -17,8 +17,6 @@ import {
   Alert,
   CircularProgress,
   Box,
-  Checkbox,
-  FormControlLabel,
 } from "@mui/material";
 
 
@@ -95,7 +93,6 @@ const ApplicationDialog = ({
   onMoveCompleted,
 }) => {
   const [selectedApplicationId, setSelectedApplicationId] = useState(null);
-  const [confirmedSaved, setConfirmedSaved] = useState(false);
   const [isMoving, setIsMoving] = useState(false);
   const [snackbar, setSnackbar] = useState({
     open: false,
@@ -110,13 +107,11 @@ const ApplicationDialog = ({
   useEffect(() => {
     if (openApplicationDialog) {
       setSelectedApplicationId(null);
-      setConfirmedSaved(false);
     }
   }, [openApplicationDialog]);
 
   const handleApplicationSelect = async () => {
     if (isMoving) return;
-    if (!confirmedSaved) return;
     if (!selectedApplicationId) {
       setSnackbar({
         open: true,
@@ -197,20 +192,6 @@ const ApplicationDialog = ({
             selectedApplicationId={selectedApplicationId}
             setSelectedApplicationId={setSelectedApplicationId}
           />
-          <Alert severity="warning" sx={{ mt: 2 }}>
-            The move uses the last saved version of this History. Save any edits
-            in the editor before moving.
-          </Alert>
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={confirmedSaved}
-                onChange={(event) => setConfirmedSaved(event.target.checked)}
-                disabled={isMoving}
-              />
-            }
-            label="I have saved the edits I want to keep."
-          />
         </DialogContent>
         <DialogActions>
           <Button
@@ -223,7 +204,7 @@ const ApplicationDialog = ({
           <Button
             onClick={handleApplicationSelect}
             color="primary"
-            disabled={!selectedApplicationId || !confirmedSaved || isMoving}
+            disabled={!selectedApplicationId || isMoving}
             startIcon={isMoving ? <CircularProgress size={16} color="inherit" /> : null}
           >
             {isMoving ? "Moving..." : "Move"}
