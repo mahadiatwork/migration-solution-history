@@ -44,9 +44,16 @@ import { Dialog as MUIDialog } from "@mui/material";
 import { useSnackbar } from "notistack";
 import LinkifyText from "./components/atoms/LinkifyText";
 import {
+  CRM_DATE_TIME_FORMAT,
   formatDateTimeForDisplay,
   parseCrmDateTime,
 } from "./util/dateTime";
+import {
+  HIGH_VOLUME_HISTORY_THRESHOLD,
+  getRecentHistoryStart,
+  isHighVolumeHistory,
+  parseHistoryCount,
+} from "./services/historyLoadPolicy";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -70,6 +77,7 @@ const dateOptions = [
   { label: "Last 7 Days", preDay: 7 },
   { label: "Last 30 Days", preDay: 30 },
   { label: "Last 90 Days", preDay: 90 },
+  { label: "Last 3 Months", preMonth: 3 },
   { label: "Current Week", custom: () => dayjs().startOf("week").format() },
   { label: "Current Month", custom: () => dayjs().startOf("month").format() },
   {
@@ -191,6 +199,7 @@ const App = () => {
     <CircularProgress />
   );
   const [loadedCount, setLoadedCount] = React.useState(0); // Records fetched so far during initial load
+  const [historyLoadSummary, setHistoryLoadSummary] = React.useState(null);
   // relatedListData now reads from cache, but we keep state for reactivity
   const [relatedListData, setRelatedListData] = React.useState([]);
   const [cacheVersion, setCacheVersion] = React.useState(0); // Force re-render when cache updates
@@ -271,7 +280,7 @@ const App = () => {
   // Visible in UI so we can confirm the paginated build is what CRM is serving
   const HISTORY_FETCH_BUILD = "contact-matter-fix-v6";
   const COQL_HISTORY_ORDER = "order by Contact_History_Info.Date desc, id desc";
-  const COQL_PAGE_SIZE = 2000; // Zoho COQL v8 hard cap per request
+  const COQL_PAGE_SIZE = HIGH_VOLUME_HISTORY_THRESHOLD; // Zoho COQL v8 hard cap per request
   const COQL_MAX_RECORDS = 100000; // Zoho COQL pagination ceiling
 
   /**
@@ -293,9 +302,14 @@ const App = () => {
     contactId,
     limit = 2000,
     cursor = null,
-    selectFields = CONTACT_HISTORY_SELECT
+    selectFields = CONTACT_HISTORY_SELECT,
+    dateFrom = null
   ) => {
     let whereClause = `Contact_Details = '${escapeCoqlString(contactId)}'`;
+
+    if (dateFrom) {
+      whereClause += ` and Contact_History_Info.Date >= '${escapeCoqlString(dateFrom)}'`;
+    }
 
     // Keyset pagination: rows older than the last Date/id we already have
     if (cursor?.date && cursor?.id) {
@@ -337,9 +351,14 @@ const App = () => {
     contactId,
     limit = 2000,
     offset = 0,
-    selectFields = CONTACT_HISTORY_SELECT
+    selectFields = CONTACT_HISTORY_SELECT,
+    dateFrom = null
   ) => {
-    const selectQuery = `select ${selectFields} from History_X_Contacts where Contact_Details = '${escapeCoqlString(contactId)}' ${COQL_HISTORY_ORDER} LIMIT ${offset}, ${limit}`;
+    let whereClause = `Contact_Details = '${escapeCoqlString(contactId)}'`;
+    if (dateFrom) {
+      whereClause += ` and Contact_History_Info.Date >= '${escapeCoqlString(dateFrom)}'`;
+    }
+    const selectQuery = `select ${selectFields} from History_X_Contacts where ${whereClause} ${COQL_HISTORY_ORDER} LIMIT ${offset}, ${limit}`;
     const req_data = {
       url: `${dataCenterMap.AU}/crm/v8/coql`,
       method: "POST",
@@ -359,7 +378,8 @@ const App = () => {
   const fetchAllHistoryViaCoqlV8 = async (
     contactId,
     onProgress,
-    selectFields = CONTACT_HISTORY_SELECT
+    selectFields = CONTACT_HISTORY_SELECT,
+    dateFrom = null
   ) => {
     const pageSize = COQL_PAGE_SIZE;
     const seenIds = new Set();
@@ -376,7 +396,8 @@ const App = () => {
           contactId,
           pageSize,
           cursor,
-          selectFields
+          selectFields,
+          dateFrom
         );
         if (page.errorCode && page.data.length === 0 && pageIndex > 0) {
           console.warn(
@@ -388,7 +409,8 @@ const App = () => {
             contactId,
             pageSize,
             offset,
-            selectFields
+            selectFields,
+            dateFrom
           );
         }
       } else {
@@ -396,7 +418,8 @@ const App = () => {
           contactId,
           pageSize,
           offset,
-          selectFields
+          selectFields,
+          dateFrom
         );
       }
 
@@ -450,6 +473,30 @@ const App = () => {
     return allRecords;
   };
 
+  /**
+   * Count the related junction rows without retrieving the history payload.
+   * COUNT on the contact lookup is supported by COQL and lets us decide
+   * whether this contact should use the archive-oriented loading policy.
+   */
+  const fetchHistoryCountViaCoqlV8 = async (contactId) => {
+    const selectQuery = `select COUNT(Contact_Details) from History_X_Contacts where Contact_Details = '${escapeCoqlString(contactId)}'`;
+    const req_data = {
+      url: `${dataCenterMap.AU}/crm/v8/coql`,
+      method: "POST",
+      param_type: 2,
+      parameters: { select_query: selectQuery },
+    };
+    const response = await ZOHO.CRM.CONNECTION.invoke(conn_name, req_data);
+    const parsed = parseCoqlV8Response(response);
+    requireSuccessfulCoqlPage(parsed, "history count");
+
+    const count = parseHistoryCount(parsed.data);
+    if (count === null) {
+      throw new Error("History count response did not contain a COUNT value.");
+    }
+    return count;
+  };
+
   // ============================================================================
   // STEP 4: Default Data Fetching (COQL v8 – paginated, full history)
   // ============================================================================
@@ -466,15 +513,47 @@ const App = () => {
         ? undefined
         : (loaded) => setLoadedCount(loaded);
 
+      let totalHistoryCount = historyLoadSummary?.totalCount ?? null;
+      let highVolumeHistory = historyLoadSummary?.isHighVolume ?? false;
+
+      if (options.resetPolicy || !historyLoadSummary) {
+        try {
+          totalHistoryCount = await fetchHistoryCountViaCoqlV8(recordId);
+          highVolumeHistory = isHighVolumeHistory(totalHistoryCount);
+          setHistoryLoadSummary({
+            totalCount: totalHistoryCount,
+            isHighVolume: highVolumeHistory,
+          });
+          if (highVolumeHistory && !options.isBackground) {
+            setDateRange(dateOptions.find(({ label }) => label === "Last 3 Months"));
+          }
+        } catch (countError) {
+          // Preserve the existing full-history fallback if the aggregate query
+          // is unavailable in a particular CRM org.
+          console.warn("Unable to count contact history records:", countError);
+          setHistoryLoadSummary({ totalCount: null, isHighVolume: false });
+        }
+      }
+
+      const dateFrom = highVolumeHistory
+        ? getRecentHistoryStart().format(CRM_DATE_TIME_FORMAT)
+        : null;
+
       let dataArray = [];
       try {
-        dataArray = await fetchAllHistoryViaCoqlV8(recordId, onProgress);
+        dataArray = await fetchAllHistoryViaCoqlV8(
+          recordId,
+          onProgress,
+          CONTACT_HISTORY_SELECT,
+          dateFrom
+        );
       } catch (coqlError) {
         console.warn("COQL v8 owner-enriched fetch failed, retrying core fields:", coqlError);
         dataArray = await fetchAllHistoryViaCoqlV8(
           recordId,
           onProgress,
-          CONTACT_HISTORY_CORE_SELECT
+          CONTACT_HISTORY_CORE_SELECT,
+          dateFrom
         );
       }
       dataArray = Array.isArray(dataArray) ? dataArray : [];
@@ -640,7 +719,9 @@ const App = () => {
       setCacheVersion(0);
       setRelatedListData([]); // Clear UI state
       setLoadedCount(0);
-      fetchRLData();
+      setHistoryLoadSummary(null);
+      setDateRange(dateOptions[0]);
+      fetchRLData({ resetPolicy: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchRLData is stable, avoid refetch loop
   }, [module, recordId]);
@@ -822,6 +903,10 @@ const App = () => {
       let dateMatch = true;
       if (dateRange?.preDay) {
         dateMatch = isInLastNDays(el?.date_time, dateRange?.preDay);
+      } else if (dateRange?.preMonth) {
+        const recordDate = parseCrmDateTime(el?.date_time);
+        const startDate = getRecentHistoryStart();
+        dateMatch = recordDate?.isSame(startDate, "day") || recordDate?.isAfter(startDate);
       } else if (dateRange?.startDate && dateRange?.endDate) {
         // Normalize dates to start/end of day for accurate comparison
         const startDate = dayjs(dateRange.startDate).startOf("day");
@@ -941,6 +1026,10 @@ const App = () => {
       );
     }
   };
+
+  const cachedRecordCount = getAllRecordsFromCache().length;
+  const totalRecordCount = historyLoadSummary?.totalCount ?? cachedRecordCount;
+  const isArchiveAwareHistory = Boolean(historyLoadSummary?.isHighVolume);
 
   return (
     <React.Fragment>
@@ -1179,10 +1268,10 @@ const App = () => {
                 <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <span>
                     <strong>Total Records:</strong>{" "}
-                    {activeFilterNames.length > 0 || keyword.trim()
-                      ? `${filteredData?.length || 0} of ${getAllRecordsFromCache().length}`
+                    {isArchiveAwareHistory || activeFilterNames.length > 0 || keyword.trim()
+                      ? `${filteredData?.length || 0} of ${totalRecordCount}`
                       : filteredData?.length || 0}
-                    {" "}
+                    {isArchiveAwareHistory && " (last 3 months)"}{" "}
                     <strong style={{ color: "#c62828" }}>
                       [{HISTORY_FETCH_BUILD}]
                     </strong>
@@ -1214,6 +1303,21 @@ const App = () => {
                 )}
               </Box>
             </Grid>
+            {isArchiveAwareHistory && (
+              <Grid item xs={12}>
+                <Box
+                  sx={{
+                    padding: "8px 10px",
+                    border: "1px solid #90caf9",
+                    borderRadius: "4px",
+                    backgroundColor: "#e3f2fd",
+                    fontSize: "9pt",
+                  }}
+                >
+                  This contact has {totalRecordCount.toLocaleString()} history records. Showing the last 3 months here; older records are available in the Archive widget.
+                </Box>
+              </Grid>
+            )}
             <Grid item xs={9}>
               <Table
                 rows={filteredData}
@@ -1409,6 +1513,21 @@ const App = () => {
                 Create
               </Button>
             </Grid>
+            {isArchiveAwareHistory && (
+              <Grid item xs={12}>
+                <Box
+                  sx={{
+                    padding: "8px 10px",
+                    border: "1px solid #90caf9",
+                    borderRadius: "4px",
+                    backgroundColor: "#e3f2fd",
+                    fontSize: "9pt",
+                  }}
+                >
+                  This contact has {totalRecordCount.toLocaleString()} history records. Showing the last 3 months here; older records are available in the Archive widget.
+                </Box>
+              </Grid>
+            )}
             <Box mt={2}>
               <TableContainer>
                 <Table size="small">
