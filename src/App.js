@@ -66,12 +66,6 @@ const parentContainerStyle = {
   p: "1em",
 };
 
-function isInLastNDays(date, pre) {
-  const now = dayjs();
-  const daysAgo = now.subtract(pre, "day");
-  return parseCrmDateTime(date)?.isAfter(daysAgo) ?? false;
-}
-
 const dateOptions = [
   { label: "Default", preDay: null },
   { label: "Last 7 Days", preDay: 7 },
@@ -86,6 +80,93 @@ const dateOptions = [
   },
   { label: "Custom Range", customRange: true },
 ];
+
+const getDateRangeBounds = (option) => {
+  if (!option) return null;
+
+  const now = dayjs();
+  if (option.startDate && option.endDate) {
+    return {
+      start: dayjs(option.startDate).startOf("day"),
+      end: dayjs(option.endDate).endOf("day"),
+    };
+  }
+
+  if (option.preDay) {
+    return {
+      start: now.subtract(Math.max(option.preDay - 1, 0), "day").startOf("day"),
+      end: now.endOf("day"),
+    };
+  }
+
+  if (option.preMonth) {
+    return {
+      start: now.subtract(option.preMonth, "month").startOf("day"),
+      end: now.endOf("day"),
+    };
+  }
+
+  if (option.custom) {
+    const start = dayjs(option.custom()).startOf("day");
+    const end = option.label === "Next Week"
+      ? start.endOf("week")
+      : option.label === "Current Week"
+        ? start.endOf("week")
+        : option.label === "Current Month"
+          ? start.endOf("month")
+          : now.endOf("day");
+    return { start, end };
+  }
+
+  return null;
+};
+
+const isRecordInDateRange = (date, bounds) => {
+  if (!bounds) return true;
+  const recordDate = parseCrmDateTime(date);
+  if (!recordDate) return false;
+
+  return (
+    (recordDate.isSame(bounds.start) || recordDate.isAfter(bounds.start)) &&
+    (recordDate.isSame(bounds.end) || recordDate.isBefore(bounds.end))
+  );
+};
+
+const mapHistoryRecordsToRows = (records) =>
+  (Array.isArray(records) ? records : []).map((obj) => ({
+    name: obj["Contact_Details.Full_Name"] || "No Name",
+    id: obj?.id,
+    date_time: obj["Contact_History_Info.Date"] || "No Date",
+    type: obj["Contact_History_Info.History_Type"] ?? "",
+    result: obj["Contact_History_Info.History_Result"] ?? "",
+    duration: obj["Contact_History_Info.Duration"] ?? null,
+    regarding: obj["Contact_History_Info.Regarding"] ?? "",
+    details: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
+    icon: <DownloadIcon />,
+    ownerName: getCoqlOwnerName(obj),
+    historyDetails: {
+      id: obj["Contact_History_Info.id"],
+      text: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
+    },
+    stakeHolder: (() => {
+      const flatId = obj["Contact_History_Info.Stakeholder.id"];
+      const flatName = obj["Contact_History_Info.Stakeholder.Account_Name"];
+      const nested = obj["Contact_History_Info.Stakeholder"];
+      const junction = obj?.Stakeholder;
+
+      const id =
+        flatId ??
+        (nested && typeof nested === "object" ? (nested.id ?? nested.Id ?? nested.ID) : undefined) ??
+        (junction && typeof junction === "object" ? (junction.id ?? junction.Id ?? junction.ID) : undefined);
+      const rawName =
+        flatName ??
+        (nested && typeof nested === "object" ? (nested.Account_Name ?? nested.name ?? nested.AccountName) : undefined) ??
+        (junction && typeof junction === "object" ? (junction.Account_Name ?? junction.name ?? junction.AccountName) : undefined);
+
+      return id != null ? { id, name: rawName || "" } : null;
+    })(),
+    history_id: obj["Contact_History_Info.id"],
+  }));
 
 // ============================================================================
 // STEP 1: Global Cache System
@@ -217,6 +298,8 @@ const App = () => {
   const [, setSelectedType] = React.useState(null);
   const [filterType, setFilterType] = React.useState([]); // Multi-select type filter
   const [dateRange, setDateRange] = React.useState(dateOptions[0]); // Default
+  const [isDateLoading, setIsDateLoading] = React.useState(false);
+  const dateFetchRequestRef = React.useRef(0);
   const [keyword, setKeyword] = React.useState("");
   const [loggedInUser, setLoggedInUser] = React.useState(null);
   const [selectedRowData, setSelectedRowData] = React.useState(null);
@@ -303,12 +386,16 @@ const App = () => {
     limit = 2000,
     cursor = null,
     selectFields = CONTACT_HISTORY_SELECT,
-    dateFrom = null
+    dateFrom = null,
+    dateTo = null
   ) => {
     let whereClause = `Contact_Details = '${escapeCoqlString(contactId)}'`;
 
     if (dateFrom) {
       whereClause += ` and Contact_History_Info.Date >= '${escapeCoqlString(dateFrom)}'`;
+    }
+    if (dateTo) {
+      whereClause += ` and Contact_History_Info.Date <= '${escapeCoqlString(dateTo)}'`;
     }
 
     // Keyset pagination: rows older than the last Date/id we already have
@@ -352,11 +439,15 @@ const App = () => {
     limit = 2000,
     offset = 0,
     selectFields = CONTACT_HISTORY_SELECT,
-    dateFrom = null
+    dateFrom = null,
+    dateTo = null
   ) => {
     let whereClause = `Contact_Details = '${escapeCoqlString(contactId)}'`;
     if (dateFrom) {
       whereClause += ` and Contact_History_Info.Date >= '${escapeCoqlString(dateFrom)}'`;
+    }
+    if (dateTo) {
+      whereClause += ` and Contact_History_Info.Date <= '${escapeCoqlString(dateTo)}'`;
     }
     const selectQuery = `select ${selectFields} from History_X_Contacts where ${whereClause} ${COQL_HISTORY_ORDER} LIMIT ${offset}, ${limit}`;
     const req_data = {
@@ -379,7 +470,8 @@ const App = () => {
     contactId,
     onProgress,
     selectFields = CONTACT_HISTORY_SELECT,
-    dateFrom = null
+    dateFrom = null,
+    dateTo = null
   ) => {
     const pageSize = COQL_PAGE_SIZE;
     const seenIds = new Set();
@@ -397,7 +489,8 @@ const App = () => {
           pageSize,
           cursor,
           selectFields,
-          dateFrom
+          dateFrom,
+          dateTo
         );
         if (page.errorCode && page.data.length === 0 && pageIndex > 0) {
           console.warn(
@@ -410,7 +503,8 @@ const App = () => {
             pageSize,
             offset,
             selectFields,
-            dateFrom
+            dateFrom,
+            dateTo
           );
         }
       } else {
@@ -419,7 +513,8 @@ const App = () => {
           pageSize,
           offset,
           selectFields,
-          dateFrom
+          dateFrom,
+          dateTo
         );
       }
 
@@ -562,42 +657,7 @@ const App = () => {
         `Contact ${recordId}: loaded ${dataArray.length} history record(s) via COQL v8 pagination`
       );
 
-      const tempData = dataArray?.map((obj) => {
-        return {
-          name: obj["Contact_Details.Full_Name"] || "No Name",
-          id: obj?.id,
-          date_time: obj["Contact_History_Info.Date"] || "No Date",
-          type: obj["Contact_History_Info.History_Type"] ?? "",
-          result: obj["Contact_History_Info.History_Result"] ?? "",
-          duration: obj["Contact_History_Info.Duration"] ?? null,
-          regarding: obj["Contact_History_Info.Regarding"] ?? "",
-          details: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
-          icon: <DownloadIcon />,
-          ownerName: getCoqlOwnerName(obj),
-          historyDetails: {
-            id: obj["Contact_History_Info.id"],
-            text: obj["Contact_History_Info.History_Details_Plain"] || "No Details",
-          },
-          stakeHolder: (() => {
-            const flatId = obj["Contact_History_Info.Stakeholder.id"];
-            const flatName = obj["Contact_History_Info.Stakeholder.Account_Name"];
-            const nested = obj["Contact_History_Info.Stakeholder"];
-            const junction = obj?.Stakeholder;
-
-            const id =
-              flatId ??
-              (nested && typeof nested === "object" ? (nested.id ?? nested.Id ?? nested.ID) : undefined) ??
-              (junction && typeof junction === "object" ? (junction.id ?? junction.Id ?? junction.ID) : undefined);
-            const rawName =
-              flatName ??
-              (nested && typeof nested === "object" ? (nested.Account_Name ?? nested.name ?? nested.AccountName) : undefined) ??
-              (junction && typeof junction === "object" ? (junction.Account_Name ?? junction.name ?? junction.AccountName) : undefined);
-
-            return id != null ? { id, name: rawName || "" } : null;
-          })(),
-          history_id: obj["Contact_History_Info.id"]
-        };
-      });
+      const tempData = mapHistoryRecordsToRows(dataArray);
 
       const usersResponse = await ZOHO.CRM.API.getAllUsers({
         Type: "AllUsers",
@@ -684,6 +744,77 @@ const App = () => {
     }
   };
 
+  const handleDateRangeChange = async (nextDateRange) => {
+    if (!nextDateRange || !recordId) return;
+    if (nextDateRange.customRange) {
+      setIsCustomRangeDialogOpen(true);
+      return;
+    }
+
+    const bounds = getDateRangeBounds(nextDateRange);
+    if (!bounds) {
+      if (historyLoadSummary?.isHighVolume && nextDateRange.label === "Default") {
+        setDateRange(dateOptions.find(({ label }) => label === "Last 3 Months"));
+      } else {
+        setDateRange(nextDateRange);
+      }
+      return;
+    }
+
+    const previousDateRange = dateRange;
+    const requestId = dateFetchRequestRef.current + 1;
+    dateFetchRequestRef.current = requestId;
+    setDateRange(nextDateRange);
+    setIsDateLoading(true);
+
+    try {
+      let dataArray;
+      const dateFrom = bounds.start.format(CRM_DATE_TIME_FORMAT);
+      const dateTo = bounds.end.format(CRM_DATE_TIME_FORMAT);
+      try {
+        dataArray = await fetchAllHistoryViaCoqlV8(
+          recordId,
+          undefined,
+          CONTACT_HISTORY_SELECT,
+          dateFrom,
+          dateTo
+        );
+      } catch (coqlError) {
+        console.warn("COQL v8 owner-enriched date-range fetch failed, retrying core fields:", coqlError);
+        dataArray = await fetchAllHistoryViaCoqlV8(
+          recordId,
+          undefined,
+          CONTACT_HISTORY_CORE_SELECT,
+          dateFrom,
+          dateTo
+        );
+      }
+
+      if (requestId !== dateFetchRequestRef.current) return;
+
+      const fetchedRows = mapHistoryRecordsToRows(dataArray);
+      mergeRecordsIntoCache(fetchedRows);
+      setRelatedListData(getAllRecordsFromCache());
+      setCacheVersion((previous) => previous + 1);
+      enqueueSnackbar(
+        `Loaded ${fetchedRows.length.toLocaleString()} records for the selected date range.`,
+        { variant: "success" }
+      );
+    } catch (error) {
+      console.error("Error fetching selected date range:", error);
+      if (requestId === dateFetchRequestRef.current) {
+        setDateRange(previousDateRange);
+        enqueueSnackbar("Failed to load records for the selected date range.", {
+          variant: "error",
+        });
+      }
+    } finally {
+      if (requestId === dateFetchRequestRef.current) {
+        setIsDateLoading(false);
+      }
+    }
+  };
+
   // ============================================================================
   // Initialization Effect: Fetch data when contact changes
   // ============================================================================
@@ -721,6 +852,8 @@ const App = () => {
       setLoadedCount(0);
       setHistoryLoadSummary(null);
       setDateRange(dateOptions[0]);
+      dateFetchRequestRef.current += 1;
+      setIsDateLoading(false);
       fetchRLData({ resetPolicy: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetchRLData is stable, avoid refetch loop
@@ -871,16 +1004,17 @@ const App = () => {
   // ============================================================================
   // STEP 7: Reactive Filtering Logic
   // ============================================================================
-  // Filtering happens client-side using useMemo that reads from the global cache
-  // Always filter from the global cache to ensure we have all data
+  // Apply filters to cached rows after the selected date range has been fetched
+  // from CRM. The cache keeps previously loaded ranges available for reuse.
   const filteredData = React.useMemo(() => {
-    // Get all records from cache (includes all previously fetched data)
     const allRecords = getAllRecordsFromCache();
 
     const records = Array.isArray(allRecords) ? allRecords : [];
     if (records.length === 0) {
       return [];
     }
+
+    const dateBounds = getDateRangeBounds(dateRange);
 
     return records.filter((el) => {
       // 1. Owner Filter (multi-select)
@@ -900,30 +1034,7 @@ const App = () => {
       const typeMatch = types.length === 0 || types.includes(el?.type);
 
       // 3. Date Filter
-      let dateMatch = true;
-      if (dateRange?.preDay) {
-        dateMatch = isInLastNDays(el?.date_time, dateRange?.preDay);
-      } else if (dateRange?.preMonth) {
-        const recordDate = parseCrmDateTime(el?.date_time);
-        const startDate = getRecentHistoryStart();
-        dateMatch = recordDate?.isSame(startDate, "day") || recordDate?.isAfter(startDate);
-      } else if (dateRange?.startDate && dateRange?.endDate) {
-        // Normalize dates to start/end of day for accurate comparison
-        const startDate = dayjs(dateRange.startDate).startOf("day");
-        const endDate = dayjs(dateRange.endDate).endOf("day");
-        const recordDate = parseCrmDateTime(el?.date_time);
-
-        // Use inclusive boundaries: records on startDate and endDate should be included
-        dateMatch = Boolean(recordDate) && (
-          (recordDate.isSame(startDate, "day") || recordDate.isAfter(startDate)) &&
-          (recordDate.isSame(endDate, "day") || recordDate.isBefore(endDate))
-        );
-      } else if (dateRange?.custom) {
-        const startDate = dayjs(dateRange.custom());
-        const endDate = dayjs();
-        const recordDate = parseCrmDateTime(el?.date_time);
-        dateMatch = recordDate?.isBetween(startDate, endDate, null, "[]") ?? false;
-      }
+      const dateMatch = isRecordInDateRange(el?.date_time, dateBounds);
 
       // 4. Keyword Filter
       const keywordMatch = !keyword.trim() || (() => {
@@ -983,13 +1094,17 @@ const App = () => {
     // Reset owner filter to show all users (no default filter)
     setFilterOwner([]);
     setSelectedOwner(null);
-    setDateRange(dateOptions[0]); // Reset to Default
+    setDateRange(
+      historyLoadSummary?.isHighVolume
+        ? dateOptions.find(({ label }) => label === "Last 3 Months")
+        : dateOptions[0]
+    );
     setKeyword("");
     setCustomRange({ startDate: null, endDate: null });
     // Also reset backward-compatible single selects
     setSelectedType(null);
     // Cache remains intact - filteredData will show all cached records when filters are cleared
-  }, []);
+  }, [historyLoadSummary]);
 
   const [applications, setApplications] = React.useState([]);
   const [openApplicationDialog, setOpenApplicationDialog] =
@@ -1030,6 +1145,8 @@ const App = () => {
   const cachedRecordCount = getAllRecordsFromCache().length;
   const totalRecordCount = historyLoadSummary?.totalCount ?? cachedRecordCount;
   const isArchiveAwareHistory = Boolean(historyLoadSummary?.isHighVolume);
+  const isRecentHistoryWindow =
+    isArchiveAwareHistory && dateRange?.label === "Last 3 Months";
 
   return (
     <React.Fragment>
@@ -1067,6 +1184,7 @@ const App = () => {
             >
               <Autocomplete
                 size="small"
+                loading={isDateLoading}
                 options={dateOptions || []}
                 value={dateRange ?? dateOptions?.[0]}
                 getOptionLabel={(option) => {
@@ -1115,11 +1233,7 @@ const App = () => {
                   },
                 }}
                 onChange={(e, value) => {
-                  if (value?.customRange) {
-                    setIsCustomRangeDialogOpen(true); // Open custom range dialog
-                  } else {
-                    setDateRange(value); // Set normal date range
-                  }
+                  handleDateRangeChange(value);
                 }}
               />
 
@@ -1271,7 +1385,7 @@ const App = () => {
                     {isArchiveAwareHistory || activeFilterNames.length > 0 || keyword.trim()
                       ? `${filteredData?.length || 0} of ${totalRecordCount}`
                       : filteredData?.length || 0}
-                    {isArchiveAwareHistory && " (last 3 months)"}{" "}
+                    {isRecentHistoryWindow && " (last 3 months)"}{" "}
                     <strong style={{ color: "#c62828" }}>
                       [{HISTORY_FETCH_BUILD}]
                     </strong>
@@ -1314,7 +1428,7 @@ const App = () => {
                     fontSize: "9pt",
                   }}
                 >
-                  This contact has {totalRecordCount.toLocaleString()} history records. Showing the last 3 months here; older records are available in the Archive widget.
+                  This high-volume contact has {totalRecordCount.toLocaleString()} history records. This view defaults to the last 3 months; selected date ranges are loaded from CRM. Older records are available in the Archive widget.
                 </Box>
               </Grid>
             )}
@@ -1376,6 +1490,7 @@ const App = () => {
               >
               <Autocomplete
                 size="small"
+                loading={isDateLoading}
                 options={dateOptions || []}
                 value={dateRange ?? dateOptions?.[0]}
                 getOptionLabel={(option) => {
@@ -1406,11 +1521,7 @@ const App = () => {
                   />
                 )}
                 onChange={(e, value) => {
-                  if (value?.customRange) {
-                    setIsCustomRangeDialogOpen(true);
-                  } else {
-                    setDateRange(value);
-                  }
+                  handleDateRangeChange(value);
                 }}
               />
               <Autocomplete
@@ -1524,7 +1635,7 @@ const App = () => {
                     fontSize: "9pt",
                   }}
                 >
-                  This contact has {totalRecordCount.toLocaleString()} history records. Showing the last 3 months here; older records are available in the Archive widget.
+                  This high-volume contact has {totalRecordCount.toLocaleString()} history records. This view defaults to the last 3 months; selected date ranges are loaded from CRM. Older records are available in the Archive widget.
                 </Box>
               </Grid>
             )}
@@ -1706,7 +1817,7 @@ const App = () => {
             <Button
               onClick={() => {
                 // ============================================================================
-                // STEP 6: Custom Date Range Handler (client-side filtering only)
+                // STEP 6: Custom Date Range Handler
                 // ============================================================================
                 // Validate dates are selected
                 if (!customRange.startDate || !customRange.endDate) {
@@ -1724,8 +1835,6 @@ const App = () => {
                   return;
                 }
 
-                // Client-side filtering only - no API call
-                // Cache holds the contact's full history from the paginated COQL v8 fetch
                 const formattedStart = dayjs(customRange.startDate).format("DD/MM/YYYY");
                 const formattedEnd = dayjs(customRange.endDate).format("DD/MM/YYYY");
 
@@ -1735,13 +1844,8 @@ const App = () => {
                   label: `${formattedStart} - ${formattedEnd}`,
                 };
 
-                setDateRange(newCustomRangeObject);
                 setIsCustomRangeDialogOpen(false);
-
-                // Snackbar will show filtered count after next render (filteredData updates)
-                enqueueSnackbar("Date range filter applied (client-side).", {
-                  variant: "success",
-                });
+                handleDateRangeChange(newCustomRangeObject);
               }}
               color="primary"
               size="small"
