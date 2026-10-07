@@ -1417,21 +1417,6 @@ const App = () => {
                 )}
               </Box>
             </Grid>
-            {isArchiveAwareHistory && (
-              <Grid item xs={12}>
-                <Box
-                  sx={{
-                    padding: "8px 10px",
-                    border: "1px solid #90caf9",
-                    borderRadius: "4px",
-                    backgroundColor: "#e3f2fd",
-                    fontSize: "9pt",
-                  }}
-                >
-                  This high-volume contact has {totalRecordCount.toLocaleString()} history records. This view defaults to the last 3 months; selected date ranges are loaded from CRM. Older records are available in the Archive widget.
-                </Box>
-              </Grid>
-            )}
             <Grid item xs={9}>
               <Table
                 rows={filteredData}
@@ -1624,21 +1609,6 @@ const App = () => {
                 Create
               </Button>
             </Grid>
-            {isArchiveAwareHistory && (
-              <Grid item xs={12}>
-                <Box
-                  sx={{
-                    padding: "8px 10px",
-                    border: "1px solid #90caf9",
-                    borderRadius: "4px",
-                    backgroundColor: "#e3f2fd",
-                    fontSize: "9pt",
-                  }}
-                >
-                  This high-volume contact has {totalRecordCount.toLocaleString()} history records. This view defaults to the last 3 months; selected date ranges are loaded from CRM. Older records are available in the Archive widget.
-                </Box>
-              </Grid>
-            )}
             <Box mt={2}>
               <TableContainer>
                 <Table size="small">
