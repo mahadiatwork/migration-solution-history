@@ -8,15 +8,16 @@ import {
 
 const ZOHO = window.ZOHO;
 
+const normalizedStatusText = (value) =>
+  String(value || "").replace(/[\s_-]/g, "").toLowerCase();
+
 export const parseAttachmentListResponse = (response, allowMorePages = false) => {
   const raw = response?.details?.statusMessage;
-  const statusCodes = [response?.details?.statusCode, response?.statusCode]
-    .filter((value) => value != null)
-    .map(Number);
   const explicitNoContent =
-    statusCodes.includes(204) ||
-    String(response?.statusText || "").toLowerCase() === "nocontent" ||
-    String(response?.details?.statusText || "").toLowerCase() === "nocontent";
+    Number(response?.statusCode) === 204 ||
+    Number(response?.details?.statusCode) === 204 ||
+    normalizedStatusText(response?.statusText) === "nocontent" ||
+    normalizedStatusText(response?.details?.statusText) === "nocontent";
   let payload = raw;
   if (typeof raw === "string" && raw.trim()) {
     try {
@@ -29,18 +30,28 @@ export const parseAttachmentListResponse = (response, allowMorePages = false) =>
       }
     }
   }
-  const failedStatus = statusCodes.find((code) => Number.isFinite(code) && code >= 400);
-  if (failedStatus) {
-    throw new Error(`Attachment request failed with status ${failedStatus}.`);
-  }
-  const error = [payload, response?.details, response].find((item) =>
+  const containers = [payload, response?.details, response].filter(
+    (item) => item && typeof item === "object"
+  );
+  const candidates = [
+    ...containers,
+    ...containers.flatMap((item) => Array.isArray(item?.data) ? item.data : []),
+  ];
+  const error = candidates.find((item) =>
     item && typeof item === "object" &&
-    (String(item.status || "").toLowerCase() === "error" ||
+    (Number(item.statusCode) >= 400 ||
+      String(item.status || "").toLowerCase() === "error" ||
       (item.code != null &&
-        !["SUCCESS", "200", "NO_CONTENT"].includes(String(item.code).toUpperCase())))
+        !["SUCCESS", "200", "204", "NO_CONTENT"].includes(String(item.code).toUpperCase())))
   );
   if (error) {
-    throw new Error(error.message || "Attachment request failed.");
+    const status = Number(error.statusCode);
+    throw new Error(
+      error.message ||
+      (status >= 400
+        ? `Attachment request failed with status ${status}.`
+        : "Attachment request failed.")
+    );
   }
   const hasMoreAttachments = [payload, response?.details, response].some(
     (item) => item?.info?.more_records === true ||
@@ -53,7 +64,10 @@ export const parseAttachmentListResponse = (response, allowMorePages = false) =>
     if (Array.isArray(candidate)) return candidate;
     if (Array.isArray(candidate?.data)) return candidate.data;
   }
-  const noContent = explicitNoContent || payload?.code === "NO_CONTENT";
+  const noContent = explicitNoContent || candidates.some((item) =>
+    String(item?.code || "").toUpperCase() === "NO_CONTENT" ||
+    normalizedStatusText(item?.statusText) === "nocontent"
+  );
   if (noContent) return [];
   throw new Error("Attachment response did not contain a verified list.");
 };
@@ -119,10 +133,30 @@ async function uploadAttachment({ module, recordId, data }) {
   }
 }
 
-async function getAttachments({ module, recordId }) {
+async function getAttachments({ module, recordId, strict = false }) {
   try {
+    const crm = (window.ZOHO || ZOHO)?.CRM;
+    if (strict) {
+      if (typeof crm?.API?.getRelatedRecords !== "function") {
+        return {
+          data: null,
+          error: "The active CRM attachment API is unavailable.",
+        };
+      }
+      const list = await readAttachmentPages((page) =>
+        crm.API.getRelatedRecords({
+          Entity: module,
+          RecordID: recordId,
+          RelatedList: "Attachments",
+          page,
+          per_page: 200,
+        })
+      );
+      return { data: list, error: null };
+    }
+
     const list = await readAttachmentPages((page) =>
-      ZOHO.CRM.CONNECTION.invoke(conn_name, {
+      crm.CONNECTION.invoke(conn_name, {
         url: `${dataCenterMap.AU}/crm/v6/${module}/${recordId}/Attachments?fields=id,File_Name,$file_id&page=${page}&per_page=200`,
         param_type: 1,
         headers: {},

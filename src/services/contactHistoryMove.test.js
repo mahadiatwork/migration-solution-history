@@ -128,6 +128,7 @@ describe("Contact History to Application History move", () => {
     expect(listAttachments).toHaveBeenCalledWith({
       module: "Applications_History",
       recordId: "application-history-1",
+      strict: true,
     });
     expect(zoho.CRM.FUNCTIONS.execute.mock.invocationCallOrder[0]).toBeLessThan(
       zoho.CRM.API.deleteRecord.mock.invocationCallOrder[0]

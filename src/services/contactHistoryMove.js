@@ -123,7 +123,11 @@ const getApplicationProgressFieldType = async (zoho, matter) => {
 };
 
 const readAttachments = async (listAttachments, entity, recordId) => {
-  const response = await listAttachments({ module: entity, recordId });
+  const response = await listAttachments({
+    module: entity,
+    recordId,
+    strict: true,
+  });
   if (response?.error || !Array.isArray(response?.data)) {
     throw new Error(`Could not inspect ${entity} attachments.`);
   }
