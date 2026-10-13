@@ -98,7 +98,12 @@ const normalizeProgress = (value) => {
 };
 
 const normalizeZohoText = (value) =>
-  String(value ?? "").replace(/\r\n?/g, "\n");
+  String(value ?? "")
+    .normalize("NFC")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\uFEFF\u200B]/g, "")
+    .replace(/[^\S\n]+/g, " ")
+    .replace(/ +(?=\n|$)/g, "");
 
 export const serializeApplicationProgress = (value, fieldType) => {
   const selected = normalizeProgress(value);
