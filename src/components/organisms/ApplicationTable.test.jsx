@@ -40,6 +40,7 @@ describe("ApplicationDialog", () => {
         ]}
         ZOHO={zoho}
         selectedRowData={{ historyDetails: { id: "history-1" } }}
+        duration={60}
         onMoveCompleted={onMoveCompleted}
       />
     );
@@ -66,6 +67,7 @@ describe("ApplicationDialog", () => {
           zoho,
           sourceHistoryId: "history-1",
           targetMatterId: "application-1",
+          duration: 60,
         })
       );
       expect(handleClose).toHaveBeenCalledTimes(1);

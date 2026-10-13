@@ -1393,6 +1393,7 @@ export function Dialog({
         applications={applications}
         ZOHO={ZOHO}
         selectedRowData={selectedRowData}
+        duration={formData?.duration}
         onMoveCompleted={onMoveCompleted}
       />
       <Snackbar

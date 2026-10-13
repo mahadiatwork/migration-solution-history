@@ -90,6 +90,7 @@ const ApplicationDialog = ({
   applications,
   ZOHO,
   selectedRowData,
+  duration,
   onMoveCompleted,
 }) => {
   const [selectedApplicationId, setSelectedApplicationId] = useState(null);
@@ -138,6 +139,7 @@ const ApplicationDialog = ({
         zoho: ZOHO,
         sourceHistoryId,
         targetMatterId: selectedApplicationId,
+        duration,
         listAttachments: zohoApi.file.getAttachments,
       });
       handleApplicationDialogClose();

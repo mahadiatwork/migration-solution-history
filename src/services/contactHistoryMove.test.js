@@ -141,6 +141,42 @@ describe("Contact History to Application History move", () => {
       .toBeLessThan(zoho.CRM.CONNECTION.invoke.mock.invocationCallOrder[sourceDeleteIndex]);
   });
 
+  test("uses the duration shown in the edit form when the saved source is blank", async () => {
+    const zoho = makeZoho();
+    zoho.CRM.API.getRecord.mockImplementation(async ({ Entity }) => {
+      if (Entity === "History1") {
+        return {
+          data: [{
+            id: "history-1",
+            Name: "Call with Contact",
+            Owner: { id: "owner-1" },
+            History_Details_Plain: "Details",
+            Duration: null,
+          }],
+        };
+      }
+      if (Entity === "Applications") {
+        return { data: [{ id: "matter-2", Name: "MAT-2" }] };
+      }
+      return { data: [] };
+    });
+
+    await moveContactHistoryToApplication({
+      zoho,
+      sourceHistoryId: "history-1",
+      targetMatterId: "matter-2",
+      duration: 60,
+      listAttachments: async () => ({ data: [], error: null }),
+      delay: async () => {},
+    });
+
+    const createRequest = zoho.CRM.CONNECTION.invoke.mock.calls.find(
+      ([, request]) => request.method === "POST" &&
+        request.url.endsWith("/Applications_History")
+    )[1];
+    expect(createRequest.parameters.data[0].Duration_Min).toBe("60");
+  });
+
   test("sends imported SharePoint URL text unchanged in the JSON destination request", async () => {
     const zoho = makeZoho();
     const sharePointUrl =

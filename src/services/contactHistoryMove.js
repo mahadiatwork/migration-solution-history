@@ -311,7 +311,12 @@ const restoreSourceLinks = async (zoho, sourceHistoryId, sourceJunctions, source
   return errors;
 };
 
-export const buildApplicationMoveData = (source, matter, progressFieldType) => {
+export const buildApplicationMoveData = (
+  source,
+  matter,
+  progressFieldType,
+  durationOverride
+) => {
   const ownerId = lookupId(source.Owner);
   if (!ownerId) throw new Error("The source history Owner could not be resolved.");
   const stakeholderId = lookupId(source.Stakeholder);
@@ -322,7 +327,11 @@ export const buildApplicationMoveData = (source, matter, progressFieldType) => {
     History_Result: source.History_Result ?? null,
     History_Type: source.History_Type ?? null,
     Regarding: source.Regarding ?? null,
-    Duration_Min: source.Duration ?? null,
+    Duration_Min: durationOverride === undefined
+      ? source.Duration ?? null
+      : durationOverride == null || durationOverride === ""
+        ? null
+        : String(durationOverride),
     Date: source.Date ?? null,
     Owner: { id: ownerId },
     [APPLICATIONS_HISTORY_STAKEHOLDER_FIELD]: stakeholderId
@@ -415,6 +424,7 @@ export const moveContactHistoryToApplication = async ({
   zoho,
   sourceHistoryId,
   targetMatterId,
+  duration,
   listAttachments,
   delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
 }) => {
@@ -436,7 +446,12 @@ export const moveContactHistoryToApplication = async ({
     sourceHistoryId
   );
   const progressFieldType = await getApplicationProgressFieldType(zoho, matter);
-  const payload = buildApplicationMoveData(source, matter, progressFieldType);
+  const payload = buildApplicationMoveData(
+    source,
+    matter,
+    progressFieldType,
+    duration
+  );
   let targetId = null;
   const targetJunctionIds = [];
   const contactIds = [...new Set(sourceJunctions.map((junction) =>
