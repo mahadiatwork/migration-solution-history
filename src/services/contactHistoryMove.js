@@ -1,4 +1,8 @@
-import { APPLICATIONS_HISTORY_STAKEHOLDER_FIELD } from "../config/config";
+import {
+  APPLICATIONS_HISTORY_STAKEHOLDER_FIELD,
+  conn_name,
+  dataCenterMap,
+} from "../config/config";
 
 const ATTACHMENT_COPY_FUNCTION =
   "copy_attachment_form_contact_history_to_applicatio";
@@ -14,6 +18,89 @@ const lookupId = (value) => {
 
 const apiError = (response, fallback) =>
   response?.data?.[0]?.message || response?.message || fallback;
+
+const unwrapConnectionResponse = (response) => {
+  const statusMessage = response?.details?.statusMessage;
+  if (typeof statusMessage === "string" && statusMessage.trim()) {
+    try {
+      return JSON.parse(statusMessage);
+    } catch {
+      // Fall through to the remaining supported response shapes.
+    }
+  }
+  if (statusMessage && typeof statusMessage === "object") {
+    return statusMessage;
+  }
+  return response?.details?.data ? response.details : response;
+};
+
+const getActiveCrmHost = () => {
+  const referrer = typeof document !== "undefined" ? document.referrer : "";
+  const ancestors = typeof window !== "undefined"
+    ? window.location?.ancestorOrigins
+    : null;
+  const parentUrl = ancestors?.length
+    ? ancestors[ancestors.length - 1]
+    : referrer;
+  if (!parentUrl) {
+    throw new Error("Could not confirm the active Zoho CRM environment; the move was cancelled.");
+  }
+  try {
+    return new URL(parentUrl).hostname.toLowerCase();
+  } catch {
+    throw new Error("Could not confirm the active Zoho CRM environment; the move was cancelled.");
+  }
+};
+
+const invokeCrmConnection = async (zoho, request) => {
+  if (typeof zoho?.CRM?.CONNECTION?.invoke !== "function") {
+    throw new Error("The CRM connection is unavailable; the move was cancelled.");
+  }
+  const host = getActiveCrmHost();
+  if (host.includes("sandbox")) {
+    throw new Error("Moving history from a Zoho CRM Sandbox is disabled for this production connection.");
+  }
+  const response = await zoho.CRM.CONNECTION.invoke(conn_name, request);
+  const payload = unwrapConnectionResponse(response);
+  const statusCode = Number(
+    response?.details?.statusCode ?? response?.statusCode ?? 0
+  );
+  if (statusCode >= 400) {
+    const error = payload?.data?.[0] || payload;
+    throw new Error(error?.message || `Zoho CRM request failed (${statusCode}).`);
+  }
+  return payload;
+};
+
+const getConnectionRecord = async (zoho, entity, recordId) => {
+  const response = await invokeCrmConnection(zoho, {
+    url: `${dataCenterMap.AU}/crm/v8/${entity}/${recordId}?approved=both`,
+    method: "GET",
+    param_type: 1,
+  });
+  const record = response?.data?.[0];
+  if (!record?.id) throw new Error(`Could not load ${entity} ${recordId} through the CRM connection.`);
+  return record;
+};
+
+const createApplicationHistory = async (zoho, payload) =>
+  invokeCrmConnection(zoho, {
+    url: `${dataCenterMap.AU}/crm/v8/Applications_History`,
+    method: "POST",
+    param_type: 2,
+    headers: { "Content-Type": "application/json" },
+    parameters: { data: [payload], trigger: ["workflow"] },
+  });
+
+const deleteConnectionRecord = async (zoho, entity, recordId, label) =>
+  requireMoveSuccess(
+    await invokeCrmConnection(zoho, {
+      url: `${dataCenterMap.AU}/crm/v8/${entity}/${recordId}`,
+      method: "DELETE",
+      param_type: 1,
+    }),
+    label
+  );
 
 export const requireMoveSuccess = (response, label) => {
   if (response?.data?.[0]?.code !== "SUCCESS") {
@@ -176,11 +263,10 @@ const rollbackTarget = async (zoho, targetId, junctionIds) => {
     }
   }
   try {
-    requireMoveSuccess(
-      await zoho.CRM.API.deleteRecord({
-        Entity: "Applications_History",
-        RecordID: targetId,
-      }),
+    await deleteConnectionRecord(
+      zoho,
+      "Applications_History",
+      targetId,
       "Target history cleanup"
     );
   } catch (error) {
@@ -277,7 +363,7 @@ const verifyDestination = async (
   payload,
   contactIds
 ) => {
-  const target = await getRecord(zoho, "Applications_History", targetId);
+  const target = await getConnectionRecord(zoho, "Applications_History", targetId);
   if (lookupId(target.Application) !== String(targetMatterId)) {
     throw new Error("Destination Matter association could not be verified.");
   }
@@ -295,27 +381,6 @@ const verifyDestination = async (
     "Billing_Type",
   ]) {
     if (!sameFieldValue(field, payload[field], target[field])) {
-      if (field === "History_Details") {
-        const expected = normalizeZohoText(payload[field]);
-        const actual = normalizeZohoText(target[field]);
-        let difference = 0;
-        while (
-          difference < Math.min(expected.length, actual.length) &&
-          expected[difference] === actual[difference]
-        ) difference += 1;
-        console.error("CONTACT_HISTORY_MOVE_READBACK", JSON.stringify({
-          targetId,
-          expectedLength: String(payload[field] ?? "").length,
-          actualLength: String(target[field] ?? "").length,
-          normalizedExpectedLength: expected.length,
-          normalizedActualLength: actual.length,
-          difference,
-          expectedCodes: [...expected.slice(Math.max(0, difference - 16), difference + 32)]
-            .map((character) => character.codePointAt(0)),
-          actualCodes: [...actual.slice(Math.max(0, difference - 16), difference + 32)]
-            .map((character) => character.codePointAt(0)),
-        }));
-      }
       throw new Error(`Destination ${field} could not be verified.`);
     }
   }
@@ -357,6 +422,11 @@ export const moveContactHistoryToApplication = async ({
 
   const source = await getRecord(zoho, "History1", sourceHistoryId);
   const matter = await getRecord(zoho, "Applications", targetMatterId);
+  // CRM's widget record API form-encodes long text and changes %20 inside
+  // imported SharePoint links to +. Use the org's CRM connection with a JSON
+  // body for the destination record, then read it back through that same API.
+  // The connection is production-scoped, so refuse Sandbox writes.
+  getActiveCrmHost();
   const sourceJunctions = await getContactJunctions(zoho, sourceHistoryId);
   const sourceAttachments = await readAttachments(
     listAttachments,
@@ -373,11 +443,7 @@ export const moveContactHistoryToApplication = async ({
 
   try {
     const create = requireMoveSuccess(
-      await zoho.CRM.API.insertRecord({
-        Entity: "Applications_History",
-        APIData: payload,
-        Trigger: ["workflow"],
-      }),
+      await createApplicationHistory(zoho, payload),
       "Destination history creation"
     );
     targetId = create.details?.id;
@@ -463,11 +529,10 @@ export const moveContactHistoryToApplication = async ({
         `Source Contact link ${junction.id} deletion`
       );
     }
-    requireMoveSuccess(
-      await zoho.CRM.API.deleteRecord({
-        Entity: "History1",
-        RecordID: sourceHistoryId,
-      }),
+    await deleteConnectionRecord(
+      zoho,
+      "History1",
+      sourceHistoryId,
       "Source history deletion"
     );
   } catch (error) {
