@@ -69,19 +69,20 @@ describe("RegardingField custom option", () => {
     fireEvent.click(screen.getByRole("option", { name: "Custom" }));
     expect(screen.getByTestId("saved-regarding")).toBeEmptyDOMElement();
 
-    fireEvent.change(screen.getByLabelText("Enter your custom regarding"), {
+    fireEvent.change(screen.getByRole("textbox", { name: /Enter your custom regarding/ }), {
       target: { value: "My own regarding" },
     });
-    fireEvent.change(screen.getByLabelText("Enter your custom regarding"), {
+    fireEvent.change(screen.getByRole("textbox", { name: /Enter your custom regarding/ }), {
       target: { value: "My updated regarding" },
     });
 
     expect(screen.getByTestId("saved-regarding")).toHaveTextContent(
       "My updated regarding"
     );
-    expect(screen.getByLabelText("Enter your custom regarding")).toHaveValue(
+    expect(screen.getByRole("textbox", { name: /Enter your custom regarding/ })).toHaveValue(
       "My updated regarding"
     );
+    expect(screen.getByRole("textbox", { name: /Enter your custom regarding/ })).toBeRequired();
   });
 
   test("renders one Custom option and keeps configured Other as a normal option", () => {

@@ -1,4 +1,5 @@
 import {
+  addMissingParticipant,
   buildJunctionSyncFields,
   buildJunctionUpdateData,
   buildViewOwner,
@@ -69,6 +70,20 @@ describe("matter history required options", () => {
         last_name: "Developer",
       })
     ).toEqual({ id: "owner-1", full_name: "Maddie Developer" });
+  });
+
+  test("adds late contact context without clearing the form draft", () => {
+    const draft = {
+      regarding: "Custom boardroom booking",
+      details: "Bring the signed documents.",
+      Participants: [],
+    };
+    const contact = { id: "contact-1", Full_Name: "Frederic Renck" };
+
+    expect(addMissingParticipant(draft, contact)).toEqual({
+      ...draft,
+      Participants: [contact],
+    });
   });
 
   test("keeps the five required categories first and removes duplicates", () => {

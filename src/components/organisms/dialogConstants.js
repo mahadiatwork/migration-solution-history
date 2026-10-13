@@ -151,6 +151,18 @@ export const mergeDurationOptions = (configuredOptions = []) => {
 export const serializeDuration = (value) =>
   value === null || value === undefined || value === "" ? null : String(value);
 
+/** Fill late-loading create context without replacing anything already typed. */
+export const addMissingParticipant = (formData = {}, currentContact) => {
+  if (
+    !currentContact ||
+    (Array.isArray(formData?.Participants) && formData.Participants.length > 0)
+  ) {
+    return formData;
+  }
+
+  return { ...formData, Participants: [currentContact] };
+};
+
 export const buildViewOwner = (owner) => {
   if (!owner || typeof owner !== "object") return null;
   const fullName =

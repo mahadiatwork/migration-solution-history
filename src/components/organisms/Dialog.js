@@ -39,6 +39,7 @@ import ApplicationDialog from "./ApplicationTable";
 import Stakeholder from "../atoms/Stakeholder";
 import { Close } from "@mui/icons-material";
 import {
+  addMissingParticipant,
   buildJunctionSyncFields,
   buildJunctionUpdateData,
   buildViewOwner,
@@ -121,6 +122,12 @@ export function Dialog({
   const [loadedAttachmentFromRecord, setLoadedAttachmentFromRecord] =
     React.useState();
   const [formData, setFormData] = React.useState(selectedRowData || {}); // Form data state
+  const dialogRecordKey = selectedRowData
+    ? selectedRowData?.historyDetails?.id ||
+      selectedRowData?.history_id ||
+      selectedRowData?.id ||
+      "edit"
+    : "create";
   const visibleTypeOptions = getContactHistoryTypeOptions(
     typeOptions,
     selectedRowData?.type || formData.type,
@@ -176,7 +183,9 @@ export function Dialog({
 
   // console.log({ selectedRowData })
 
-  // Reinitialize dialog state when `openDialog` or `obj` changes
+  // Initialize once for each dialog opening/record. User and contact data can
+  // finish loading while the dialog is open; those prop changes must not wipe
+  // details or a custom Regarding value the user has already entered.
   React.useEffect(() => {
     if (openDialog) {
       setIsSubmitting(false);
@@ -241,8 +250,21 @@ export function Dialog({
       // Reset formData to avoid stale data
       setFormData({});
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- ownerList, setSelectedContacts intentionally omitted
-  }, [openDialog, selectedRowData, loggedInUser, currentContact]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- initialize only when the dialog opens or switches records
+  }, [openDialog, dialogRecordKey]);
+
+  // Late-loading context may fill missing create defaults, but never replaces
+  // form values that the user has already edited.
+  React.useEffect(() => {
+    if (!openDialog || selectedRowData || !currentContact) return;
+
+    setFormData((prev) => addMissingParticipant(prev, currentContact));
+  }, [openDialog, selectedRowData, currentContact]);
+
+  React.useEffect(() => {
+    if (!openDialog || selectedOwner || !loggedInUser) return;
+    setSelectedOwner(loggedInUser);
+  }, [openDialog, selectedOwner, loggedInUser]);
 
   React.useEffect(() => {
     const fetchHistoryData = async () => {

@@ -361,7 +361,7 @@ const App = () => {
   // COQL v8 Fetch Helpers (2000 records per page, paginated for full history)
   // ============================================================================
   // Visible in UI so we can confirm the paginated build is what CRM is serving
-  const HISTORY_FETCH_BUILD = "contact-matter-fix-v6";
+  const HISTORY_FETCH_BUILD = "contact-history-draft-fix-v7";
   const COQL_HISTORY_ORDER = "order by Contact_History_Info.Date desc, id desc";
   const COQL_PAGE_SIZE = HIGH_VOLUME_HISTORY_THRESHOLD; // Zoho COQL v8 hard cap per request
   const COQL_MAX_RECORDS = 100000; // Zoho COQL pagination ceiling

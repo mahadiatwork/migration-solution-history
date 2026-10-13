@@ -96,6 +96,7 @@ const RegardingField = ({ formData, handleInputChange, selectedRowData, picklist
         <TextField
           label="Enter your custom regarding"
           fullWidth
+          required
           variant="standard"
           size="small"
           value={manualInput}
