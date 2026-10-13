@@ -89,7 +89,7 @@ const createApplicationHistory = async (zoho, payload) =>
     method: "POST",
     param_type: 2,
     headers: { "Content-Type": "application/json" },
-    parameters: { data: [payload], trigger: ["workflow"] },
+    parameters: JSON.stringify({ data: [payload], trigger: ["workflow"] }),
   });
 
 const deleteConnectionRecord = async (zoho, entity, recordId, label) =>

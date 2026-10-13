@@ -69,7 +69,10 @@ const makeZoho = () => {
   const deleteRecord = jest.fn(async ({ RecordID }) => success(RecordID));
   const invoke = jest.fn(async (_connection, request) => {
     if (request.method === "POST" && request.url.endsWith("/Applications_History")) {
-      targetPayload = request.parameters.data[0];
+      const body = typeof request.parameters === "string"
+        ? JSON.parse(request.parameters)
+        : request.parameters;
+      targetPayload = body.data[0];
       return connectionResponse(success("application-history-1"));
     }
     if (request.method === "GET" && request.url.includes("/Applications_History/")) {
@@ -122,7 +125,7 @@ describe("Contact History to Application History move", () => {
     );
     const targetCreate = zoho.CRM.CONNECTION.invoke.mock.calls[createIndex][1];
     expect(targetCreate.headers).toEqual({ "Content-Type": "application/json" });
-    expect(targetCreate.parameters.data[0]).toEqual(expect.objectContaining({
+    expect(JSON.parse(targetCreate.parameters).data[0]).toEqual(expect.objectContaining({
       Application: { id: "matter-2" },
       History_Details: "Details",
       Duration_Min: "30",
@@ -159,7 +162,8 @@ describe("Contact History to Application History move", () => {
       ([, request]) => request.method === "POST" &&
         request.url.endsWith("/Applications_History")
     )[1];
-    expect(createRequest.parameters.data[0].History_Details).toBe(sharePointUrl);
+    expect(typeof createRequest.parameters).toBe("string");
+    expect(JSON.parse(createRequest.parameters).data[0].History_Details).toBe(sharePointUrl);
     expect(createRequest.headers["Content-Type"]).toBe("application/json");
   });
 
