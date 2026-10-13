@@ -69,9 +69,8 @@ const makeZoho = () => {
   const deleteRecord = jest.fn(async ({ RecordID }) => success(RecordID));
   const invoke = jest.fn(async (_connection, request) => {
     if (request.method === "POST" && request.url.endsWith("/Applications_History")) {
-      const body = typeof request.parameters === "string"
-        ? JSON.parse(request.parameters)
-        : request.parameters;
+      // The embedded SDK serializes parameters before sending them.
+      const body = JSON.parse(JSON.stringify(request.parameters));
       targetPayload = body.data[0];
       return connectionResponse(success("application-history-1"));
     }
@@ -124,8 +123,9 @@ describe("Contact History to Application History move", () => {
       ([, request]) => request.method === "POST" && request.url.endsWith("/Applications_History")
     );
     const targetCreate = zoho.CRM.CONNECTION.invoke.mock.calls[createIndex][1];
+    expect(typeof targetCreate.parameters).toBe("object");
     expect(targetCreate.headers).toEqual({ "Content-Type": "application/json" });
-    expect(JSON.parse(targetCreate.parameters).data[0]).toEqual(expect.objectContaining({
+    expect(targetCreate.parameters.data[0]).toEqual(expect.objectContaining({
       Application: { id: "matter-2" },
       History_Details: "Details",
       Duration_Min: "30",
@@ -162,8 +162,11 @@ describe("Contact History to Application History move", () => {
       ([, request]) => request.method === "POST" &&
         request.url.endsWith("/Applications_History")
     )[1];
-    expect(typeof createRequest.parameters).toBe("string");
-    expect(JSON.parse(createRequest.parameters).data[0].History_Details).toBe(sharePointUrl);
+    expect(typeof createRequest.parameters).toBe("object");
+    // Zoho Embedded App SDK 1.2 calls JSON.stringify(parameters) internally.
+    const sdkRequestBody = JSON.parse(JSON.stringify(createRequest.parameters));
+    expect(sdkRequestBody.data[0].History_Details).toBe(sharePointUrl);
+    expect(JSON.stringify(sdkRequestBody)).toContain("Shared%20Documents");
     expect(createRequest.headers["Content-Type"]).toBe("application/json");
   });
 
