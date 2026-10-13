@@ -295,6 +295,27 @@ const verifyDestination = async (
     "Billing_Type",
   ]) {
     if (!sameFieldValue(field, payload[field], target[field])) {
+      if (field === "History_Details") {
+        const expected = normalizeZohoText(payload[field]);
+        const actual = normalizeZohoText(target[field]);
+        let difference = 0;
+        while (
+          difference < Math.min(expected.length, actual.length) &&
+          expected[difference] === actual[difference]
+        ) difference += 1;
+        console.error("CONTACT_HISTORY_MOVE_READBACK", JSON.stringify({
+          targetId,
+          expectedLength: String(payload[field] ?? "").length,
+          actualLength: String(target[field] ?? "").length,
+          normalizedExpectedLength: expected.length,
+          normalizedActualLength: actual.length,
+          difference,
+          expectedCodes: [...expected.slice(Math.max(0, difference - 16), difference + 32)]
+            .map((character) => character.codePointAt(0)),
+          actualCodes: [...actual.slice(Math.max(0, difference - 16), difference + 32)]
+            .map((character) => character.codePointAt(0)),
+        }));
+      }
       throw new Error(`Destination ${field} could not be verified.`);
     }
   }
