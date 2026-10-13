@@ -1317,7 +1317,7 @@ export function Dialog({
                   padding: "4px 8px",
                 }}
               >
-                Move to Application
+                Move to Matter
               </Button>
               {/*               
               <Button
@@ -1331,7 +1331,7 @@ export function Dialog({
                   padding: "4px 8px",
                 }}
               >
-                Move to Application
+                Move to Matter
               </Button> */}
             </div>
           ) : (

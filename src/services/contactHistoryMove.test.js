@@ -200,6 +200,29 @@ describe("Contact History to Application History move", () => {
     });
   });
 
+  test("accepts Zoho newline normalization in destination history details", async () => {
+    const zoho = makeZoho();
+    const originalGetRecord = zoho.CRM.API.getRecord.getMockImplementation();
+    zoho.CRM.API.getRecord.mockImplementation(async (request) => {
+      const response = await originalGetRecord(request);
+      if (request.Entity === "History1") {
+        response.data[0].History_Details_Plain = "First line\r\nSecond line";
+      }
+      if (request.Entity === "Applications_History") {
+        response.data[0].History_Details = "First line\nSecond line";
+      }
+      return response;
+    });
+
+    await expect(move(zoho)).resolves.toMatchObject({
+      targetHistoryId: "application-history-1",
+    });
+    expect(zoho.CRM.API.deleteRecord).toHaveBeenCalledWith({
+      Entity: "History1",
+      RecordID: "history-1",
+    });
+  });
+
   test("a source deletion error restores the source and removes the target", async () => {
     const zoho = makeZoho();
     zoho.CRM.API.deleteRecord.mockImplementation(async ({ Entity, RecordID }) =>

@@ -97,6 +97,9 @@ const normalizeProgress = (value) => {
   return String(first).trim();
 };
 
+const normalizeZohoText = (value) =>
+  String(value ?? "").replace(/\r\n?/g, "\n");
+
 export const serializeApplicationProgress = (value, fieldType) => {
   const selected = normalizeProgress(value);
   if (!selected) return null;
@@ -245,6 +248,9 @@ export const buildApplicationMoveData = (source, matter, progressFieldType) => {
 const sameFieldValue = (field, expected, actual) => {
   if (expected == null || expected === "") {
     return actual == null || actual === "";
+  }
+  if (field === "History_Details") {
+    return normalizeZohoText(expected) === normalizeZohoText(actual);
   }
   if (field === "Date") {
     const expectedTime = Date.parse(expected);
