@@ -8,6 +8,7 @@ import {
   durationOptions,
   getContactHistoryDefaults,
   getContactHistoryTypeOptions,
+  getInitialDuration,
   mandatoryActivityTypes,
   mandatoryCategoryOptions,
   mergeCategoryOptions,
@@ -252,5 +253,11 @@ describe("matter history required options", () => {
     expect(serializeDuration(0)).toBe("0");
     expect(serializeDuration("0")).toBe("0");
     expect(serializeDuration(null)).toBeNull();
+  });
+
+  test("uses the default duration only when creating a history record", () => {
+    expect(getInitialDuration(null, 60)).toBe(60);
+    expect(getInitialDuration({ duration: "10" }, 60)).toBe("10");
+    expect(getInitialDuration({ duration: null }, 60)).toBeNull();
   });
 });

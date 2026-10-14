@@ -50,6 +50,9 @@ export const mandatoryCategoryOptions = Object.keys(mandatoryActivityTypes);
 // Required Duration values: 0, 5, 10, ... 240.
 export const durationOptions = Array.from({ length: 49 }, (_, i) => i * 5);
 
+export const getInitialDuration = (selectedRowData, defaultDuration) =>
+  selectedRowData ? selectedRowData.duration ?? null : defaultDuration;
+
 const legacyTypeOptions = [
   "Meeting",
   "To-Do",

@@ -46,6 +46,7 @@ import {
   durationOptions as fallbackDurationOptions,
   getContactHistoryDefaults,
   getContactHistoryTypeOptions,
+  getInitialDuration,
   requireSuccessfulRecordResponse,
   serializeDuration,
   typeOptions as fallbackTypeOptions,
@@ -207,7 +208,7 @@ export function Dialog({
           Participants: selectedRowData?.Participants || [],
           result: selectedRowData?.result ?? defaultResult,
           type: selectedRowData?.type ?? defaultType,
-          duration: selectedRowData?.duration ?? defaultDuration,
+          duration: getInitialDuration(selectedRowData, defaultDuration),
           regarding: selectedRowData?.regarding ?? defaultRegarding,
           details: selectedRowData?.details || "",
           stakeHolder: (selectedRowData?.stakeHolder && typeof selectedRowData.stakeHolder === "object" && selectedRowData.stakeHolder?.id != null)
